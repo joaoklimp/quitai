@@ -7594,13 +7594,14 @@ function viewAdmin() {
   <section class="card">
     <div class="card-head"><div><h3>Suporte</h3><p class="card-sub">${open ? plural(open, 'mensagem em aberto', 'mensagens em aberto') : 'Nenhuma mensagem em aberto'} · as respostas são pelo seu e-mail</p></div></div>
     <div class="card-body flush">${(st.tickets || []).length ? html`<div class="table-wrap"><table class="table responsive">
-      <thead><tr><th>Quando</th><th>Quem</th><th>Assunto</th><th>Mensagem</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Última atividade</th><th>Quem</th><th>Assunto</th><th>Mensagem</th><th>Situação</th><th class="actions"><span class="sr-only">Responder</span></th></tr></thead>
       <tbody>${st.tickets.map((t) => html`<tr>
-        <td data-label="Quando" class="nowrap">${timeAgo(Date.parse(t.created_at))}</td>
+        <td data-label="Última atividade" class="nowrap">${timeAgo(Date.parse(t.last_at || t.created_at))}${t.replies ? html`<div class="cell-sub">${plural(t.replies + 1, 'mensagem', 'mensagens')}</div>` : ''}</td>
         <td data-label="Quem"><div class="cell-main ellipsis">${t.name}</div><div class="cell-sub ellipsis"><a href="mailto:${t.email}?subject=${encodeURIComponent('Re: ' + (SUPPORT_TOPICS[t.topic] || 'Suporte Quitaí'))}">${t.email}</a>${t.company_name ? ` · ${t.company_name}` : ''}</div></td>
         <td data-label="Assunto">${SUPPORT_TOPICS[t.topic] || t.topic}</td>
         <td data-label="Mensagem" style="max-width:420px;white-space:pre-wrap">${clipText(t.message, 400)}</td>
         <td data-label="Situação"><select class="input" style="min-width:130px" data-change="ticketStatus" data-id="${t.id}" aria-label="Situação da mensagem">${[['aberto', 'Em aberto'], ['respondido', 'Respondida'], ['fechado', 'Resolvida']].map(([k, l]) => html`<option value="${k}"${raw(t.status === k ? ' selected' : '')}>${l}</option>`)}</select></td>
+        <td class="actions"><button type="button" class="btn btn-sm ${t.status === 'aberto' ? 'btn-primary' : ''}" data-act="ticketOpen" data-id="${t.id}">${icon('chat')}Responder</button></td>
       </tr>`)}</tbody></table></div>` : emptyMini('chat', 'Nenhuma mensagem ainda', 'As mensagens do formulário “Fale com o suporte” aparecem aqui.')}</div>
   </section>`;
 }
@@ -7610,6 +7611,59 @@ IN.adminSearch = (el) => {
   ui.admin.q = el.value;
   clearTimeout(ui.adminT);
   ui.adminT = setTimeout(() => { refreshPage(true); const i = $('[data-input="adminSearch"]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250);
+};
+const SUPPORT_ERRORS = {
+  ai_not_configured: 'A IA ainda não está configurada (falta a chave ANTHROPIC_API_KEY no Supabase).',
+  ai_busy: 'A IA está ocupada agora. Tente de novo em alguns segundos.',
+  ai_refused: 'A IA não quis sugerir uma resposta para esta mensagem. Escreva a resposta manualmente.',
+  ai_error: 'A IA não respondeu agora. Tente de novo ou escreva a resposta manualmente.',
+  send_failed: 'O e-mail não foi enviado. Confira a chave do Resend e tente de novo.',
+};
+A.ticketOpen = async (el) => {
+  const t = (ui.admin.tickets || []).find((x) => x.id === el.dataset.id);
+  if (!t) return;
+  ui.ticket = { id: t.id, thread: null };
+  const render = () => {
+    const th = ui.ticket && ui.ticket.thread;
+    return html`<div class="stack">
+      <div class="muted" style="font-size:13px">${t.name} · <a href="mailto:${t.email}">${t.email}</a>${t.company_name ? ` · ${t.company_name}` : ''} · ${SUPPORT_TOPICS[t.topic] || t.topic} · protocolo #${t.id.slice(0, 8)}</div>
+      <div id="tk-thread" class="stack" style="max-height:320px;overflow:auto;gap:10px">${th ? th.map((m) => html`<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--line);${m.direction === 'out' ? 'background:var(--accent-soft);margin-left:32px' : 'background:var(--surface-2);margin-right:32px'}"><div class="muted" style="font-size:12px;margin-bottom:4px">${m.direction === 'out' ? 'Quitaí' : t.name.split(' ')[0]} · ${fmtDateTime(Date.parse(m.created_at))}</div><div style="white-space:pre-wrap">${m.body}</div></div>`) : html`<p class="muted">Carregando a conversa…</p>`}</div>
+      <form id="f-ticket" class="stack" data-form="ticketReply" data-id="${t.id}" novalidate>
+        <div class="field"><div class="between"><label for="tk-text">Sua resposta</label><button type="button" class="btn btn-sm" data-act="ticketSuggest" data-id="${t.id}">${icon('star')}Sugerir resposta com IA</button></div>
+        <textarea id="tk-text" name="text" class="textarea" rows="9" maxlength="8000" placeholder="Escreva a resposta ou peça uma sugestão à IA."></textarea></div>
+        <p class="hint">O e-mail sai como suporte@usequitai.com.br. Se o cliente responder, a mensagem aparece nesta conversa.</p>
+      </form>
+    </div>`;
+  };
+  openModal({ title: 'Atendimento', size: 'lg', body: render(), foot: html`<button type="button" class="btn" data-act="modalCancel">Fechar</button><button type="submit" form="f-ticket" class="btn btn-primary">${icon('send')}Enviar resposta</button>` });
+  const res = await callFn('support-admin', { action: 'thread', ticket_id: t.id });
+  if (!ui.ticket || ui.ticket.id !== t.id) return;
+  ui.ticket.thread = res.thread || [];
+  const box = document.getElementById('tk-thread');
+  if (box) { const tmp = document.createElement('div'); tmp.innerHTML = render().s; box.replaceWith(tmp.querySelector('#tk-thread')); const nb = document.getElementById('tk-thread'); if (nb) nb.scrollTop = nb.scrollHeight; }
+};
+A.ticketSuggest = async (el) => {
+  const ta = document.getElementById('tk-text');
+  if (ta && ta.value.trim().length > 20 && !(await confirmBox({ title: 'Trocar o texto pela sugestão?', text: 'O que você escreveu será substituído pelo rascunho da IA.', ok: 'Trocar' }))) return;
+  setBusy(el, true, 'Escrevendo…');
+  const res = await callFn('support-admin', { action: 'suggest', ticket_id: el.dataset.id });
+  if (el.isConnected) setBusy(el, false);
+  if (res.error || !res.draft) { toast(SUPPORT_ERRORS[res.error] || fnError(res.error), { type: 'bad', timeout: 9000 }); return; }
+  const t2 = document.getElementById('tk-text');
+  if (t2) { t2.value = res.draft; t2.focus(); t2.setSelectionRange(0, 0); t2.scrollTop = 0; }
+  toast('Rascunho pronto. Revise antes de enviar.', { type: 'info' });
+};
+F.ticketReply = async (f) => {
+  const text = (f.elements.text.value || '').trim();
+  if (!showErrors(f, text.length < 5 ? { text: 'Escreva a resposta antes de enviar.' } : {})) return;
+  const btn = $('[form="f-ticket"]');
+  setBusy(btn, true, 'Enviando…');
+  const res = await callFn('support-admin', { action: 'reply', ticket_id: f.dataset.id, text });
+  setBusy(btn, false);
+  if (res.error) { formError(f, SUPPORT_ERRORS[res.error] || fnError(res.error)); return; }
+  closeModal(true);
+  toast('Resposta enviada ao cliente.');
+  adminLoad();
 };
 CH.ticketStatus = async (el) => {
   const { error } = await Cloud.sb.rpc('admin_set_ticket', { p_id: el.dataset.id, p_status: el.value });

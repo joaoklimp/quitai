@@ -1,18 +1,7 @@
-// Formulário "Fale com o suporte": guarda a mensagem e avisa o dono do Quitaí por e-mail.
-// Funciona com ou sem login. Responder o e-mail de aviso responde direto ao cliente.
+// Formulário "Fale com o suporte": guarda a mensagem, confirma o recebimento para o cliente
+// e avisa o dono do Quitaí. Funciona com ou sem login.
 import { admin, caller, cors, json } from '../_shared/common.ts';
-
-const TOPICS: Record<string, string> = {
-  pagamento: 'Pagamento ou assinatura',
-  acesso: 'Login ou senha',
-  duvida: 'Dúvida sobre o uso',
-  problema: 'Algo não funciona',
-  outro: 'Outro assunto',
-};
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
+import { brandedHtml, notifyOwner, protocol, sendEmail, ticketSubject, TOPICS } from '../_shared/mail.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
@@ -42,28 +31,24 @@ Deno.serve(async (req) => {
       .insert({ company_id: me?.company_id ?? null, user_id: me?.user_id ?? null, name, email, topic, message })
       .select('id').single();
     if (error) throw error;
+    const proto = protocol(ticket.id);
 
-    const key = Deno.env.get('RESEND_API_KEY');
-    const inbox = Deno.env.get('SUPPORT_INBOX');
-    if (key && inbox) {
-      const rows = [
-        ['Assunto', TOPICS[topic]], ['Nome', name], ['E-mail', email],
-        ['Empresa', companyName || '(sem login)'], ['Plano', plan || '-'], ['Protocolo', ticket.id.slice(0, 8)],
-      ].map(([k, v]) => `<tr><td style="color:#676D82;padding:2px 12px 2px 0">${k}</td><td><strong>${escapeHtml(v)}</strong></td></tr>`).join('');
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: 'Suporte Quitaí <suporte@usequitai.com.br>',
-          to: [inbox],
-          reply_to: email,
-          subject: `[Suporte Quitaí] ${TOPICS[topic]} · ${name}`,
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px"><table>${rows}</table><hr><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p style="color:#676D82;font-size:13px">Responda este e-mail para falar direto com o cliente.</p></div>`,
-        }),
-      });
-      if (!res.ok) console.error('envio do aviso de suporte falhou', res.status, await res.text());
-    }
-    return json(req, { ok: true, protocol: ticket.id.slice(0, 8) });
+    // confirmação para o cliente; responder este e-mail continua a mesma conversa
+    const first = name.split(' ')[0];
+    await sendEmail({
+      to: [email],
+      subject: ticketSubject(ticket.id, topic),
+      html: brandedHtml(
+        `Olá, ${first}!\n\nRecebemos sua mensagem e já estamos olhando. Respondemos por aqui, normalmente no mesmo dia útil.\n\nSeu protocolo é #${proto}.\n\nSua mensagem:\n"${message}"`,
+        'Para acrescentar algo, é só responder este e-mail.',
+      ),
+    });
+    await notifyOwner(
+      `[Suporte Quitaí] ${TOPICS[topic]} · ${name}`,
+      [['Assunto', TOPICS[topic]], ['Nome', name], ['E-mail', email], ['Empresa', companyName || '(sem login)'], ['Plano', plan || '-'], ['Protocolo', `#${proto}`]],
+      message,
+    );
+    return json(req, { ok: true, protocol: proto });
   } catch (e) {
     console.error(e);
     return json(req, { error: 'server_error' }, 500);
