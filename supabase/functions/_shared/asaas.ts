@@ -85,10 +85,7 @@ export async function syncCompany(companyId: string): Promise<void> {
   const coverEnd = lastPaid ? addPeriod(lastPaid.dueDate, sub.cycle) : null;
   const overdue = payments.filter((p) => p.status === 'OVERDUE').sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))[0];
 
-  const patch: Record<string, unknown> = {
-    billing_provider: 'asaas',
-    updated_at: new Date().toISOString(),
-    invoices: payments.slice(0, 36).map((p) => ({
+  const current = payments.slice(0, 36).map((p) => ({
       id: p.id,
       date: p.paymentDate ?? p.confirmedDate ?? p.dueDate,
       desc: `Plano ${mapped ? PRICES[mapped.plan].name : ''} · ${mapped?.cycle ?? ''}`.replace(/\s+·\s*$/, ''),
@@ -96,9 +93,14 @@ export async function syncCompany(companyId: string): Promise<void> {
       status: invoiceStatus(p.status),
       method: method(p.billingType),
       url: p.invoiceUrl ?? null,
-    })),
-  };
-  if (mapped) { patch.plan = mapped.plan; patch.billing_cycle = mapped.cycle; }
+  }));
+  // mantém no histórico as faturas de assinaturas anteriores (troca de plano ou de forma de pagamento)
+  const ids = new Set(current.map((i) => i.id));
+  const older = (Array.isArray(company.invoices) ? company.invoices : []).filter((i: { id: string }) => !ids.has(i.id));
+  const invoices = [...current, ...older].sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)).slice(0, 60);
+  const patch: Record<string, unknown> = { billing_provider: 'asaas', updated_at: new Date().toISOString(), invoices };
+  // o plano novo só vale quando a assinatura nova tem pagamento; até lá continua o plano já pago
+  if (mapped && (lastPaid || !['active', 'past_due'].includes(company.billing_status))) { patch.plan = mapped.plan; patch.billing_cycle = mapped.cycle; }
   if (lastPaid) patch.billing_method = method(lastPaid.billingType);
 
   const ended = sub.deleted || sub.status === 'INACTIVE' || sub.status === 'EXPIRED';
@@ -120,6 +122,32 @@ export async function syncCompany(companyId: string): Promise<void> {
   }
   const { error } = await admin.from('companies').update(patch).eq('id', company.id);
   if (error) throw new Error(`não consegui salvar a assinatura: ${error.message}`);
+}
+
+/** Liga à empresa uma assinatura nova (vinda do Checkout de cartão) e encerra a anterior, se houver. */
+export async function adoptSubscription(companyId: string, sub: { id: string; customer: string; billingType?: string }) {
+  const { data: company } = await admin.from('companies').select('asaas_subscription_id').eq('id', companyId).single();
+  const old = company?.asaas_subscription_id;
+  const { error } = await admin.from('companies').update({
+    asaas_customer_id: sub.customer, asaas_subscription_id: sub.id, billing_provider: 'asaas',
+    billing_method: sub.billingType === 'CREDIT_CARD' ? 'cartao' : 'pix',
+  }).eq('id', companyId);
+  if (error) throw new Error(`não consegui ligar a assinatura: ${error.message}`);
+  // troca de plano ou de forma de pagamento: a anterior é encerrada (o novo plano começa no fim do período pago)
+  if (old && old !== sub.id) {
+    try { await asaas(`/subscriptions/${old}`, { method: 'DELETE' }); } catch (e) { console.error('remover assinatura anterior', e); }
+  }
+}
+
+/** Procura a assinatura criada pelo último Checkout da empresa (campo checkoutSession) e liga à empresa. */
+export async function adoptFromCheckout(companyId: string): Promise<boolean> {
+  const { data: company } = await admin.from('companies').select('asaas_checkout_id,asaas_subscription_id').eq('id', companyId).single();
+  if (!company?.asaas_checkout_id) return false;
+  const list = await asaas<{ data: { id: string; customer: string; billingType: string; status: string; checkoutSession?: string | null }[] }>('/subscriptions?limit=50');
+  const sub = (list.data ?? []).find((s) => s.checkoutSession === company.asaas_checkout_id && s.status === 'ACTIVE');
+  if (!sub || sub.id === company.asaas_subscription_id) return false;
+  await adoptSubscription(companyId, sub);
+  return true;
 }
 
 /** Reembolso ou contestação: encerra a assinatura e bloqueia o painel na hora. */

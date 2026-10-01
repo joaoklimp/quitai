@@ -1,7 +1,7 @@
 // Assinatura do Quitaí pelo Asaas: assinar (cartão ou Pix/boleto), cancelar e conferir pagamento.
 // Empresas antigas da Stripe (se houver) ainda podem abrir o portal da Stripe.
 import { admin, caller, cors, CYCLES, json, PLAN_IDS, SITE_URL, stripe } from '../_shared/common.ts';
-import { asaas, AsaasError, CHECKOUT_BASE, PRICES, syncCompany, todaySP } from '../_shared/asaas.ts';
+import { adoptFromCheckout, asaas, AsaasError, CHECKOUT_BASE, PRICES, syncCompany, todaySP } from '../_shared/asaas.ts';
 import { LOGO_PNG_BASE64 } from '../_shared/logo.ts';
 
 function onlyDigits(s: unknown): string { return String(s ?? '').replace(/\D/g, ''); }
@@ -44,7 +44,10 @@ Deno.serve(async (req) => {
 
     // "Já paguei e meu plano não liberou": confere direto no Asaas
     if (body.action === 'sync') {
-      if (!company.asaas_subscription_id) return json(req, { ok: true, found: false });
+      // assinatura de cartão que ainda não foi ligada (o aviso do Asaas pode ter se perdido)
+      try { await adoptFromCheckout(company.id); } catch (e) { console.error('ligar assinatura do checkout', e); }
+      const { data: fresh } = await admin.from('companies').select('asaas_subscription_id').eq('id', company.id).single();
+      if (!fresh?.asaas_subscription_id) return json(req, { ok: true, found: false });
       await syncCompany(company.id);
       const { data: c2 } = await admin.from('companies').select('billing_status').eq('id', company.id).single();
       return json(req, { ok: true, found: true, status: c2?.billing_status });
