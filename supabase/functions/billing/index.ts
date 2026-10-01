@@ -140,10 +140,10 @@ Deno.serve(async (req) => {
       // Pix ou boleto: o Quitaí cria o cliente e a assinatura; cada cobrança tem QR Code Pix e boleto
       let customer = company.asaas_customer_id as string | null;
       if (!customer) {
-        const c = await asaas<{ id: string }>('/customers', { method: 'POST', body: { name, cpfCnpj: doc, email: me.email, externalReference: company.id } });
+        const c = await asaas<{ id: string }>('/customers', { method: 'POST', body: { name, cpfCnpj: doc, email: me.email, externalReference: company.id, notificationDisabled: true } });
         customer = c.id;
       } else {
-        await asaas(`/customers/${customer}`, { method: 'POST', body: { cpfCnpj: doc } }).catch(() => {});
+        await asaas(`/customers/${customer}`, { method: 'PUT', body: { cpfCnpj: doc, notificationDisabled: true } }).catch((e) => console.error('atualizar cliente', e));
       }
       const subBody = { customer, billingType: 'UNDEFINED', value, nextDueDate: firstDue, cycle: asaasCycle, description: desc, externalReference: company.id };
       let sub: { id: string };

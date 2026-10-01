@@ -137,6 +137,8 @@ export async function adoptSubscription(companyId: string, sub: { id: string; cu
     billing_method: sub.billingType === 'CREDIT_CARD' ? 'cartao' : 'pix',
   }).eq('id', companyId);
   if (error) throw new Error(`não consegui ligar a assinatura: ${error.message}`);
+  // os e-mails da cobrança saem pelo Quitaí: desliga as notificações pagas do Asaas para este cliente
+  try { await asaas(`/customers/${sub.customer}`, { method: 'PUT', body: { notificationDisabled: true } }); } catch (e) { console.error('desligar notificações do cliente', e); }
   // troca de plano ou de forma de pagamento: a anterior é encerrada (o novo plano começa no fim do período pago)
   if (old && old !== sub.id) {
     try { await asaas(`/subscriptions/${old}`, { method: 'DELETE' }); } catch (e) { console.error('remover assinatura anterior', e); }

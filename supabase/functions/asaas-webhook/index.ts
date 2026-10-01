@@ -1,9 +1,11 @@
 // Recebe os avisos do Asaas (checkout, assinaturas e cobranças) e mantém o plano da empresa em dia.
 import { admin } from '../_shared/common.ts';
 import { adoptFromCheckout, adoptSubscription, revokeCompany, syncCompany } from '../_shared/asaas.ts';
+import { billingMail } from '../_shared/billing-mail.ts';
 
 type Sub = { id: string; customer: string; status: string; billingType?: string; checkoutSession?: string | null };
-type Ev = { id: string; event: string; checkout?: { id: string; customer?: string | null }; subscription?: Sub; payment?: { id: string; subscription?: string; customer: string; status: string } };
+type Pay = { id: string; subscription?: string; customer: string; status: string; value: number; dueDate: string; billingType: string; invoiceUrl?: string; transactionReceiptUrl?: string | null };
+type Ev = { id: string; event: string; checkout?: { id: string; customer?: string | null }; subscription?: Sub; payment?: Pay };
 
 async function companyBy(field: string, value: string | null | undefined) {
   if (!value) return null;
@@ -47,6 +49,8 @@ Deno.serve(async (req) => {
         } else {
           await syncCompany(c.id);
         }
+        // e-mail da cobrança enviado pelo Quitaí (no lugar das notificações pagas do Asaas)
+        try { await billingMail(ev.event, p, c); } catch (e) { console.error('e-mail da cobrança', e); }
       }
     }
   } catch (e) {
