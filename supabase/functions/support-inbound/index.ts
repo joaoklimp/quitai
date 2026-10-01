@@ -1,7 +1,8 @@
 // Recebe (via webhook do Resend) os e-mails que os clientes mandam para suporte@usequitai.com.br
-// e coloca cada um na conversa certa do painel. Também avisa o dono do Quitaí.
+// e coloca cada um na conversa certa do painel; o assistente do suporte cuida do resto.
 import { admin } from '../_shared/common.ts';
-import { notifyOwner, protocol } from '../_shared/mail.ts';
+import { protocol } from '../_shared/mail.ts';
+import { handleIncoming, inBackground } from '../_shared/autoreply.ts';
 
 function b64ToBytes(b64: string): Uint8Array {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -64,6 +65,11 @@ Deno.serve(async (req) => {
     const subject = String(mail.subject ?? '');
     const text = stripQuoted(String(mail.text ?? '').trim() || String(mail.html ?? '').replace(/<[^>]+>/g, ' ')).slice(0, 8000);
     if (!from || !text) return new Response('empty');
+    // evita loop: e-mails do próprio domínio e respostas automáticas (férias, "fora do escritório") não acionam o assistente
+    if (from.endsWith('@usequitai.com.br')) return new Response('own domain');
+    const hdrs = JSON.stringify(mail.headers ?? {}).toLowerCase();
+    const autoMail = /auto-submitted"?\s*[:,]\s*"?auto-|x-autoreply|x-autorespond|precedence"?\s*[:,]\s*"?(auto_reply|bulk|junk)/.test(hdrs)
+      || /^(resposta autom[aá]tica|auto:|automatic reply|out of office|fora do escrit[oó]rio|ausente)/i.test(subject.trim());
 
     // acha o atendimento pelo protocolo no assunto; se não tiver, o mais recente desse e-mail
     let ticket: { id: string; name: string; email: string; topic: string } | null = null;
@@ -76,6 +82,7 @@ Deno.serve(async (req) => {
       const { data } = await admin.from('support_tickets').select('id,name,email,topic').eq('email', from).order('created_at', { ascending: false }).limit(1).maybeSingle();
       ticket = data ?? null;
     }
+    if (!ticket && autoMail) return new Response('auto reply ignored');
     if (!ticket) {
       // e-mail novo de alguém sem atendimento: vira um atendimento novo (ignora reenvio do mesmo e-mail)
       const since = new Date(Date.now() - 3600_000).toISOString();
@@ -83,13 +90,14 @@ Deno.serve(async (req) => {
       if (dup) return new Response('duplicate');
       const { data, error } = await admin.from('support_tickets').insert({ name: from.split('@')[0], email: from, topic: 'outro', message: text }).select('id,name,email,topic').single();
       if (error) throw error;
-      await notifyOwner(`[Suporte Quitaí] Novo e-mail de ${from}`, [['De', from], ['Assunto', subject], ['Protocolo', `#${protocol(data.id)}`]], text);
+      inBackground(handleIncoming(data.id, true));
       return new Response('created');
     }
 
     await admin.from('support_messages').insert({ ticket_id: ticket.id, direction: 'in', body: text, email_id: emailId });
+    if (autoMail) return new Response('auto reply stored'); // guarda na conversa, mas não responde nem reabre
     await admin.from('support_tickets').update({ status: 'aberto' }).eq('id', ticket.id);
-    await notifyOwner(`[Suporte Quitaí] ${ticket.name} respondeu (#${protocol(ticket.id)})`, [['De', `${ticket.name} <${from}>`], ['Protocolo', `#${protocol(ticket.id)}`]], text);
+    inBackground(handleIncoming(ticket.id, false));
     return new Response('ok');
   } catch (e) {
     console.error(e);

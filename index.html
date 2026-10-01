@@ -7540,10 +7540,10 @@ function adminMRR(r) {
 }
 async function adminLoad() {
   ui.admin = Object.assign({ q: '', filter: 'todas', rows: [], tickets: [] }, ui.admin || {}, { loading: true, error: null });
-  const [a, b] = await Promise.all([Cloud.sb.rpc('admin_companies'), Cloud.sb.rpc('admin_tickets', { p_limit: 50 })]);
+  const [a, b, s] = await Promise.all([Cloud.sb.rpc('admin_companies'), Cloud.sb.rpc('admin_tickets', { p_limit: 50 }), Cloud.sb.rpc('admin_support_settings')]);
   ui.admin.loading = false;
   if (a.error || b.error) ui.admin.error = 'Não conseguimos carregar os dados agora. Tente atualizar.';
-  else { ui.admin.rows = a.data || []; ui.admin.tickets = b.data || []; ui.admin.loadedAt = Date.now(); }
+  else { ui.admin.rows = a.data || []; ui.admin.tickets = b.data || []; ui.admin.autoReply = s.data !== false; ui.admin.loadedAt = Date.now(); }
   if (ui.route.page === 'admin') refreshPage(false);
 }
 function viewAdmin() {
@@ -7556,6 +7556,7 @@ function viewAdmin() {
   const q = norm(st.q || '');
   const list = rows.filter((r) => (st.filter === 'todas' || adminStatus(r).key === st.filter) && (!q || norm(`${r.name} ${r.owner_name} ${r.owner_email}`).includes(q)));
   const open = (st.tickets || []).filter((t) => t.status === 'aberto').length;
+  const needYou = (st.tickets || []).filter((t) => t.status === 'aberto' && t.escalated).length;
   const kpi = (label, value, sub) => html`<div class="card" style="padding:16px 18px"><div class="muted" style="font-size:13px">${label}</div><div style="font:700 26px/1.2 var(--font-display, inherit);margin-top:4px" class="tnum">${value}</div>${sub ? html`<div class="muted" style="font-size:12px;margin-top:2px">${sub}</div>` : ''}</div>`;
   const filters = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativas', 'Ativas'], ['canceladas', 'Canceladas']];
   return html`
@@ -7592,20 +7593,32 @@ function viewAdmin() {
       </tr>`; })}</tbody></table></div>` : emptyMini('building', 'Nenhuma empresa aqui', st.q ? 'Nenhuma empresa combina com a busca.' : 'Quando alguém se cadastrar, aparece nesta lista.')}</div>
   </section>
   <section class="card">
-    <div class="card-head"><div><h3>Suporte</h3><p class="card-sub">${open ? plural(open, 'mensagem em aberto', 'mensagens em aberto') : 'Nenhuma mensagem em aberto'} · as respostas são pelo seu e-mail</p></div></div>
+    <div class="card-head" style="flex-wrap:wrap;gap:10px"><div><h3>Suporte</h3><p class="card-sub">${needYou ? html`<strong style="color:var(--bad)">${plural(needYou, 'atendimento precisa de você', 'atendimentos precisam de você')}</strong>` : 'Nenhum atendimento esperando por você'}${open > needYou ? ` · ${plural(open - needYou, 'outro em aberto', 'outros em aberto')}` : ''}</p></div>
+      <div class="row-wrap" style="gap:8px;align-items:center"><span class="muted" style="font-size:13px">Assistente automático</span><div class="seg" role="group" aria-label="Assistente automático"><button type="button" aria-pressed="${st.autoReply ? 'true' : 'false'}" data-act="setAutoReply" data-on="1">Ligado</button><button type="button" aria-pressed="${st.autoReply ? 'false' : 'true'}" data-act="setAutoReply" data-on="0">Desligado</button></div></div>
+    </div>
+    <div class="callout" style="margin:0 16px 12px">${icon(st.autoReply ? 'zap' : 'info')}<div>${st.autoReply ? 'O assistente responde sozinho as dúvidas comuns e encaminha para você (por e-mail) quando a pessoa pede um atendente, quando envolve reembolso ou reclamação, ou quando ele não tem certeza.' : 'Assistente desligado: o cliente recebe só a confirmação de recebimento e você recebe todas as mensagens por e-mail.'}</div></div>
     <div class="card-body flush">${(st.tickets || []).length ? html`<div class="table-wrap"><table class="table responsive">
       <thead><tr><th>Última atividade</th><th>Quem</th><th>Assunto</th><th>Mensagem</th><th>Situação</th><th class="actions"><span class="sr-only">Responder</span></th></tr></thead>
       <tbody>${st.tickets.map((t) => html`<tr>
         <td data-label="Última atividade" class="nowrap">${timeAgo(Date.parse(t.last_at || t.created_at))}${t.replies ? html`<div class="cell-sub">${plural(t.replies + 1, 'mensagem', 'mensagens')}</div>` : ''}</td>
         <td data-label="Quem"><div class="cell-main ellipsis">${t.name}</div><div class="cell-sub ellipsis"><a href="mailto:${t.email}?subject=${encodeURIComponent('Re: ' + (SUPPORT_TOPICS[t.topic] || 'Suporte Quitaí'))}">${t.email}</a>${t.company_name ? ` · ${t.company_name}` : ''}</div></td>
         <td data-label="Assunto">${SUPPORT_TOPICS[t.topic] || t.topic}</td>
-        <td data-label="Mensagem" style="max-width:420px;white-space:pre-wrap">${clipText(t.message, 400)}</td>
+        <td data-label="Mensagem" style="max-width:420px">${t.status === 'aberto' && t.escalated ? html`<span class="chip st-atrasado" style="margin-bottom:6px">${icon('alert')}Precisa de você</span>` : t.auto_replies && !t.escalated ? html`<span class="chip st-pago" style="margin-bottom:6px">${icon('zap')}Resolvido pelo assistente</span>` : ''}${t.summary ? html`<div style="font-weight:600;margin-bottom:4px">${t.summary}</div>` : ''}<div class="muted" style="white-space:pre-wrap">${clipText(t.message, 300)}</div></td>
         <td data-label="Situação"><select class="input" style="min-width:130px" data-change="ticketStatus" data-id="${t.id}" aria-label="Situação da mensagem">${[['aberto', 'Em aberto'], ['respondido', 'Respondida'], ['fechado', 'Resolvida']].map(([k, l]) => html`<option value="${k}"${raw(t.status === k ? ' selected' : '')}>${l}</option>`)}</select></td>
         <td class="actions"><button type="button" class="btn btn-sm ${t.status === 'aberto' ? 'btn-primary' : ''}" data-act="ticketOpen" data-id="${t.id}">${icon('chat')}Responder</button></td>
       </tr>`)}</tbody></table></div>` : emptyMini('chat', 'Nenhuma mensagem ainda', 'As mensagens do formulário “Fale com o suporte” aparecem aqui.')}</div>
   </section>`;
 }
 A.adminReload = () => adminLoad();
+A.setAutoReply = async (el) => {
+  const on = el.dataset.on === '1';
+  if (on === ui.admin.autoReply) return;
+  const { data, error } = await Cloud.sb.rpc('admin_support_settings', { p_auto_reply: on });
+  if (error) { toast(fnError('network'), { type: 'bad' }); return; }
+  ui.admin.autoReply = data !== false;
+  refreshPage(false);
+  toast(ui.admin.autoReply ? 'Assistente automático ligado.' : 'Assistente automático desligado. Todas as mensagens vão para você.');
+};
 A.adminFilter = (el) => { ui.admin.filter = el.dataset.k; refreshPage(false); };
 IN.adminSearch = (el) => {
   ui.admin.q = el.value;
@@ -7627,7 +7640,7 @@ A.ticketOpen = async (el) => {
     const th = ui.ticket && ui.ticket.thread;
     return html`<div class="stack">
       <div class="muted" style="font-size:13px">${t.name} · <a href="mailto:${t.email}">${t.email}</a>${t.company_name ? ` · ${t.company_name}` : ''} · ${SUPPORT_TOPICS[t.topic] || t.topic} · protocolo #${t.id.slice(0, 8)}</div>
-      <div id="tk-thread" class="stack" style="max-height:320px;overflow:auto;gap:10px">${th ? th.map((m) => html`<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--line);${m.direction === 'out' ? 'background:var(--accent-soft);margin-left:32px' : 'background:var(--surface-2);margin-right:32px'}"><div class="muted" style="font-size:12px;margin-bottom:4px">${m.direction === 'out' ? 'Quitaí' : t.name.split(' ')[0]} · ${fmtDateTime(Date.parse(m.created_at))}</div><div style="white-space:pre-wrap">${m.body}</div></div>`) : html`<p class="muted">Carregando a conversa…</p>`}</div>
+      <div id="tk-thread" class="stack" style="max-height:320px;overflow:auto;gap:10px">${th ? th.map((m) => html`<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--line);${m.direction === 'out' ? 'background:var(--accent-soft);margin-left:32px' : 'background:var(--surface-2);margin-right:32px'}"><div class="muted" style="font-size:12px;margin-bottom:4px">${m.direction === 'out' ? (m.auto ? 'Assistente automático' : 'Você') : t.name.split(' ')[0]} · ${fmtDateTime(Date.parse(m.created_at))}</div><div style="white-space:pre-wrap">${m.body}</div></div>`) : html`<p class="muted">Carregando a conversa…</p>`}</div>
       <form id="f-ticket" class="stack" data-form="ticketReply" data-id="${t.id}" novalidate>
         <div class="field"><div class="between"><label for="tk-text">Sua resposta</label><button type="button" class="btn btn-sm" data-act="ticketSuggest" data-id="${t.id}">${icon('star')}Sugerir resposta com IA</button></div>
         <textarea id="tk-text" name="text" class="textarea" rows="9" maxlength="8000" placeholder="Escreva a resposta ou peça uma sugestão à IA."></textarea></div>
