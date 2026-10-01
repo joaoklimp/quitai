@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
       return json(req, { url: s.url });
     }
 
+    if (body.action === 'checkout' && company.complimentary) return json(req, { error: 'complimentary' }, 409);
     if (body.action === 'checkout') {
       // no site oficial, só aceita pagamento com a chave real (impede assinar com cartão de teste)
       const liveKey = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').startsWith('sk_live_');

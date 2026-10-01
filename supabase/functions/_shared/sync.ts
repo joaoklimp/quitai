@@ -21,7 +21,7 @@ export async function companyFor(customer: string | null, meta: Record<string, s
 export async function syncSubscription(sub: Stripe.Subscription) {
   const customer = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
   const company = await companyFor(customer, sub.metadata);
-  if (!company) return;
+  if (!company || company.complimentary) return; // conta cortesia não depende da Stripe
   // uma assinatura antiga encerrando não mexe numa assinatura nova
   if (company.stripe_subscription_id && company.stripe_subscription_id !== sub.id && ['canceled', 'incomplete_expired'].includes(sub.status)) return;
   if (sub.status === 'incomplete') return;
