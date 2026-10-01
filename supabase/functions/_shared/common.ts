@@ -25,7 +25,8 @@ export const admin: SupabaseClient = createClient(Deno.env.get('SUPABASE_URL')!,
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-export const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', { httpClient: Stripe.createFetchHttpClient() });
+// sem a chave cadastrada, a função continua de pé e só as chamadas à Stripe falham
+export const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || 'sk_test_missing', { httpClient: Stripe.createFetchHttpClient() });
 
 export type Member = { user_id: string; company_id: string; email: string; name: string; role: string; active: boolean };
 
