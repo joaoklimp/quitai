@@ -2012,14 +2012,17 @@ async function cloudLoad() {
   DB = migrate(db);
   clearTimeout(Cloud.t);
   Object.assign(Cloud, { on: true, userId: user.id, companyId: c.id, version: row.version, updatedAt: row.updated_at, pending: false, retry: 0, t: null });
+  if (Cloud.isAdmin) setTimeout(supportPoll, 1500);
   setSyncState('cloud');
   return { ok: true, user: DB.users[m.email] };
 }
 /* volta para o modo deste navegador (demonstração) */
 function leaveCloud() {
   clearTimeout(Cloud.t);
-  Object.assign(Cloud, { on: false, userId: null, companyId: null, version: 0, pending: false, t: null, isAdmin: false });
+  Object.assign(Cloud, { on: false, userId: null, companyId: null, version: 0, pending: false, t: null, isAdmin: false, supportSeen: false, needYou: 0 });
   ui.admin = null;
+  ui.ticket = null;
+  document.title = BASE_TITLE;
   DB = migrate(loadLocal() || emptyDB());
   if (!localSessionOk()) DB.session = { email: null, realEmail: null };
   setSyncState(Sync.localOk ? 'local' : 'memory');
@@ -5307,7 +5310,7 @@ function viewSidebar() {
     if (p.perm && !canSeePage(id)) return '';
     const locked = p.feature && !planHas(p.feature);
     const cur = ui.route.page === id || (id === 'clientes' && ui.route.page === 'cliente');
-    return html`<button type="button" data-act="nav" data-page="${id}"${cur ? raw(' aria-current="page"') : ''}>${icon(p.icon)}<span>${p.title}</span><span class="nav-end">${id === 'cobrancas' && overdueN ? html`<span class="nav-count" title="${plural(overdueN, 'cobrança em atraso', 'cobranças em atraso')}">${overdueN}</span>` : ''}${locked ? html`<span title="Disponível no plano ${PLANS[FEATURE_PLAN[p.feature]].name}">${icon('lock', 'i-lock')}</span>` : ''}</span></button>`;
+    return html`<button type="button" data-act="nav" data-page="${id}"${cur ? raw(' aria-current="page"') : ''}>${icon(p.icon)}<span>${p.title}</span><span class="nav-end">${id === 'admin' && Cloud.needYou ? html`<span class="nav-count" title="${plural(Cloud.needYou, 'atendimento precisa de você', 'atendimentos precisam de você')}">${Cloud.needYou}</span>` : ''}${id === 'cobrancas' && overdueN ? html`<span class="nav-count" title="${plural(overdueN, 'cobrança em atraso', 'cobranças em atraso')}">${overdueN}</span>` : ''}${locked ? html`<span title="Disponível no plano ${PLANS[FEATURE_PLAN[p.feature]].name}">${icon('lock', 'i-lock')}</span>` : ''}</span></button>`;
   };
   const bs = billingState(c);
   const planLabel = c.billing.complimentary ? `Plano ${planOf(c).name} · cortesia` : bs.kind === 'trial' ?`Plano ${planOf(c).name} · teste` : bs.kind === 'trial-ended' ? 'Teste encerrado' : bs.kind.startsWith('canceled') ? `Plano ${planOf(c).name} · cancelado` : `Plano ${planOf(c).name}`;
@@ -7543,7 +7546,7 @@ async function adminLoad() {
   const [a, b, s] = await Promise.all([Cloud.sb.rpc('admin_companies'), Cloud.sb.rpc('admin_tickets', { p_limit: 50 }), Cloud.sb.rpc('admin_support_settings')]);
   ui.admin.loading = false;
   if (a.error || b.error) ui.admin.error = 'Não conseguimos carregar os dados agora. Tente atualizar.';
-  else { ui.admin.rows = a.data || []; ui.admin.tickets = b.data || []; ui.admin.autoReply = s.data !== false; ui.admin.loadedAt = Date.now(); }
+  else { ui.admin.rows = a.data || []; ui.admin.tickets = b.data || []; ui.admin.autoReply = s.data !== false; ui.admin.loadedAt = Date.now(); setNeedYou(ui.admin.tickets.filter((t) => t.status === 'aberto' && t.escalated).length); }
   if (ui.route.page === 'admin') refreshPage(false);
 }
 function viewAdmin() {
@@ -7594,7 +7597,7 @@ function viewAdmin() {
   </section>
   <section class="card">
     <div class="card-head" style="flex-wrap:wrap;gap:10px"><div><h3>Suporte</h3><p class="card-sub">${needYou ? html`<strong style="color:var(--bad)">${plural(needYou, 'atendimento precisa de você', 'atendimentos precisam de você')}</strong>` : 'Nenhum atendimento esperando por você'}${open > needYou ? ` · ${plural(open - needYou, 'outro em aberto', 'outros em aberto')}` : ''}</p></div>
-      <div class="row-wrap" style="gap:8px;align-items:center"><span class="muted" style="font-size:13px">Assistente automático</span><div class="seg" role="group" aria-label="Assistente automático"><button type="button" aria-pressed="${st.autoReply ? 'true' : 'false'}" data-act="setAutoReply" data-on="1">Ligado</button><button type="button" aria-pressed="${st.autoReply ? 'false' : 'true'}" data-act="setAutoReply" data-on="0">Desligado</button></div></div>
+      <div class="row-wrap" style="gap:8px;align-items:center">${'Notification' in window && Notification.permission === 'default' ? html`<button type="button" class="btn btn-sm" data-act="enableNotifications">${icon('bell')}Avisar no computador</button>` : ''}<span class="muted" style="font-size:13px">Assistente automático</span><div class="seg" role="group" aria-label="Assistente automático"><button type="button" aria-pressed="${st.autoReply ? 'true' : 'false'}" data-act="setAutoReply" data-on="1">Ligado</button><button type="button" aria-pressed="${st.autoReply ? 'false' : 'true'}" data-act="setAutoReply" data-on="0">Desligado</button></div></div>
     </div>
     <div class="callout" style="margin:0 16px 12px">${icon(st.autoReply ? 'zap' : 'info')}<div>${st.autoReply ? 'O assistente responde sozinho as dúvidas comuns e encaminha para você (por e-mail) quando a pessoa pede um atendente, quando envolve reembolso ou reclamação, ou quando ele não tem certeza.' : 'Assistente desligado: o cliente recebe só a confirmação de recebimento e você recebe todas as mensagens por e-mail.'}</div></div>
     <div class="card-body flush">${(st.tickets || []).length ? html`<div class="table-wrap"><table class="table responsive">
@@ -7610,6 +7613,59 @@ function viewAdmin() {
   </section>`;
 }
 A.adminReload = () => adminLoad();
+
+/* ---------- avisos em tempo real do suporte (só administradores) ---------- */
+const BASE_TITLE = document.title;
+function setNeedYou(n) {
+  Cloud.needYou = n;
+  document.title = n ? `(${n}) ${BASE_TITLE}` : BASE_TITLE;
+  const btn = $('#shell [data-act="nav"][data-page="admin"] .nav-end');
+  if (btn) btn.innerHTML = n ? html`<span class="nav-count" title="${plural(n, 'atendimento precisa de você', 'atendimentos precisam de você')}">${n}</span>`.s : '';
+}
+function desktopNotify(title, body) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const n = new Notification(title, { body, tag: 'quitai-suporte', icon: $('link[rel=icon]') ? $('link[rel=icon]').href : undefined });
+    n.onclick = () => { window.focus(); go('admin'); n.close(); };
+  } catch (e) { /* ignora */ }
+}
+A.enableNotifications = async () => {
+  if (!('Notification' in window)) { toast('Este navegador não mostra notificações.', { type: 'warn' }); return; }
+  const p = await Notification.requestPermission();
+  if (p === 'granted') { toast('Pronto. Você vai ser avisado quando um atendimento precisar de você.'); desktopNotify('Notificações ligadas', 'É assim que os avisos do suporte vão aparecer.'); }
+  else toast('As notificações ficaram bloqueadas. Para liberar, clique no cadeado ao lado do endereço do site.', { type: 'warn', timeout: 9000 });
+  if (ui.route.page === 'admin') refreshPage(false);
+};
+async function supportPoll() {
+  if (!Cloud.on || !Cloud.isAdmin || isImpersonating()) return;
+  const { data, error } = await Cloud.sb.rpc('admin_tickets', { p_limit: 50 });
+  if (error || !Array.isArray(data)) return;
+  const prev = new Map(((ui.admin && ui.admin.tickets) || []).map((t) => [t.id, t]));
+  const first = !Cloud.supportSeen;
+  Cloud.supportSeen = true;
+  const fresh = data.filter((t) => t.status === 'aberto' && t.escalated && (!prev.has(t.id) || !prev.get(t.id).escalated || prev.get(t.id).last_at !== t.last_at));
+  const changed = !ui.admin || data.length !== prev.size || data.some((t) => { const p = prev.get(t.id); return !p || p.last_at !== t.last_at || p.status !== t.status || p.escalated !== t.escalated; });
+  ui.admin = Object.assign({ q: '', filter: 'todas', rows: [], tickets: [] }, ui.admin || {}, { tickets: data });
+  setNeedYou(data.filter((t) => t.status === 'aberto' && t.escalated).length);
+  if (!first && fresh.length) {
+    const t = fresh[0];
+    const msg = `${t.name}: ${t.summary || clipText(t.message, 90)}`;
+    toast(`Atendimento precisa de você · ${msg}`, { type: 'warn', timeout: 12000 });
+    if (document.visibilityState !== 'visible' || ui.route.page !== 'admin') desktopNotify('Quitaí · atendimento precisa de você', msg);
+  }
+  // conversa aberta: mostra a mensagem nova na hora
+  if (ui.ticket && ui.ticket.thread && document.getElementById('tk-thread')) {
+    const t = data.find((x) => x.id === ui.ticket.id);
+    const p = prev.get(ui.ticket.id);
+    if (t && p && t.last_at !== p.last_at) {
+      const res = await callFn('support-admin', { action: 'thread', ticket_id: t.id });
+      if (res.thread && ui.ticket && ui.ticket.id === t.id) { ui.ticket.thread = res.thread; if (ui.ticket.redraw) ui.ticket.redraw(); }
+    }
+  }
+  // na página de Administração, atualiza a lista sem atrapalhar quem está digitando ou com uma janela aberta
+  const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (changed && ui.route.page === 'admin' && !modalStack.length && !typing) refreshPage(false);
+}
 A.setAutoReply = async (el) => {
   const on = el.dataset.on === '1';
   if (on === ui.admin.autoReply) return;
@@ -7649,11 +7705,19 @@ A.ticketOpen = async (el) => {
     </div>`;
   };
   openModal({ title: 'Atendimento', size: 'lg', body: render(), foot: html`<button type="button" class="btn" data-act="modalCancel">Fechar</button><button type="submit" form="f-ticket" class="btn btn-primary">${icon('send')}Enviar resposta</button>` });
+  ui.ticket.redraw = () => {
+    const box = document.getElementById('tk-thread');
+    if (!box) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = render().s;
+    box.replaceWith(tmp.querySelector('#tk-thread'));
+    const nb = document.getElementById('tk-thread');
+    if (nb) nb.scrollTop = nb.scrollHeight;
+  };
   const res = await callFn('support-admin', { action: 'thread', ticket_id: t.id });
   if (!ui.ticket || ui.ticket.id !== t.id) return;
   ui.ticket.thread = res.thread || [];
-  const box = document.getElementById('tk-thread');
-  if (box) { const tmp = document.createElement('div'); tmp.innerHTML = render().s; box.replaceWith(tmp.querySelector('#tk-thread')); const nb = document.getElementById('tk-thread'); if (nb) nb.scrollTop = nb.scrollHeight; }
+  ui.ticket.redraw();
 };
 A.ticketSuggest = async (el) => {
   const ta = document.getElementById('tk-text');
@@ -9524,6 +9588,7 @@ function boot() {
   getDownloads();
   aiProbe();
   setInterval(() => { tick(); cloudPoll(); }, 60000);
+  setInterval(supportPoll, 20000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { if (Cloud.on) { if (Cloud.t) flushCloudSave(); } else flushLocal(); }
     else { tick(); cloudPoll(); }
