@@ -1,24 +1,36 @@
-// Assinatura: abre o pagamento da Stripe (checkout) ou o portal para gerenciar a assinatura.
+// Assinatura do Quitaí pelo Asaas: assinar (cartão ou Pix/boleto), cancelar e conferir pagamento.
+// Empresas antigas da Stripe (se houver) ainda podem abrir o portal da Stripe.
 import { admin, caller, cors, CYCLES, json, PLAN_IDS, SITE_URL, stripe } from '../_shared/common.ts';
-import { syncSubscription } from '../_shared/sync.ts';
+import { asaas, AsaasError, CHECKOUT_BASE, PRICES, syncCompany, todaySP } from '../_shared/asaas.ts';
+import { LOGO_PNG_BASE64 } from '../_shared/logo.ts';
+
+function onlyDigits(s: unknown): string { return String(s ?? '').replace(/\D/g, ''); }
+function validCpfCnpj(d: string): boolean {
+  if (d.length === 11) {
+    if (/^(\d)\1+$/.test(d)) return false;
+    const calc = (n: number) => { let s = 0; for (let i = 0; i < n; i++) s += +d[i] * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+    return calc(9) === +d[9] && calc(10) === +d[10];
+  }
+  if (d.length === 14) {
+    if (/^(\d)\1+$/.test(d)) return false;
+    const calc = (n: number) => { const w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]; let s = 0; for (let i = 0; i < n; i++) s += +d[i] * w[i]; const r = s % 11; return r < 2 ? 0 : 11 - r; };
+    return calc(12) === +d[12] && calc(13) === +d[13];
+  }
+  return false;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
   try {
-    // checagem de configuração: só diz o modo das chaves, nunca o valor
+    // checagem de configuração: só diz se as chaves existem e o ambiente, nunca o valor
     const peek = await req.clone().json().catch(() => ({}));
     if (peek.action === 'health') {
-      const key = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
-      let account: string | null = null;
-      let prices = 0;
-      try {
-        account = (await stripe.accounts.retrieve()).id;
-        prices = (await stripe.prices.list({ lookup_keys: ['quitai_basico_mensal', 'quitai_pro_mensal', 'quitai_empresa_mensal', 'quitai_basico_anual', 'quitai_pro_anual', 'quitai_empresa_anual'], active: true, limit: 10 })).data.length;
-      } catch (_) { /* chave inválida */ }
+      let asaasOk = false;
+      try { await asaas('/myAccount/status'); asaasOk = true; } catch (_) { asaasOk = false; }
       return json(req, {
-        mode: key.startsWith('sk_live_') ? 'live' : key.startsWith('sk_test_') ? 'test' : key.startsWith('rk_live_') ? 'live-restricted' : 'unknown',
-        account, prices,
-        webhookSecret: (Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '').startsWith('whsec_'),
+        asaasEnv: Deno.env.get('ASAAS_ENV') === 'production' ? 'production' : 'sandbox',
+        asaasKey: asaasOk,
+        asaasWebhookToken: (Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '').length >= 32,
         resend: (Deno.env.get('RESEND_API_KEY') ?? '').startsWith('re_'),
         resendWebhook: (Deno.env.get('RESEND_WEBHOOK_SECRET') ?? '').startsWith('whsec_'),
         ai: (Deno.env.get('ANTHROPIC_API_KEY') ?? '').startsWith('sk-ant-'),
@@ -30,73 +42,99 @@ Deno.serve(async (req) => {
     const { data: company } = await admin.from('companies').select('*').eq('id', me.company_id).single();
     if (!company) return json(req, { error: 'no_company' }, 404);
 
-    // "Já paguei e meu plano não liberou": busca a assinatura direto na Stripe
+    // "Já paguei e meu plano não liberou": confere direto no Asaas
     if (body.action === 'sync') {
-      if (!company.stripe_customer_id) return json(req, { ok: true, found: false });
-      const subs = await stripe.subscriptions.list({ customer: company.stripe_customer_id, status: 'all', limit: 10 });
-      const mine = subs.data.filter((s) => s.metadata?.app === 'quitai');
-      const best = mine.find((s) => ['active', 'trialing', 'past_due'].includes(s.status)) ?? mine[0];
-      if (!best) return json(req, { ok: true, found: false });
-      await syncSubscription(best);
-      return json(req, { ok: true, found: true, status: best.status });
+      if (!company.asaas_subscription_id) return json(req, { ok: true, found: false });
+      await syncCompany(company.id);
+      const { data: c2 } = await admin.from('companies').select('billing_status').eq('id', company.id).single();
+      return json(req, { ok: true, found: true, status: c2?.billing_status });
     }
 
     if (me.role !== 'owner') return json(req, { error: 'not_owner' }, 403);
-    // volta para o endereço de onde a pessoa veio (site publicado ou teste local)
     const origin = cors(req)['Access-Control-Allow-Origin'] === req.headers.get('origin') ? req.headers.get('origin') : SITE_URL;
-    const page = origin === 'https://joaoklimp.github.io' ? `${origin}/quitai/` : `${origin}/`;
-    const returnUrl = `${page}#assinatura`;
+    const page = `${origin}/`;
 
+    // assinaturas antigas da Stripe
     if (body.action === 'portal') {
       if (!company.stripe_customer_id) return json(req, { error: 'no_subscription' }, 400);
       const configuration = Deno.env.get('STRIPE_PORTAL_CONFIG') || undefined;
-      const s = await stripe.billingPortal.sessions.create({ customer: company.stripe_customer_id, return_url: returnUrl, configuration });
+      const s = await stripe.billingPortal.sessions.create({ customer: company.stripe_customer_id, return_url: `${page}#assinatura`, configuration });
       return json(req, { url: s.url });
     }
 
-    if (body.action === 'checkout' && company.complimentary) return json(req, { error: 'complimentary' }, 409);
-    if (body.action === 'checkout') {
-      // no site oficial, só aceita pagamento com a chave real (impede assinar com cartão de teste)
-      const liveKey = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').startsWith('sk_live_');
-      if (!liveKey && /usequitai\.com\.br$/.test(new URL(page).hostname)) return json(req, { error: 'payments_soon' }, 503);
-      const plan = String(body.plan);
-      const cycle = String(body.cycle);
-      if (!PLAN_IDS.includes(plan as never) || !CYCLES.includes(cycle as never)) return json(req, { error: 'invalid_plan' }, 400);
-      if (company.stripe_subscription_id && ['active', 'past_due'].includes(company.billing_status)) return json(req, { error: 'already_subscribed' }, 409);
-      const prices = await stripe.prices.list({ lookup_keys: [`quitai_${plan}_${cycle}`], active: true, limit: 1 });
-      const price = prices.data[0];
-      if (!price) return json(req, { error: 'price_not_found' }, 500);
+    if (body.action === 'cancel') {
+      if (!company.asaas_subscription_id) return json(req, { error: 'no_subscription' }, 400);
+      await asaas(`/subscriptions/${company.asaas_subscription_id}`, { method: 'DELETE' });
+      await syncCompany(company.id);
+      return json(req, { ok: true });
+    }
 
-      let customer = company.stripe_customer_id as string | null;
-      if (!customer) {
-        const c = await stripe.customers.create({
-          email: me.email,
-          name: (company.data?.name as string) || me.name,
-          metadata: { app: 'quitai', company_id: company.id },
+    if (body.action === 'checkout') {
+      if (company.complimentary) return json(req, { error: 'complimentary' }, 409);
+      // no site oficial, só com o Asaas de produção (impede assinar no ambiente de testes)
+      if (Deno.env.get('ASAAS_ENV') !== 'production' && /usequitai\.com\.br$/.test(new URL(page).hostname)) return json(req, { error: 'payments_soon' }, 503);
+      const plan = String(body.plan);
+      const cycle = String(body.cycle) as 'mensal' | 'anual';
+      const method = body.method === 'pix' ? 'pix' : 'cartao';
+      if (!PLAN_IDS.includes(plan as never) || !CYCLES.includes(cycle as never)) return json(req, { error: 'invalid_plan' }, 400);
+      const doc = onlyDigits(body.cpfCnpj);
+      if (doc && !validCpfCnpj(doc)) return json(req, { error: 'invalid_doc' }, 400);
+      if (method === 'pix' && !doc) return json(req, { error: 'doc_required' }, 400);
+
+      const value = PRICES[plan][cycle];
+      const asaasCycle = cycle === 'anual' ? 'YEARLY' : 'MONTHLY';
+      const today = todaySP();
+      // já tem período pago (troca de plano ou reativação): a nova assinatura começa quando ele acabar
+      const paidUntil = ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null;
+      const firstDue = paidUntil ?? today;
+      const desc = `Quitaí · Plano ${PRICES[plan].name} · ${cycle}`;
+      const name = String((company.data?.name as string) || me.name).slice(0, 100);
+
+      if (method === 'cartao') {
+        const checkout = await asaas<{ id: string; link?: string }>('/checkouts', {
+          method: 'POST',
+          body: {
+            billingTypes: ['CREDIT_CARD'],
+            chargeTypes: ['RECURRENT'],
+            minutesToExpire: 60,
+            externalReference: company.id,
+            callback: { successUrl: `${page}#assinatura-ok`, cancelUrl: `${page}#assinatura`, expiredUrl: `${page}#assinatura` },
+            items: [{ name: `Quitaí ${PRICES[plan].name}`.slice(0, 30), description: desc.slice(0, 150), quantity: 1, value, imageBase64: LOGO_PNG_BASE64 }],
+            customerData: { name, email: me.email, ...(doc ? { cpfCnpj: doc } : {}) },
+            subscription: { cycle: asaasCycle, nextDueDate: `${firstDue} 12:00:00` },
+          },
         });
-        customer = c.id;
-        await admin.from('companies').update({ stripe_customer_id: customer }).eq('id', company.id);
+        await admin.from('companies').update({ asaas_checkout_id: checkout.id }).eq('id', company.id);
+        return json(req, { url: checkout.link || `${CHECKOUT_BASE}/checkoutSession/show?id=${checkout.id}` });
       }
-      const meta = { app: 'quitai', company_id: company.id, plan, cycle };
-      const s = await stripe.checkout.sessions.create({
-        mode: 'subscription',
-        customer,
-        client_reference_id: company.id,
-        line_items: [{ price: price.id, quantity: 1 }],
-        metadata: meta,
-        subscription_data: { metadata: meta },
-        locale: 'pt-BR',
-        allow_promotion_codes: true,
-        success_url: `${page}#assinatura-ok`,
-        cancel_url: returnUrl,
+
+      // Pix ou boleto: o Quitaí cria o cliente e a assinatura; cada cobrança tem QR Code Pix e boleto
+      let customer = company.asaas_customer_id as string | null;
+      if (!customer) {
+        const c = await asaas<{ id: string }>('/customers', { method: 'POST', body: { name, cpfCnpj: doc, email: me.email, externalReference: company.id } });
+        customer = c.id;
+      } else {
+        await asaas(`/customers/${customer}`, { method: 'POST', body: { cpfCnpj: doc } }).catch(() => {});
+      }
+      const sub = await asaas<{ id: string }>('/subscriptions', {
+        method: 'POST',
+        body: { customer, billingType: 'UNDEFINED', value, nextDueDate: firstDue, cycle: asaasCycle, description: desc, externalReference: company.id },
       });
-      return json(req, { url: s.url });
+      const old = company.asaas_subscription_id;
+      await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix' }).eq('id', company.id);
+      if (old && old !== sub.id) await asaas(`/subscriptions/${old}`, { method: 'DELETE' }).catch((e) => console.error('remover assinatura anterior', e));
+      if (paidUntil) return json(req, { ok: true, scheduled: firstDue });
+      const pays = await asaas<{ data: { invoiceUrl?: string }[] }>(`/subscriptions/${sub.id}/payments?limit=1`);
+      return json(req, { url: pays.data?.[0]?.invoiceUrl ?? null, ok: true });
     }
 
     return json(req, { error: 'invalid_action' }, 400);
   } catch (e) {
+    if (e instanceof AsaasError) {
+      console.error(e.message);
+      return json(req, { error: e.status === 401 ? 'payments_not_configured' : 'payment_error', detail: e.body.slice(0, 300) }, 502);
+    }
     console.error(e);
-    const err = e as { type?: string; code?: string; rawType?: string };
-    return json(req, { error: 'server_error', detail: err.code || err.rawType || err.type || 'unknown' }, 500);
+    return json(req, { error: 'server_error' }, 500);
   }
 });

@@ -15,11 +15,13 @@ Planos (preço mensal; no anual o valor por mês fica menor, pago de uma vez por
 - Pro: R$ 129/mês (ou R$ 109/mês no anual). Até 200 clientes, 100 análises com IA, extrato, maquininha, WhatsApp, acordos e relatórios.
 - Empresa: R$ 249/mês (ou R$ 209/mês no anual). Clientes ilimitados, 400 análises com IA, equipe com permissões e régua de cobrança.
 - Toda conta nova tem 7 dias de teste grátis, sem cartão. Depois do teste, se não assinar, o painel fica em modo leitura e os dados continuam guardados.
-- Pagamento da assinatura: cartão de crédito, pela Stripe.
+- Pagamento da assinatura pelo Asaas: cartão de crédito (renova sozinho) ou Pix/boleto (a cobrança chega por e-mail a cada mês ou ano, com QR Code Pix e boleto). Pix cai na hora; boleto leva até 3 dias úteis.
 
 Como fazer as coisas mais comuns:
-- Assinar ou mudar de plano: menu Assinatura → Assinar. Com assinatura ativa: Assinatura → Gerenciar assinatura (troca de plano, troca de cartão, faturas, cancelamento).
-- Cancelar: Assinatura → Gerenciar assinatura → Cancelar assinatura. O acesso continua até o fim do período já pago.
+- Assinar: menu Assinatura → Assinar, escolhendo cartão ou Pix/boleto.
+- Mudar de plano, de ciclo (mensal/anual) ou de forma de pagamento: menu Assinatura → escolher o plano desejado. O novo plano começa quando termina o período já pago, sem cobrança em dobro.
+- Faturas e segunda via (Pix/boleto): menu Assinatura → Faturas; cada fatura tem o link para pagar.
+- Cancelar: Assinatura → Cancelar assinatura. O acesso continua até o fim do período já pago.
 - Pagou e o plano não liberou: Assinatura → "Já paguei e não liberou", ou no menu do usuário → Ajuda e suporte → "Verificar meu pagamento".
 - Esqueceu a senha: na tela Entrar → "Esqueci minha senha"; o link chega por e-mail (confira o spam).
 - Pessoa da equipe sem acesso: o dono ou um administrador redefine a senha em Equipe.
