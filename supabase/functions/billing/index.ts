@@ -134,10 +134,17 @@ Deno.serve(async (req) => {
       } else {
         await asaas(`/customers/${customer}`, { method: 'POST', body: { cpfCnpj: doc } }).catch(() => {});
       }
-      const sub = await asaas<{ id: string }>('/subscriptions', {
-        method: 'POST',
-        body: { customer, billingType: 'UNDEFINED', value, nextDueDate: firstDue, cycle: asaasCycle, description: desc, externalReference: company.id },
-      });
+      const subBody = { customer, billingType: 'UNDEFINED', value, nextDueDate: firstDue, cycle: asaasCycle, description: desc, externalReference: company.id };
+      let sub: { id: string };
+      try {
+        // depois de pagar, a página da cobrança leva o cliente de volta ao Quitaí
+        sub = await asaas<{ id: string }>('/subscriptions', { method: 'POST', body: { ...subBody, callback: { successUrl: `${page}#assinatura-ok`, autoRedirect: true } } });
+      } catch (e) {
+        // o Asaas recusa o retorno se o domínio não estiver cadastrado na conta: cria sem o retorno
+        if (!(e instanceof AsaasError) || e.status !== 400 || !/callback|successUrl|dom[ií]nio|site/i.test(e.body)) throw e;
+        console.error('retorno automático recusado pelo Asaas', e.body.slice(0, 200));
+        sub = await asaas<{ id: string }>('/subscriptions', { method: 'POST', body: subBody });
+      }
       const old = company.asaas_subscription_id;
       await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix' }).eq('id', company.id);
       if (old && old !== sub.id) await asaas(`/subscriptions/${old}`, { method: 'DELETE' }).catch((e) => console.error('remover assinatura anterior', e));
