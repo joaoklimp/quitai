@@ -7512,6 +7512,37 @@ function openCheckout(planId) {
     foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-checkout" class="btn btn-primary">${c.cloud ? 'Ir para o pagamento' : 'Confirmar assinatura'}</button>`,
   });
 }
+function openPixWait(url, planId) {
+  openModal({
+    title: 'Pague com Pix', size: 'sm', dismissable: false,
+    body: html`<div class="stack">
+      <p class="ink2">Abra a cobrança, pague pelo <strong>QR Code Pix</strong> ou pelo <strong>Pix copia e cola</strong> no app do seu banco e volte para esta tela.</p>
+      <a class="btn btn-primary btn-lg btn-block" href="${url}" target="_blank" rel="noopener" data-act="pixOpened">${icon('external')}Abrir a cobrança do Pix</a>
+      <div class="callout" id="pix-wait">${icon('clock')}<div>Aguardando o pagamento… Esta tela atualiza sozinha assim que o Pix cair, normalmente em segundos.</div></div>
+      <p class="hint">Prefere boleto? Na mesma página da cobrança dá para gerar o boleto (compensa em até 3 dias úteis).</p>
+    </div>`,
+    foot: html`<button type="button" class="btn" data-act="pixWaitClose">Pago depois</button>`,
+  });
+  const started = Date.now();
+  ui.pixWait = setInterval(async () => {
+    if (!document.getElementById('pix-wait') || Date.now() - started > 30 * 60000) { clearInterval(ui.pixWait); return; }
+    const res = await callFn('billing', { action: 'sync' });
+    if (res && res.status === 'active') {
+      clearInterval(ui.pixWait);
+      closeAllModals();
+      await cloudReload();
+      go('assinatura');
+      toast(`Pagamento confirmado. Seu plano ${PLANS[planId].name} está liberado. Obrigado!`, { timeout: 9000 });
+    }
+  }, 6000);
+}
+A.pixOpened = (a) => { if (a && a.href) window.open(a.href, '_blank', 'noopener'); const el = document.getElementById('pix-wait'); if (el) el.querySelector('div').textContent = 'Aguardando o pagamento… Depois de pagar, volte para esta aba: ela libera o plano sozinha.'; };
+A.pixWaitClose = async () => {
+  clearInterval(ui.pixWait);
+  closeAllModals();
+  await cloudReload();
+  toast('Sem problemas. A cobrança fica em Assinatura → Faturas, com o link para pagar.', { type: 'info', timeout: 9000 });
+};
 function overdueInvoice(c) { return (c.invoices || []).find((i) => (i.status === 'vencida' || i.status === 'pendente') && i.url) || null; }
 function paidUntilISO(c) {
   const b = c.billing;
@@ -7549,7 +7580,10 @@ F.checkout = async (f) => {
       return;
     }
     if (!res.url) { setBusy(btn, false); formError(f, fnError('payment_error')); return; }
-    location.href = res.url;
+    if (method === 'cartao') { location.href = res.url; return; }
+    // Pix/boleto: a página de cobrança do Asaas não volta para o site; abre em outra aba e esta tela espera o pagamento
+    closeModal(true);
+    openPixWait(res.url, planId);
     return;
   }
   const method = v.method || 'pix';

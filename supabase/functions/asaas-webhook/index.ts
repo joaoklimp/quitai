@@ -25,8 +25,8 @@ async function adoptFromCustomer(companyId: string, customer: string) {
 }
 
 Deno.serve(async (req) => {
-  const token = Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '';
-  if (!token || req.headers.get('asaas-access-token') !== token) return new Response('unauthorized', { status: 401 });
+  const token = (Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '').trim();
+  if (!token || (req.headers.get('asaas-access-token') ?? '').trim() !== token) return new Response('unauthorized', { status: 401 });
   let ev: Ev;
   try { ev = await req.json(); } catch { return new Response('bad json', { status: 400 }); }
 
