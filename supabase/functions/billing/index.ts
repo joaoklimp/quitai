@@ -110,6 +110,18 @@ Deno.serve(async (req) => {
         return json(req, { url: checkout.link || `${CHECKOUT_BASE}/checkoutSession/show?id=${checkout.id}` });
       }
 
+      // clicou de novo no mesmo plano antes de pagar: reaproveita a cobrança em aberto em vez de criar outra assinatura
+      if (company.asaas_subscription_id && !paidUntil) {
+        try {
+          const cur = await asaas<{ status: string; deleted?: boolean; value: number; cycle: string }>(`/subscriptions/${company.asaas_subscription_id}`);
+          if (!cur.deleted && cur.status === 'ACTIVE' && Math.abs(cur.value - value) < 0.01 && cur.cycle === asaasCycle) {
+            const open = await asaas<{ data: { invoiceUrl?: string; status: string }[] }>(`/subscriptions/${company.asaas_subscription_id}/payments?limit=10`);
+            const pending = (open.data ?? []).find((p) => ['PENDING', 'OVERDUE'].includes(p.status) && p.invoiceUrl);
+            if (pending) return json(req, { url: pending.invoiceUrl, ok: true, reused: true });
+          }
+        } catch (e) { console.error('conferir assinatura atual', e); }
+      }
+
       // Pix ou boleto: o Quitaí cria o cliente e a assinatura; cada cobrança tem QR Code Pix e boleto
       let customer = company.asaas_customer_id as string | null;
       if (!customer) {

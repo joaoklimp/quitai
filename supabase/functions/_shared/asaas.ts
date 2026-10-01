@@ -118,7 +118,8 @@ export async function syncCompany(companyId: string): Promise<void> {
     patch.current_period_end = coverEnd && coverEnd > (sub.nextDueDate ?? '') ? coverEnd : (sub.nextDueDate ?? coverEnd);
     patch.canceled_at = null;
   }
-  await admin.from('companies').update(patch).eq('id', company.id);
+  const { error } = await admin.from('companies').update(patch).eq('id', company.id);
+  if (error) throw new Error(`não consegui salvar a assinatura: ${error.message}`);
 }
 
 /** Reembolso ou contestação: encerra a assinatura e bloqueia o painel na hora. */
