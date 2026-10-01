@@ -52,8 +52,10 @@ Deno.serve(async (req) => {
     const { data: seen } = await admin.from('support_messages').select('id').eq('email_id', emailId).maybeSingle();
     if (seen) return new Response('duplicate');
 
-    const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, { headers: { Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}` } });
-    if (!res.ok) { console.error('não consegui ler o e-mail recebido', res.status); return new Response('fetch failed', { status: 500 }); }
+    // ler e-mails recebidos exige uma chave com acesso total (a de envio é só "Sending access")
+    const readKey = Deno.env.get('RESEND_INBOUND_KEY') ?? Deno.env.get('RESEND_API_KEY');
+    const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, { headers: { Authorization: `Bearer ${readKey}` } });
+    if (!res.ok) { console.error('não consegui ler o e-mail recebido', res.status); return new Response(`fetch failed ${res.status}`, { status: 500 }); }
     const mail = await res.json();
     const from = addressOf(String(mail.from ?? ''));
     const subject = String(mail.subject ?? '');
