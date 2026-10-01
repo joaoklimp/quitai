@@ -25,6 +25,9 @@ async function verify(req: Request, body: string): Promise<boolean> {
 
 /** Tira do texto a parte citada da mensagem anterior ("Em ... escreveu:", linhas com ">"). */
 function stripQuoted(text: string): string {
+  // o Gmail quebra "Em <data>, <nome> <e-mail> escreveu:" em várias linhas
+  const cut = /\n\s*(Em|On) [^\n]*(\n[^\n]*){0,3}?(escreveu|wrote):/i.exec('\n' + text.replace(/\r/g, ''));
+  if (cut) text = ('\n' + text.replace(/\r/g, '')).slice(0, cut.index);
   const lines = text.replace(/\r/g, '').split('\n');
   const out: string[] = [];
   for (const l of lines) {
