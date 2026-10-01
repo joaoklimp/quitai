@@ -7659,7 +7659,7 @@ function viewAdmin() {
         <td data-label="Clientes" class="num tnum">${fmtInt(r.clients)}</td>
         <td data-label="Último acesso" class="nowrap">${r.last_login_at ? timeAgo(Date.parse(r.last_login_at)) : html`<span class="muted">Nunca</span>`}</td>
         <td data-label="Cadastro" class="tnum nowrap">${fmtDate(String(r.created_at).slice(0, 10))}</td>
-        <td class="actions corner">${r.stripe_customer_id ? html`<a class="btn btn-ghost btn-xs" href="https://dashboard.stripe.com/customers/${r.stripe_customer_id}" target="_blank" rel="noopener" title="Abrir na Stripe">${icon('external')}Stripe</a>` : ''}</td>
+        <td class="actions corner"><div class="row-wrap" style="gap:6px;justify-content:flex-end">${r.stripe_customer_id ? html`<a class="btn btn-ghost btn-xs" href="https://dashboard.stripe.com/customers/${r.stripe_customer_id}" target="_blank" rel="noopener" title="Abrir na Stripe">${icon('external')}Stripe</a>` : ''}${!r.complimentary && !(r.billing_status === 'canceled' && (!r.current_period_end || r.current_period_end <= todayISO())) ? html`<button type="button" class="btn btn-danger-outline btn-xs" data-act="adminRevoke" data-id="${r.id}">${icon('ban')}Cancelar e bloquear</button>` : ''}</div></td>
       </tr>`; })}</tbody></table></div>` : emptyMini('building', 'Nenhuma empresa aqui', st.q ? 'Nenhuma empresa combina com a busca.' : 'Quando alguém se cadastrar, aparece nesta lista.')}</div>
   </section>
   <section class="card">
@@ -7680,6 +7680,21 @@ function viewAdmin() {
   </section>`;
 }
 A.adminReload = () => adminLoad();
+A.adminRevoke = async (el) => {
+  const r = (ui.admin.rows || []).find((x) => x.id === el.dataset.id);
+  if (!r) return;
+  const ok = await confirmBox({
+    title: `Cancelar e bloquear ${r.name || 'esta empresa'}?`,
+    text: 'A assinatura é encerrada no Asaas (não haverá novas cobranças) e o painel do cliente fica em modo leitura agora. Os dados continuam guardados. Para voltar, o cliente precisa assinar de novo. Se for o caso, faça o estorno no painel do Asaas.',
+    ok: 'Cancelar e bloquear', danger: true, typed: 'BLOQUEAR',
+  });
+  if (!ok) return;
+  setBusy(el, true, 'Bloqueando…');
+  const res = await callFn('billing', { action: 'admin_revoke', company_id: r.id });
+  if (res.error) { if (el.isConnected) setBusy(el, false); toast(fnError(res.error), { type: 'bad' }); return; }
+  toast(`${r.name || 'Empresa'} cancelada e bloqueada.`);
+  adminLoad();
+};
 
 /* ---------- avisos em tempo real do suporte (só administradores) ---------- */
 const BASE_TITLE = document.title;

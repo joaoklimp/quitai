@@ -1,7 +1,7 @@
 // Assinatura do Quitaí pelo Asaas: assinar (cartão ou Pix/boleto), cancelar e conferir pagamento.
 // Empresas antigas da Stripe (se houver) ainda podem abrir o portal da Stripe.
 import { admin, caller, cors, CYCLES, json, PLAN_IDS, SITE_URL, stripe } from '../_shared/common.ts';
-import { adoptFromCheckout, asaas, AsaasError, CHECKOUT_BASE, PRICES, syncCompany, todaySP } from '../_shared/asaas.ts';
+import { adoptFromCheckout, asaas, AsaasError, CHECKOUT_BASE, PRICES, revokeCompany, syncCompany, todaySP } from '../_shared/asaas.ts';
 import { LOGO_PNG_BASE64 } from '../_shared/logo.ts';
 
 function onlyDigits(s: unknown): string { return String(s ?? '').replace(/\D/g, ''); }
@@ -39,6 +39,17 @@ Deno.serve(async (req) => {
     const me = await caller(req);
     if (!me) return json(req, { error: 'not_authenticated' }, 401);
     const body = await req.json().catch(() => ({}));
+
+    // Administração do Quitaí: cancelar a assinatura de uma empresa e bloquear o painel na hora
+    if (body.action === 'admin_revoke') {
+      const { data: adm } = await admin.from('platform_admins').select('user_id').eq('user_id', me.user_id).maybeSingle();
+      if (!adm) return json(req, { error: 'not_allowed' }, 403);
+      const { data: target } = await admin.from('companies').select('id,complimentary').eq('id', String(body.company_id ?? '')).maybeSingle();
+      if (!target) return json(req, { error: 'not_found' }, 404);
+      if (target.complimentary) return json(req, { error: 'complimentary' }, 409);
+      await revokeCompany(target.id, 'reembolsada');
+      return json(req, { ok: true });
+    }
     const { data: company } = await admin.from('companies').select('*').eq('id', me.company_id).single();
     if (!company) return json(req, { error: 'no_company' }, 404);
 
@@ -90,7 +101,7 @@ Deno.serve(async (req) => {
       const asaasCycle = cycle === 'anual' ? 'YEARLY' : 'MONTHLY';
       const today = todaySP();
       // já tem período pago (troca de plano ou reativação): a nova assinatura começa quando ele acabar
-      const paidUntil = ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null;
+      const paidUntil = !company.access_revoked && ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null;
       const firstDue = paidUntil ?? today;
       const desc = `Quitaí · Plano ${PRICES[plan].name} · ${cycle}`;
       const name = String((company.data?.name as string) || me.name).slice(0, 100);
@@ -146,7 +157,7 @@ Deno.serve(async (req) => {
         sub = await asaas<{ id: string }>('/subscriptions', { method: 'POST', body: subBody });
       }
       const old = company.asaas_subscription_id;
-      await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix' }).eq('id', company.id);
+      await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix', access_revoked: false }).eq('id', company.id);
       if (old && old !== sub.id) await asaas(`/subscriptions/${old}`, { method: 'DELETE' }).catch((e) => console.error('remover assinatura anterior', e));
       if (paidUntil) return json(req, { ok: true, scheduled: firstDue });
       const pays = await asaas<{ data: { invoiceUrl?: string }[] }>(`/subscriptions/${sub.id}/payments?limit=1`);

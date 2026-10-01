@@ -104,7 +104,11 @@ export async function syncCompany(companyId: string): Promise<void> {
   if (lastPaid) patch.billing_method = method(lastPaid.billingType);
 
   const ended = sub.deleted || sub.status === 'INACTIVE' || sub.status === 'EXPIRED';
-  if (ended) {
+  if (company.access_revoked) {
+    // bloqueado por estorno, contestação ou pelo administrador: não devolve o acesso
+    patch.billing_status = 'canceled';
+    patch.current_period_end = company.current_period_end && company.current_period_end < today ? company.current_period_end : today;
+  } else if (ended) {
     patch.billing_status = 'canceled';
     patch.current_period_end = coverEnd && coverEnd > today ? coverEnd : today;
     patch.canceled_at = company.canceled_at ?? new Date().toISOString();
@@ -129,7 +133,7 @@ export async function adoptSubscription(companyId: string, sub: { id: string; cu
   const { data: company } = await admin.from('companies').select('asaas_subscription_id').eq('id', companyId).single();
   const old = company?.asaas_subscription_id;
   const { error } = await admin.from('companies').update({
-    asaas_customer_id: sub.customer, asaas_subscription_id: sub.id, billing_provider: 'asaas',
+    asaas_customer_id: sub.customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', access_revoked: false,
     billing_method: sub.billingType === 'CREDIT_CARD' ? 'cartao' : 'pix',
   }).eq('id', companyId);
   if (error) throw new Error(`não consegui ligar a assinatura: ${error.message}`);
@@ -159,7 +163,7 @@ export async function revokeCompany(companyId: string, reason: 'reembolsada' | '
   }
   const invoices = (Array.isArray(company.invoices) ? company.invoices : []).map((i: { id: string; status: string }) => (i.id === paymentId ? { ...i, status: reason } : i));
   await admin.from('companies').update({
-    billing_status: 'canceled', current_period_end: todaySP(), canceled_at: new Date().toISOString(), invoices, updated_at: new Date().toISOString(),
+    billing_status: 'canceled', current_period_end: todaySP(), canceled_at: new Date().toISOString(), invoices, access_revoked: true, updated_at: new Date().toISOString(),
   }).eq('id', company.id);
 }
 
