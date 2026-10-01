@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     return json(req, { error: 'invalid_action' }, 400);
   } catch (e) {
     console.error(e);
-    return json(req, { error: 'server_error' }, 500);
+    const err = e as { type?: string; code?: string; rawType?: string };
+    return json(req, { error: 'server_error', detail: err.code || err.rawType || err.type || 'unknown' }, 500);
   }
 });

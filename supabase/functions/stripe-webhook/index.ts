@@ -57,11 +57,18 @@ async function recordInvoice(inv: Stripe.Invoice) {
   if (!company) return;
   const list = Array.isArray(company.invoices) ? company.invoices : [];
   if (list.some((x: { id: string }) => x.id === inv.id)) return;
-  const line = inv.lines?.data?.[0];
+  const line = inv.lines?.data?.[0] as unknown as { pricing?: { price_details?: { price?: string } }; price?: { id?: string } } | undefined;
+  const priceId = line?.pricing?.price_details?.price ?? line?.price?.id;
+  let desc = 'Assinatura Quitaí';
+  if (priceId) {
+    const price = await stripe.prices.retrieve(priceId).catch(() => null);
+    const m = /^quitai_(basico|pro|empresa)_(mensal|anual)$/.exec(price?.lookup_key ?? '');
+    if (m) desc = `Plano ${{ basico: 'Básico', pro: 'Pro', empresa: 'Empresa' }[m[1]]} · ${m[2]}`;
+  }
   const entry = {
     id: inv.id,
     date: isoDate(inv.status_transitions?.paid_at ?? inv.created),
-    desc: line?.description || 'Assinatura Quitaí',
+    desc,
     amount: inv.amount_paid,
     status: 'paga',
     method: 'cartao',
