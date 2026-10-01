@@ -72,7 +72,9 @@ Deno.serve(async (req) => {
     if (body.action === 'checkout') {
       if (company.complimentary) return json(req, { error: 'complimentary' }, 409);
       // no site oficial, só com o Asaas de produção (impede assinar no ambiente de testes)
-      if (Deno.env.get('ASAAS_ENV') !== 'production' && /usequitai\.com\.br$/.test(new URL(page).hostname)) return json(req, { error: 'payments_soon' }, 503);
+      // (contas de teste listadas em ASAAS_SANDBOX_TESTERS podem testar o sandbox no site oficial)
+      const testers = (Deno.env.get('ASAAS_SANDBOX_TESTERS') ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (Deno.env.get('ASAAS_ENV') !== 'production' && /usequitai\.com\.br$/.test(new URL(page).hostname) && !testers.includes(me.email.toLowerCase())) return json(req, { error: 'payments_soon' }, 503);
       const plan = String(body.plan);
       const cycle = String(body.cycle) as 'mensal' | 'anual';
       const method = body.method === 'pix' ? 'pix' : 'cartao';
