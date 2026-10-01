@@ -102,7 +102,8 @@ Deno.serve(async (req) => {
             externalReference: company.id,
             callback: { successUrl: `${page}#assinatura-ok`, cancelUrl: `${page}#assinatura`, expiredUrl: `${page}#assinatura` },
             items: [{ name: `Quitaí ${PRICES[plan].name}`.slice(0, 30), description: desc.slice(0, 150), quantity: 1, value, imageBase64: LOGO_PNG_BASE64 }],
-            customerData: { name, email: me.email, ...(doc ? { cpfCnpj: doc } : {}) },
+            // sem customerData: quando enviado, o Asaas exige o cadastro completo (telefone, endereço...);
+            // a própria página do Checkout pede esses dados ao pagador
             subscription: { cycle: asaasCycle, nextDueDate: `${firstDue} 12:00:00` },
           },
         });
