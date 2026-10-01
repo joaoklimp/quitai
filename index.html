@@ -1248,7 +1248,7 @@ const CLOUD_CFG = { url: 'https://zldzvtmtulmqkikvarbj.supabase.co', key: 'sb_pu
    Quitaí · núcleo: utilitários, template HTML seguro, ícones,
    datas, dinheiro, documentos e telefone.
    ============================================================ */
-const APP = { name: 'Quitaí', version: '1.1.0', schema: 2, supportEmail: 'contato@quitai.com.br' };
+const APP = { name: 'Quitaí', version: '1.1.0', schema: 2, supportEmail: 'o formulário “Fale com o suporte”' };
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -4858,7 +4858,7 @@ function viewLanding() {
       <div class="stack">
         ${logo()}
         <p class="muted" style="max-width:38ch">Recebíveis, cobrança e fechamento financeiro para pequenos negócios.</p>
-        <span class="copyline muted">${icon('mail', 'i-sm')}<code>${APP.supportEmail}</code><button type="button" class="btn btn-ghost btn-xs" data-act="copy" data-text="${APP.supportEmail}" data-ok="E-mail copiado.">Copiar</button></span>
+        <span><button type="button" class="btn btn-sm" data-act="openSupport">${icon('chat', 'i-sm')}Fale com o suporte</button></span>
       </div>
       <div><h4>Produto</h4><ul>
         <li><button type="button" class="fl" data-act="scrollTo" data-target="recursos">Recursos</button></li>
@@ -4870,6 +4870,7 @@ function viewLanding() {
         <li><button type="button" class="fl" data-act="openTerms">Termos de uso</button></li>
         <li><button type="button" class="fl" data-act="openPrivacy">Política de privacidade</button></li>
         <li><button type="button" class="fl" data-act="scrollTo" data-target="duvidas">Dúvidas frequentes</button></li>
+        <li><button type="button" class="fl" data-act="openSupport">Suporte</button></li>
       </ul></div>
       <div class="legal"><span>© ${new Date().getFullYear()} Quitaí. Feito no Brasil.</span><span>O Quitaí organiza e confere cobranças. O pagamento vai direto para a sua conta.</span></div>
     </div>
@@ -5206,7 +5207,7 @@ const TERMS_HTML = `
 <h3>7. Alterações</h3>
 <p>Podemos atualizar estes termos. Mudanças relevantes serão comunicadas com antecedência pelo e-mail cadastrado ou dentro do próprio sistema.</p>
 <h3>8. Contato</h3>
-<p>Dúvidas sobre estes termos: ${APP.supportEmail}.</p>`;
+<p>Dúvidas sobre estes termos: use o formulário “Fale com o suporte” no site usequitai.com.br.</p>`;
 const PRIVACY_HTML = `
 <p>Esta política explica como o Quitaí trata dados pessoais, em conformidade com a Lei Geral de Proteção de Dados (LGPD).</p>
 <h3>1. Dados que tratamos</h3>
@@ -5222,7 +5223,7 @@ const PRIVACY_HTML = `
 <h3>6. Segurança</h3>
 <p>Adotamos medidas técnicas e administrativas para proteger os dados contra acessos não autorizados, perda ou alteração.</p>
 <h3>7. Contato do encarregado</h3>
-<p>Para exercer seus direitos ou tirar dúvidas: ${APP.supportEmail}.</p>`;
+<p>Para exercer seus direitos ou tirar dúvidas: use o formulário “Fale com o suporte” no site usequitai.com.br.</p>`;
 
 /* ============================================================
    Estrutura do painel: barra lateral, topo, avisos, busca,
@@ -5441,6 +5442,7 @@ A.userMenu = (el) => {
     { label: 'Minha conta', icon: 'user', run: () => go('config', null, { tab: 'conta' }) },
   ];
   if (canSeePage('assinatura')) items.push({ label: 'Assinatura', icon: 'card', run: () => go('assinatura') });
+  items.push({ label: 'Ajuda e suporte', icon: 'help', run: () => A.openSupport() });
   items.push({ label: 'Ver o site', icon: 'external', run: () => goPublic('landing') });
   if (isImpersonating()) items.push({ label: 'Voltar para a minha conta', icon: 'arrowLeft', run: () => A.stopImpersonate() });
   items.push({ sep: true }, { label: 'Sair', icon: 'logout', run: () => A.logout() });
@@ -7390,6 +7392,7 @@ function viewBilling() {
       <p class="muted">${fmtMoney(planMonthly(c.plan, c.billing.cycle))} por mês${c.billing.cycle === 'anual' ? ' no plano anual' : ''} · ${Number.isFinite(p.clients) ? `até ${p.clients} clientes` : 'clientes ilimitados'} · ${p.ai} análises com IA por mês · ${p.support}</p>
     </div>
     <div class="row-wrap" style="justify-content:flex-end">
+      ${c.cloud && bs.kind !== 'active' ? html`<button type="button" class="btn btn-ghost" data-act="syncPayment">${icon('refresh')}Já paguei e não liberou</button>` : ''}
       ${bs.kind === 'trial' || bs.kind === 'trial-ended' || bs.kind === 'canceled-ended' ? html`<button type="button" class="btn btn-primary" data-act="checkout" data-plan="${c.plan}">Assinar o ${p.name}</button>` : ''}
       ${bs.kind === 'active' ? (c.cloud ? html`<button type="button" class="btn" data-act="billingPortal">${icon('card')}Gerenciar assinatura</button>` : html`<button type="button" class="btn btn-danger-outline" data-act="cancelSub">Cancelar assinatura</button>`) : ''}
       ${bs.kind === 'canceled-active' ? html`<button type="button" class="btn btn-primary" data-act="${c.cloud ? 'billingPortal' : 'reactivate'}">Reativar assinatura</button>` : ''}
@@ -7508,6 +7511,71 @@ F.checkout = async (f) => {
   refreshPage(false);
   toast(`Assinatura do plano ${PLANS[planId].name} ativada. Obrigado!`);
 };
+/* ---------- suporte ---------- */
+const SUPPORT_TOPICS = { pagamento: 'Pagamento ou assinatura', acesso: 'Login ou senha', duvida: 'Dúvida sobre o uso', problema: 'Algo não funciona', outro: 'Outro assunto' };
+A.openSupport = () => {
+  closeMenu();
+  const u = me();
+  const cloud = Cloud.on && u;
+  const demo = co() && co().isDemo;
+  openModal({
+    title: 'Fale com o suporte', sub: 'Respondemos por e-mail, normalmente no mesmo dia útil.',
+    body: html`<form id="f-support" class="stack" data-form="support" novalidate>
+      ${cloud ? html`<div class="callout">${icon('card')}<div><strong>Pagou e o plano não foi liberado?</strong> Clique abaixo: conferimos o pagamento direto na Stripe e liberamos na hora.<div style="margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-act="syncPayment">${icon('refresh')}Verificar meu pagamento</button></div></div></div>` : ''}
+      ${cloud ? '' : html`<div class="form-grid">
+        <div class="field"><label for="sp-name">Seu nome</label><input id="sp-name" name="name" class="input" autocomplete="name" required value="${demo ? '' : (u ? u.name : '')}"></div>
+        <div class="field"><label for="sp-email">Seu e-mail</label><input id="sp-email" name="email" type="email" class="input" autocomplete="email" required></div>
+      </div>`}
+      <div class="field"><label for="sp-topic">Assunto</label><select id="sp-topic" name="topic" class="input">${Object.entries(SUPPORT_TOPICS).map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></div>
+      <div class="field"><label for="sp-msg">Mensagem</label><textarea id="sp-msg" name="message" class="textarea" rows="6" maxlength="4000" required placeholder="Conte o que aconteceu. Se for um erro, diga em qual tela e o que você clicou."></textarea></div>
+      <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      ${cloud ? html`<p class="hint">Vamos responder para <strong>${realUser().email}</strong>.</p>` : ''}
+    </form>`,
+    foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-support" class="btn btn-primary">Enviar mensagem</button>`,
+  });
+};
+F.support = async (f) => {
+  const v = formValues(f);
+  const cloud = Cloud.on && me();
+  const errs = {};
+  if (!cloud) {
+    if ((v.name || '').length < 2) errs.name = 'Digite seu nome.';
+    if (!validEmail(v.email || '')) errs.email = 'Digite um e-mail válido para a resposta.';
+  }
+  if ((v.message || '').trim().length < 10) errs.message = 'Escreva um pouco mais sobre o que aconteceu.';
+  if (!showErrors(f, errs)) return;
+  if (!cloudReady()) { formError(f, fnError('network')); return; }
+  const btn = $('[form="f-support"]');
+  setBusy(btn, true, 'Enviando…');
+  const body = { name: cloud ? realUser().name : v.name, email: cloud ? realUser().email : v.email, topic: v.topic, message: v.message, website: f.elements.website.value };
+  let res;
+  if (cloud) res = await callFn('support', body);
+  else {
+    try {
+      const r = await fetch(CLOUD_CFG.url + '/functions/v1/support', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CLOUD_CFG.key }, body: JSON.stringify(body) });
+      res = await r.json().catch(() => ({ error: 'network' }));
+    } catch (e) { res = { error: 'network' }; }
+  }
+  setBusy(btn, false);
+  if (!res || res.error) { formError(f, res && res.error === 'rate_limited' ? 'Você enviou várias mensagens seguidas. Espere um pouco e tente de novo.' : fnError(res && res.error)); return; }
+  closeModal(true);
+  toast(`Mensagem enviada${res.protocol ? ` (protocolo ${res.protocol})` : ''}. Vamos responder no seu e-mail.`, { timeout: 9000 });
+};
+A.syncPayment = async (el) => {
+  if (!Cloud.on) return;
+  if (el) setBusy(el, true, 'Verificando…');
+  const res = await callFn('billing', { action: 'sync' });
+  if (res.error) { if (el && el.isConnected) setBusy(el, false); toast(fnError(res.error), { type: 'bad' }); return; }
+  await cloudReload();
+  closeAllModals();
+  const c = co();
+  const kind = c ? billingState(c).kind : '';
+  if (res.found && kind === 'active') toast(`Pagamento confirmado. Seu plano ${planOf(c).name} está liberado.`);
+  else if (res.found && kind === 'canceled-active') toast(`Sua assinatura está cancelada, com acesso liberado até ${fmtDate(c.billing.currentPeriodEnd)}. Para continuar depois disso, use “Reativar assinatura”.`, { type: 'info', timeout: 10000 });
+  else if (res.found) toast('Encontramos sua assinatura, mas o pagamento ainda não foi aprovado pela Stripe. Se o cartão foi recusado, tente de novo em Assinatura.', { type: 'warn', timeout: 10000 });
+  else toast('Não encontramos nenhum pagamento desta conta na Stripe. Se você pagou, use “Fale com o suporte” e conte o e-mail usado no pagamento.', { type: 'warn', timeout: 12000 });
+};
+
 A.billingPortal = async (el) => {
   if (me().role !== 'owner' || isImpersonating()) { toast('Só o proprietário da conta pode gerenciar a assinatura.', { type: 'warn' }); return; }
   if (el) setBusy(el, true, 'Abrindo…');
@@ -7650,7 +7718,7 @@ function setAccount() {
   return html`<section class="card set-card" aria-labelledby="st-acc">
     <div><h3 id="st-acc">Seus dados</h3><p class="set-desc">Você entra no Quitaí com este e-mail.</p></div>
     <form id="f-account" class="stack-lg" data-form="account" novalidate>
-      <div class="form-grid"><div class="field"><label for="ac-name">Nome</label><input id="ac-name" name="name" class="input" value="${u.name}" autocomplete="name" required></div><div class="field"><label for="ac-email">E-mail de acesso</label><input id="ac-email" name="email" type="email" class="input" value="${u.email}" autocomplete="email" required${Cloud.on ? raw(' readonly') : ''}>${Cloud.on ? html`<p class="hint">Para trocar o e-mail de acesso, escreva para ${APP.supportEmail}.</p>` : ''}</div></div>
+      <div class="form-grid"><div class="field"><label for="ac-name">Nome</label><input id="ac-name" name="name" class="input" value="${u.name}" autocomplete="name" required></div><div class="field"><label for="ac-email">E-mail de acesso</label><input id="ac-email" name="email" type="email" class="input" value="${u.email}" autocomplete="email" required${Cloud.on ? raw(' readonly') : ''}>${Cloud.on ? html`<p class="hint">Para trocar o e-mail de acesso, <button type="button" class="link-btn" data-act="openSupport">fale com o suporte</button>.</p>` : ''}</div></div>
       <div class="between"><span class="muted">Função: <strong style="color:var(--ink)">${ROLES[u.role].label}</strong></span><button type="submit" class="btn btn-primary">Salvar</button></div>
     </form>
   </section>

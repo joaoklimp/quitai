@@ -1,15 +1,28 @@
 // Assinatura: abre o pagamento da Stripe (checkout) ou o portal para gerenciar a assinatura.
 import { admin, caller, cors, CYCLES, json, PLAN_IDS, SITE_URL, stripe } from '../_shared/common.ts';
+import { syncSubscription } from '../_shared/sync.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
   try {
     const me = await caller(req);
     if (!me) return json(req, { error: 'not_authenticated' }, 401);
-    if (me.role !== 'owner') return json(req, { error: 'not_owner' }, 403);
     const body = await req.json().catch(() => ({}));
     const { data: company } = await admin.from('companies').select('*').eq('id', me.company_id).single();
     if (!company) return json(req, { error: 'no_company' }, 404);
+
+    // "Já paguei e meu plano não liberou": busca a assinatura direto na Stripe
+    if (body.action === 'sync') {
+      if (!company.stripe_customer_id) return json(req, { ok: true, found: false });
+      const subs = await stripe.subscriptions.list({ customer: company.stripe_customer_id, status: 'all', limit: 10 });
+      const mine = subs.data.filter((s) => s.metadata?.app === 'quitai');
+      const best = mine.find((s) => ['active', 'trialing', 'past_due'].includes(s.status)) ?? mine[0];
+      if (!best) return json(req, { ok: true, found: false });
+      await syncSubscription(best);
+      return json(req, { ok: true, found: true, status: best.status });
+    }
+
+    if (me.role !== 'owner') return json(req, { error: 'not_owner' }, 403);
     // volta para o endereço de onde a pessoa veio (site publicado ou teste local)
     const origin = cors(req)['Access-Control-Allow-Origin'] === req.headers.get('origin') ? req.headers.get('origin') : SITE_URL;
     const page = origin === 'https://joaoklimp.github.io' ? `${origin}/quitai/` : `${origin}/`;
