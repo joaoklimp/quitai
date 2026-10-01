@@ -31,6 +31,27 @@ async function recordInvoice(inv: Stripe.Invoice) {
   await admin.from('companies').update({ invoices: [entry, ...list].slice(0, 60) }).eq('id', company.id);
 }
 
+// Reembolso total ou contestação no cartão: cancela a assinatura na hora (o acesso é bloqueado
+// quando o aviso customer.subscription.deleted chega) e marca a fatura como estornada.
+async function revokeForCharge(charge: Stripe.Charge, reason: 'reembolsada' | 'contestada') {
+  const customer = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id ?? null;
+  const company = await companyFor(customer, null);
+  if (!company) return;
+  if (company.stripe_subscription_id) {
+    const sub = await stripe.subscriptions.retrieve(company.stripe_subscription_id).catch(() => null);
+    if (sub && !['canceled', 'incomplete_expired'].includes(sub.status)) {
+      await stripe.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false, cancellation_details: { comment: `Pagamento ${reason}` } });
+    }
+  }
+  // marca a fatura correspondente (mesmo valor, mais recente ainda paga)
+  const list = Array.isArray(company.invoices) ? company.invoices : [];
+  const i = list.findIndex((x: { status: string; amount: number }) => x.status === 'paga' && x.amount === charge.amount);
+  if (i >= 0) {
+    list[i] = { ...list[i], status: reason };
+    await admin.from('companies').update({ invoices: list }).eq('id', company.id);
+  }
+}
+
 Deno.serve(async (req) => {
   const sig = req.headers.get('stripe-signature');
   const body = await req.text();
@@ -58,6 +79,17 @@ Deno.serve(async (req) => {
       case 'invoice.paid':
         await recordInvoice(event.data.object as Stripe.Invoice);
         break;
+      case 'charge.refunded': {
+        const ch = event.data.object as Stripe.Charge;
+        if (ch.refunded) await revokeForCharge(ch, 'reembolsada'); // só reembolso total
+        break;
+      }
+      case 'charge.dispute.created': {
+        const d = event.data.object as Stripe.Dispute;
+        const ch = await stripe.charges.retrieve(typeof d.charge === 'string' ? d.charge : d.charge.id);
+        await revokeForCharge(ch, 'contestada');
+        break;
+      }
     }
   } catch (e) {
     console.error(event.type, e);
