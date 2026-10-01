@@ -36,6 +36,9 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'checkout') {
+      // no site oficial, só aceita pagamento com a chave real (impede assinar com cartão de teste)
+      const liveKey = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').startsWith('sk_live_');
+      if (!liveKey && /usequitai\.com\.br$/.test(new URL(page).hostname)) return json(req, { error: 'payments_soon' }, 503);
       const plan = String(body.plan);
       const cycle = String(body.cycle);
       if (!PLAN_IDS.includes(plan as never) || !CYCLES.includes(cycle as never)) return json(req, { error: 'invalid_plan' }, 400);
