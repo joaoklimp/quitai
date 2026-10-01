@@ -5,6 +5,23 @@ import { syncSubscription } from '../_shared/sync.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
   try {
+    // checagem de configuração: só diz o modo das chaves, nunca o valor
+    const peek = await req.clone().json().catch(() => ({}));
+    if (peek.action === 'health') {
+      const key = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+      let account: string | null = null;
+      let prices = 0;
+      try {
+        account = (await stripe.accounts.retrieve()).id;
+        prices = (await stripe.prices.list({ lookup_keys: ['quitai_basico_mensal', 'quitai_pro_mensal', 'quitai_empresa_mensal', 'quitai_basico_anual', 'quitai_pro_anual', 'quitai_empresa_anual'], active: true, limit: 10 })).data.length;
+      } catch (_) { /* chave inválida */ }
+      return json(req, {
+        mode: key.startsWith('sk_live_') ? 'live' : key.startsWith('sk_test_') ? 'test' : key.startsWith('rk_live_') ? 'live-restricted' : 'unknown',
+        account, prices,
+        webhookSecret: (Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '').startsWith('whsec_'),
+        resend: (Deno.env.get('RESEND_API_KEY') ?? '').startsWith('re_'),
+      });
+    }
     const me = await caller(req);
     if (!me) return json(req, { error: 'not_authenticated' }, 401);
     const body = await req.json().catch(() => ({}));
