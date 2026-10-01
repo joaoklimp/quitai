@@ -20,6 +20,8 @@ Deno.serve(async (req) => {
         account, prices,
         webhookSecret: (Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '').startsWith('whsec_'),
         resend: (Deno.env.get('RESEND_API_KEY') ?? '').startsWith('re_'),
+        resendWebhook: (Deno.env.get('RESEND_WEBHOOK_SECRET') ?? '').startsWith('whsec_'),
+        ai: (Deno.env.get('ANTHROPIC_API_KEY') ?? '').startsWith('sk-ant-'),
       });
     }
     const me = await caller(req);
