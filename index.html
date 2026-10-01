@@ -1238,9 +1238,12 @@ body.drawer-open .toasts { right: 480px; }
 <div id="modals"></div>
 <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
 <noscript><p style="padding:24px;font-family:system-ui">O Quitaí precisa de JavaScript para funcionar. Ative o JavaScript do navegador e recarregue a página.</p></noscript>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <script>
 (function () {
 'use strict';
+/* Servidor (Supabase). A chave abaixo é a pública (publishable/anon): pode ficar no site. */
+const CLOUD_CFG = { url: 'https://zldzvtmtulmqkikvarbj.supabase.co', key: 'COLE_AQUI_A_CHAVE_PUBLICA' };
 /* ============================================================
    Quitaí · núcleo: utilitários, template HTML seguro, ícones,
    datas, dinheiro, documentos e telefone.
@@ -1792,6 +1795,7 @@ function migrate(d) {
 function save() {
   if (!DB) return;
   DB.savedAt = Date.now();
+  if (Cloud.on) { cloudSave(); return; }
   clearTimeout(Sync.tLocal);
   Sync.tLocal = setTimeout(flushLocal, 150);
   if (Sync.cloud) {
@@ -1803,7 +1807,7 @@ function save() {
 function flushLocal() {
   clearTimeout(Sync.tLocal);
   Sync.tLocal = null;
-  if (!DB) return;
+  if (!DB || Cloud.on) return;
   const ok = lsSet(LS_KEY, JSON.stringify(DB));
   Sync.localOk = ok;
   if (!Sync.cloud) setSyncState(ok ? 'local' : 'memory');
@@ -1938,6 +1942,194 @@ function syncBadge() {
 }
 
 /* ============================================================
+   Nuvem (Supabase): login de verdade, dados da empresa no
+   servidor e assinatura pela Stripe. A demonstração continua
+   só neste navegador.
+   ============================================================ */
+const Cloud = { sb: null, on: false, userId: null, companyId: null, version: 0, updatedAt: '', saving: false, pending: false, t: null, retry: 0, warned: false };
+const SERVER_KEYS = ['id', 'plan', 'billing', 'invoices', 'createdAt', 'cloud'];
+function cloudReady() {
+  if (Cloud.sb) return true;
+  if (!window.supabase || !CLOUD_CFG.key || CLOUD_CFG.key.startsWith('COLE_')) return false;
+  Cloud.sb = window.supabase.createClient(CLOUD_CFG.url, CLOUD_CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  return true;
+}
+function cloudOff() { return !cloudReady(); }
+function sitePage() { return location.origin + location.pathname; }
+function themeKey(id) { return 'quitai:theme:' + id; }
+
+/* monta o DB em memória a partir do servidor */
+function applyServerBilling(c, row) {
+  c.plan = PLANS[row.plan] ? row.plan : 'pro';
+  c.billing = {
+    status: row.billing_status === 'past_due' ? 'active' : row.billing_status,
+    pastDue: row.billing_status === 'past_due',
+    trialEndsAt: row.trial_ends_at, currentPeriodEnd: row.current_period_end || null,
+    method: row.billing_status === 'trial' ? null : 'cartao', canceledAt: row.canceled_at ? Date.parse(row.canceled_at) : null,
+    cycle: row.billing_cycle === 'anual' ? 'anual' : 'mensal', hasSub: !!row.stripe_subscription_id,
+  };
+  c.invoices = Array.isArray(row.invoices) ? row.invoices : [];
+}
+async function cloudLoad() {
+  const sb = Cloud.sb;
+  const { data: auth } = await sb.auth.getUser();
+  const user = auth && auth.user;
+  if (!user) return { error: 'Sua sessão terminou. Entre de novo.' };
+  let { data: m } = await sb.from('members').select('*').eq('user_id', user.id).maybeSingle();
+  if (!m) {
+    // primeiro acesso depois do cadastro: cria a empresa com o que a pessoa preencheu
+    const md = user.user_metadata || {};
+    const { error } = await sb.rpc('create_company', { p_name: md.company || 'Minha empresa', p_owner_name: md.name || '', p_plan: md.plan || 'pro', p_segment: md.segment || 'servicos' });
+    if (error && !/already_member/.test(error.message)) return { error: 'Não conseguimos criar a sua empresa agora. Tente de novo em instantes.' };
+    ({ data: m } = await sb.from('members').select('*').eq('user_id', user.id).maybeSingle());
+    if (!m) return { error: 'Não encontramos a empresa desta conta.' };
+  }
+  if (!m.active) return { error: 'Seu acesso foi desativado. Fale com o responsável pela empresa.' };
+  const { data: row } = await sb.from('companies').select('*').eq('id', m.company_id).maybeSingle();
+  if (!row) return { error: 'O acesso de equipe não está disponível no plano atual da empresa. Peça ao proprietário para mudar para o plano Empresa.' };
+  const { data: people } = await sb.from('members').select('*').eq('company_id', m.company_id);
+  const d = row.data || {};
+  const c = Object.assign(newCompany({ name: d.name || 'Minha empresa', email: d.email || user.email, plan: row.plan, segment: d.segment }), d);
+  c.id = row.id;
+  c.cloud = true;
+  c.isDemo = false;
+  c.createdAt = Date.parse(row.created_at) || Date.now();
+  applyServerBilling(c, row);
+  const db = emptyDB();
+  db.companies[c.id] = c;
+  for (const p of people || [m]) {
+    db.users[p.email] = { id: p.user_id, name: p.name, email: p.email, companyId: c.id, role: p.role, active: p.active, mustChange: p.must_change, lastLoginAt: p.last_login_at ? Date.parse(p.last_login_at) : null, createdAt: Date.parse(p.created_at) || null, theme: lsGet(themeKey(p.user_id)) || 'system' };
+  }
+  db.session = { email: m.email, realEmail: null };
+  db.savedAt = Date.now();
+  DB = migrate(db);
+  clearTimeout(Cloud.t);
+  Object.assign(Cloud, { on: true, userId: user.id, companyId: c.id, version: row.version, updatedAt: row.updated_at, pending: false, retry: 0, t: null });
+  setSyncState('cloud');
+  return { ok: true, user: DB.users[m.email] };
+}
+/* volta para o modo deste navegador (demonstração) */
+function leaveCloud() {
+  clearTimeout(Cloud.t);
+  Object.assign(Cloud, { on: false, userId: null, companyId: null, version: 0, pending: false, t: null });
+  DB = migrate(loadLocal() || emptyDB());
+  if (!localSessionOk()) DB.session = { email: null, realEmail: null };
+  setSyncState(Sync.localOk ? 'local' : 'memory');
+}
+/* neste navegador só a demonstração pode ficar logada */
+function localSessionOk() {
+  const u = DB.session.email ? DB.users[DB.session.email] : null;
+  const c = u ? DB.companies[u.companyId] : null;
+  return !!(c && c.isDemo);
+}
+function companyPayload(c) {
+  const out = {};
+  for (const [k, v] of Object.entries(c)) if (!SERVER_KEYS.includes(k)) out[k] = v;
+  return out;
+}
+function cloudSave() {
+  if (!Cloud.on) return;
+  clearTimeout(Cloud.t);
+  Cloud.t = setTimeout(flushCloudSave, 900);
+  setSyncState('saving');
+}
+async function flushCloudSave() {
+  clearTimeout(Cloud.t);
+  Cloud.t = null;
+  if (!Cloud.on) return;
+  const c = DB.companies[Cloud.companyId];
+  const u = realUser();
+  if (!c || !u || u.role === 'leitura') { setSyncState('cloud'); return; }
+  if (Cloud.saving) { Cloud.pending = true; return; }
+  Cloud.saving = true;
+  try {
+    const { data, error } = await Cloud.sb.rpc('save_company', { p_data: companyPayload(c), p_version: Cloud.version });
+    if (error) throw error;
+    Cloud.version = data;
+    Cloud.retry = 0;
+    setSyncState('cloud');
+  } catch (e) {
+    const msg = String((e && e.message) || '');
+    const why = ['conflict', 'locked', 'client_limit', 'read_only', 'no_access'].find((k) => msg.includes(k));
+    if (why) {
+      Cloud.pending = false;
+      await cloudReload();
+      toast({
+        conflict: 'Outra pessoa da equipe mudou os dados agora há pouco. Atualizamos a tela. Confira se a sua última alteração entrou.',
+        locked: 'O painel está em modo leitura porque o teste ou a assinatura terminou. A última alteração não foi salva.',
+        client_limit: 'Você chegou ao limite de clientes do seu plano. A última alteração não foi salva.',
+        read_only: 'Seu acesso é só de leitura. A alteração não foi salva.',
+        no_access: 'Seu acesso a esta empresa mudou. Entre de novo.',
+      }[why], { type: 'warn', timeout: 9000 });
+    } else {
+      setSyncState('error');
+      Cloud.retry = Math.min(Cloud.retry + 1, 6);
+      clearTimeout(Cloud.t);
+      Cloud.t = setTimeout(flushCloudSave, 3000 * Cloud.retry);
+    }
+  } finally {
+    Cloud.saving = false;
+    if (Cloud.pending) { Cloud.pending = false; setTimeout(flushCloudSave, 50); }
+  }
+}
+async function cloudReload() {
+  if (!Cloud.on) return;
+  const route = Object.assign({}, ui.route);
+  const sess = Object.assign({}, DB.session);
+  const r = await cloudLoad();
+  if (r.error) { await cloudSignOut(); toast(r.error, { type: 'warn', timeout: 9000 }); return; }
+  if (sess.realEmail && DB.users[sess.email]) DB.session = sess;
+  runMaintenance();
+  if (!modalStack.length) { ui.route = route; render(); }
+}
+/* confere de tempos em tempos se a assinatura ou os dados mudaram no servidor */
+async function cloudPoll() {
+  if (!Cloud.on || Cloud.saving || Cloud.t || document.visibilityState === 'hidden') return;
+  const { data: row } = await Cloud.sb.from('companies').select('version,updated_at,plan,billing_status,billing_cycle,trial_ends_at,current_period_end,canceled_at,invoices,stripe_subscription_id').eq('id', Cloud.companyId).maybeSingle();
+  if (!row || !Cloud.on) return;
+  if (row.version !== Cloud.version) { if (!Cloud.t && !Cloud.saving) await cloudReload(); return; }
+  if (row.updated_at !== Cloud.updatedAt) {
+    Cloud.updatedAt = row.updated_at;
+    const c = DB.companies[Cloud.companyId];
+    applyServerBilling(c, row);
+    if (!modalStack.length) refreshPage(false);
+    return true;
+  }
+  return false;
+}
+async function cloudSignOut() {
+  try { if (Cloud.sb) await Cloud.sb.auth.signOut(); } catch (e) { /* ignora */ }
+  leaveCloud();
+  closeAllModals();
+  ui.route = { name: 'landing', page: 'dashboard', id: null };
+  const root = document.getElementById('app');
+  if (root) root.innerHTML = '';
+  render();
+}
+/* chama uma função do servidor (equipe, assinatura) com o login atual */
+async function callFn(name, body) {
+  try {
+    const { data, error } = await Cloud.sb.functions.invoke(name, { body });
+    if (error) {
+      let detail = null;
+      try { detail = await error.context.json(); } catch (e) { detail = null; }
+      return { error: (detail && detail.error) || 'network' };
+    }
+    return data || { error: 'network' };
+  } catch (e) { return { error: 'network' }; }
+}
+const FN_ERRORS = {
+  network: 'Não conseguimos falar com o servidor. Confira a internet e tente de novo.',
+  not_owner: 'Só o proprietário da conta pode fazer isso.',
+  not_allowed: 'Você não tem permissão para fazer isso.',
+  plan_required: 'A equipe está disponível só no plano Empresa.',
+  email_in_use: 'Este e-mail já tem acesso ao Quitaí.',
+  already_subscribed: 'Você já tem uma assinatura ativa. Use “Gerenciar assinatura” para mudar de plano.',
+  no_subscription: 'Ainda não há assinatura para gerenciar.',
+};
+function fnError(code) { return FN_ERRORS[code] || 'Algo deu errado. Tente de novo em instantes.'; }
+
+/* ============================================================
    Regras de negócio: contas, empresas, clientes, cobranças,
    status, multa e juros, mensalidades automáticas, acordos,
    pontualidade, métricas, mensagens e fila de cobrança.
@@ -1986,7 +2178,7 @@ function billingState(c = co()) {
 function isLocked(c = co()) { const k = billingState(c).kind; return k === 'trial-ended' || k === 'canceled-ended'; }
 function renewSubscriptions(c) {
   const b = c.billing, t = todayISO();
-  if (b.status !== 'active' || !b.currentPeriodEnd) return;
+  if (c.cloud || b.status !== 'active' || !b.currentPeriodEnd) return;
   const cy = b.cycle === 'anual' ? 'anual' : 'mensal';
   let guard = 0;
   while (b.currentPeriodEnd <= t && guard++ < 36) {
@@ -4858,6 +5050,7 @@ A.lpMenu = (el) => openMenu(el, [
 ]);
 A.startDemo = async (el) => {
   if (el && el.disabled) return;
+  if (Cloud.on) { toast('Para abrir a demonstração, saia primeiro da sua conta.', { type: 'info' }); return; }
   const btns = $$('[data-act="startDemo"]');
   btns.forEach((b) => { b.disabled = true; });
   try {
@@ -4872,26 +5065,55 @@ A.startDemo = async (el) => {
   } finally { btns.forEach((b) => { if (b.isConnected) b.disabled = false; }); }
 };
 A.forgotPass = () => {
+  const email = (($('#login-email') || {}).value || '').trim();
   openModal({
     title: 'Esqueceu a senha?', size: 'sm',
-    body: html`<p class="ink2">Se você faz parte da equipe de uma empresa, peça ao proprietário ou a um administrador para redefinir sua senha em <strong>Equipe</strong>.</p><div class="callout">${icon('info')}<div>A recuperação de senha por e-mail do proprietário ainda não está disponível. Se precisar de ajuda, escreva para <strong>${APP.supportEmail}</strong>.</div></div>`,
-    foot: html`<button type="button" class="btn btn-primary" data-act="modalCancel">Entendi</button>`,
+    body: html`<form id="f-forgot" class="stack" data-form="forgot" novalidate>
+      <p class="ink2">Digite o e-mail da sua conta. Vamos enviar um link para você criar uma senha nova.</p>
+      <div class="field"><label for="fg-email">E-mail</label><input id="fg-email" name="email" type="email" class="input" autocomplete="username" value="${email}" required></div>
+      <p class="hint">Faz parte da equipe de uma empresa? O proprietário ou um administrador também pode redefinir sua senha em <strong>Equipe</strong>.</p>
+    </form>`,
+    foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-forgot" class="btn btn-primary">Enviar link</button>`,
   });
 };
+F.forgot = async (f) => {
+  const v = formValues(f);
+  if (!showErrors(f, validEmail(v.email) ? {} : { email: 'Digite um e-mail válido.' })) return;
+  if (cloudOff()) { formError(f, 'O login está indisponível agora. Tente de novo em instantes.'); return; }
+  const btn = $('[form="f-forgot"]');
+  setBusy(btn, true, 'Enviando…');
+  const { error } = await Cloud.sb.auth.resetPasswordForEmail(v.email.trim().toLowerCase(), { redirectTo: sitePage() });
+  setBusy(btn, false);
+  if (error && /rate|limit|security purposes/i.test(error.message)) { formError(f, 'Você pediu vários links seguidos. Espere alguns minutos e tente de novo.'); return; }
+  closeModal(true);
+  toast('Se este e-mail tiver conta no Quitaí, o link chega em alguns minutos. Confira também o spam.', { timeout: 9000 });
+};
 
+function authErrorText(e) {
+  const m = String((e && e.message) || '');
+  if (/invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (/email not confirmed/i.test(m)) return 'Confirme seu e-mail pelo link que enviamos antes de entrar.';
+  if (/already registered|already been registered|exists/i.test(m)) return 'Já existe uma conta com este e-mail. Entre com sua senha ou use outro e-mail.';
+  if (/password/i.test(m) && /weak|short|characters/i.test(m)) return 'Escolha uma senha mais forte, com pelo menos 8 caracteres.';
+  if (/rate|too many/i.test(m)) return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
+  return 'Não conseguimos falar com o servidor. Confira a internet e tente de novo.';
+}
 F.login = async (f) => {
   const v = formValues(f);
   const errs = {};
   if (!validEmail(v.email)) errs.email = 'Digite um e-mail válido.';
   if (!v.pass) errs.pass = 'Digite sua senha.';
   if (!showErrors(f, errs)) return;
+  if (cloudOff()) { formError(f, 'O login está indisponível agora. Tente de novo em instantes.'); return; }
   const btn = f.querySelector('[type=submit]');
   const pass = f.elements.pass.value;
   setBusy(btn, true, 'Entrando…');
-  await ensureCloud();
-  const r = await login(v.email, pass);
+  const { error } = await Cloud.sb.auth.signInWithPassword({ email: v.email.trim().toLowerCase(), password: pass });
+  if (error) { setBusy(btn, false); formError(f, authErrorText(error)); return; }
+  const r = await cloudLoad();
   setBusy(btn, false);
-  if (r.error) { formError(f, r.error); return; }
+  if (r.error) { await Cloud.sb.auth.signOut(); leaveCloud(); formError(f, r.error); return; }
+  Cloud.sb.rpc('touch_login');
   runMaintenance();
   go('dashboard');
   if (r.user.mustChange) askNewPassword();
@@ -4906,20 +5128,34 @@ F.signup = async (f) => {
   if ((f.elements.pass.value || '').length < 8) errs.pass = 'A senha precisa ter pelo menos 8 caracteres.';
   if (!v.terms) errs.terms = 'Para criar a conta, aceite os termos de uso e a política de privacidade.';
   if (!showErrors(f, errs)) return;
+  if (cloudOff()) { formError(f, 'O cadastro está indisponível agora. Tente de novo em instantes.'); return; }
   const btn = f.querySelector('[type=submit]');
   const pass = f.elements.pass.value;
   setBusy(btn, true, 'Criando sua conta…');
-  await ensureCloud();
-  const r = await createAccount({ name: v.name, email: v.email, companyName: v.company, pass, plan: v.plan || 'pro', segment: v.segment || 'servicos' });
+  const meta = { name: v.name.trim(), company: v.company.trim(), plan: PLANS[v.plan] ? v.plan : 'pro', segment: SEGMENTS[v.segment] ? v.segment : 'servicos' };
+  const { data, error } = await Cloud.sb.auth.signUp({ email: v.email.trim().toLowerCase(), password: pass, options: { data: meta, emailRedirectTo: sitePage() } });
+  if (error) { setBusy(btn, false); showErrors(f, { email: authErrorText(error) }); return; }
+  if (!data.session) {
+    // o projeto pede confirmação por e-mail: a empresa é criada no primeiro acesso
+    setBusy(btn, false);
+    if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) { showErrors(f, { email: authErrorText({ message: 'already registered' }) }); return; }
+    openModal({ title: 'Confirme seu e-mail', size: 'sm', body: html`<p class="ink2">Enviamos um link para <strong>${v.email}</strong>. Abra o e-mail e clique no link para ativar sua conta e começar o teste grátis.</p><p class="hint">Não chegou? Confira o spam.</p>`, foot: html`<button type="button" class="btn btn-primary" data-act="modalCancel">Entendi</button>` });
+    return;
+  }
+  const r = await cloudLoad();
   setBusy(btn, false);
-  if (r.error) { showErrors(f, { email: r.error }); return; }
+  if (r.error) { await Cloud.sb.auth.signOut(); leaveCloud(); formError(f, r.error); return; }
+  const c = co();
+  logAct(c, 'account', `Criou a conta da empresa no plano ${PLANS[c.plan].name}, com ${TRIAL_DAYS} dias de teste grátis`);
+  save();
   go('dashboard');
-  toast(`Conta criada. Seu teste do plano ${planOf().name} vai até ${fmtDate(co().billing.trialEndsAt)}.`);
+  toast(`Conta criada. Seu teste do plano ${planOf().name} vai até ${fmtDate(c.billing.trialEndsAt)}.`);
 };
-function askNewPassword() {
+function askNewPassword(recovery = false) {
+  ui.recovery = recovery;
   openModal({
-    title: 'Crie sua senha', size: 'sm', dismissable: false,
-    sub: 'Você entrou com uma senha temporária. Defina agora uma senha só sua.',
+    title: recovery ? 'Crie uma senha nova' : 'Crie sua senha', size: 'sm', dismissable: false,
+    sub: recovery ? 'Você abriu o link de recuperação. Defina agora a sua senha nova.' : 'Você entrou com uma senha temporária. Defina agora uma senha só sua.',
     body: html`<form id="f-newpass" class="stack" data-form="newPass" novalidate>${passField('np-1', 'p1', 'Nova senha (mínimo 8 caracteres)', 'new-password')}${passField('np-2', 'p2', 'Repita a nova senha', 'new-password')}</form>`,
     foot: html`<button type="submit" form="f-newpass" class="btn btn-primary">Salvar senha</button>`,
   });
@@ -4931,12 +5167,23 @@ F.newPass = async (f) => {
   else if (p1 !== p2) errs.p2 = 'As senhas não são iguais.';
   if (!showErrors(f, errs)) return;
   const u = me();
-  u.salt = uid('s_');
-  u.hash = await hashPass(p1, u.salt);
-  u.mustChange = false;
-  save();
+  if (Cloud.on) {
+    const btn = $('[form="f-newpass"]');
+    setBusy(btn, true, 'Salvando…');
+    const { error } = await Cloud.sb.auth.updateUser({ password: p1 });
+    if (!error) await Cloud.sb.rpc('clear_must_change');
+    setBusy(btn, false);
+    if (error) { showErrors(f, { p1: /different|same/i.test(error.message) ? 'Escolha uma senha diferente da anterior.' : authErrorText(error) }); return; }
+    u.mustChange = false;
+  } else {
+    u.salt = uid('s_');
+    u.hash = await hashPass(p1, u.salt);
+    u.mustChange = false;
+    save();
+  }
   closeModal(true);
-  toast('Senha criada. Bem-vindo ao Quitaí!');
+  toast(ui.recovery ? 'Senha nova salva.' : 'Senha criada. Bem-vindo ao Quitaí!');
+  ui.recovery = false;
 };
 
 /* ---------- textos legais (modelo) ---------- */
@@ -5104,6 +5351,7 @@ function viewBanners() {
   } else if (bs.kind === 'canceled-active') {
     out.push(html`<div class="banner warn">${icon('info')}<span>Assinatura cancelada. Você pode usar tudo até ${fmtDate(bs.until)}.</span>${owner ? html`<span class="banner-act"><button type="button" class="btn btn-sm" data-act="nav" data-page="assinatura">Reativar</button></span>` : ''}</div>`);
   }
+  if (c.billing.pastDue) out.push(html`<div class="banner warn">${icon('alert')}<span>Não conseguimos cobrar a última fatura da assinatura. Atualize o cartão para não perder o acesso.</span>${owner ? html`<span class="banner-act"><button type="button" class="btn btn-sm btn-primary" data-act="billingPortal">Atualizar cartão</button></span>` : ''}</div>`);
   if (Sync.state === 'memory') out.push(html`<div class="banner warn">${icon('alert')}<span>Este navegador não está permitindo salvar dados. Exporte um backup antes de fechar a página.</span><span class="banner-act"><button type="button" class="btn btn-sm" data-act="exportJSON">Baixar backup</button></span></div>`);
   return html`${out}`;
 }
@@ -5198,8 +5446,14 @@ A.userMenu = (el) => {
   items.push({ sep: true }, { label: 'Sair', icon: 'logout', run: () => A.logout() });
   openMenu(el, items, 'left');
 };
-A.logout = () => {
+A.logout = async () => {
   const c = co();
+  if (Cloud.on) {
+    if (Cloud.t || Cloud.saving) await flushCloudSave();
+    await cloudSignOut();
+    toast('Você saiu da sua conta.', { type: 'info' });
+    return;
+  }
   logout();
   closeAllModals();
   ui.route = { name: 'landing', page: 'dashboard', id: null };
@@ -6691,8 +6945,22 @@ F.member = async (f) => {
   if (!validEmail(v.email)) errs.email = 'Digite um e-mail válido.';
   else if (DB.users[v.email.toLowerCase()]) errs.email = 'Este e-mail já tem acesso ao Quitaí.';
   if (!showErrors(f, errs)) return;
-  const r = await addMember(c, { name: v.name, email: v.email, role: v.role || 'financeiro' });
-  if (r.error) { showErrors(f, { email: r.error }); return; }
+  let r;
+  if (Cloud.on) {
+    const btn = $('[form="f-member"]');
+    setBusy(btn, true, 'Criando…');
+    const role = ROLES[v.role] && v.role !== 'owner' ? v.role : 'financeiro';
+    const res = await callFn('team', { action: 'add', name: v.name.trim(), email: v.email.trim().toLowerCase(), role });
+    setBusy(btn, false);
+    if (res.error) { showErrors(f, { email: fnError(res.error) }); return; }
+    const key = v.email.trim().toLowerCase();
+    DB.users[key] = { id: res.user_id, name: v.name.trim(), email: key, companyId: c.id, role, createdAt: Date.now(), lastLoginAt: null, mustChange: true, active: true, invitedBy: realUser().id, theme: 'system' };
+    logAct(c, 'team', `Deu acesso a ${v.name.trim()} como ${ROLES[role].label}`);
+    r = { temp: res.temp, user: DB.users[key] };
+  } else {
+    r = await addMember(c, { name: v.name, email: v.email, role: v.role || 'financeiro' });
+    if (r.error) { showErrors(f, { email: r.error }); return; }
+  }
   save();
   closeModal(true);
   refreshPage(false);
@@ -6705,7 +6973,7 @@ function showCredentials(u, temp, isNew) {
     title: isNew ? 'Acesso criado' : 'Senha redefinida', size: 'sm',
     body: html`<p class="ink2">Envie os dados abaixo para ${u.name.split(' ')[0]}. A senha temporária aparece só agora.</p>
       <div class="fieldset"><div class="between"><span class="muted">E-mail</span><strong>${u.email}</strong></div><div class="between"><span class="muted">Senha temporária</span><code class="mono" style="font-size:15px;font-weight:600;user-select:all">${temp}</code></div></div>
-      <p class="hint">Nesta versão, os dados da conta ficam salvos neste navegador, então o acesso funciona neste dispositivo. Use “Ver o painel como esta pessoa” para conferir o que ela enxerga.</p>`,
+      <p class="hint">${Cloud.on ? `A pessoa entra em ${sitePage()} com este e-mail e esta senha, de qualquer dispositivo.` : 'Na demonstração, o acesso funciona só neste navegador.'} Use “Ver o painel como esta pessoa” para conferir o que ela enxerga.</p>`,
     foot: html`<button type="button" class="btn" data-act="copy" data-text="${msg}" data-ok="Mensagem copiada.">${icon('copy')}Copiar mensagem</button><button type="button" class="btn btn-primary" data-act="modalCancel">Concluir</button>`,
   });
 }
@@ -6716,10 +6984,22 @@ A.memberMenu = (el) => {
   const items = [
     { label: 'Ver o painel como esta pessoa', icon: 'eye', disabled: u.active === false, run: () => impersonate(u) },
     { label: 'Alterar função', icon: 'edit', run: () => changeRoleModal(u) },
-    { label: 'Redefinir senha', icon: 'key', run: async () => { const t = await resetMemberPassword(u); logAct(c, 'team', `Redefiniu a senha de ${u.name}`); save(); refreshPage(); showCredentials(u, t, false); } },
-    { label: u.active === false ? 'Reativar acesso' : 'Desativar acesso', icon: u.active === false ? 'refresh' : 'ban', run: () => { u.active = u.active === false; logAct(c, 'team', `${u.active ? 'Reativou' : 'Desativou'} o acesso de ${u.name}`); save(); refreshPage(); toast(u.active ? 'Acesso reativado.' : 'Acesso desativado. A pessoa não consegue mais entrar.'); } },
+    { label: 'Redefinir senha', icon: 'key', run: async () => {
+      let t;
+      if (Cloud.on) { const res = await callFn('team', { action: 'reset', user_id: u.id }); if (res.error) { toast(fnError(res.error), { type: 'bad' }); return; } t = res.temp; u.mustChange = true; } else t = await resetMemberPassword(u);
+      logAct(c, 'team', `Redefiniu a senha de ${u.name}`); save(); refreshPage(); showCredentials(u, t, false);
+    } },
+    { label: u.active === false ? 'Reativar acesso' : 'Desativar acesso', icon: u.active === false ? 'refresh' : 'ban', run: async () => {
+      const next = u.active === false;
+      if (Cloud.on) { const { error } = await Cloud.sb.rpc('manage_member', { p_user: u.id, p_action: next ? 'activate' : 'deactivate' }); if (error) { toast(fnError('not_allowed'), { type: 'bad' }); return; } }
+      u.active = next; logAct(c, 'team', `${u.active ? 'Reativou' : 'Desativou'} o acesso de ${u.name}`); save(); refreshPage(); toast(u.active ? 'Acesso reativado.' : 'Acesso desativado. A pessoa não consegue mais entrar.');
+    } },
     { sep: true },
-    { label: 'Remover da equipe', icon: 'trash', danger: true, run: async () => { const ok = await confirmBox({ title: `Remover ${u.name}?`, text: 'A pessoa perde o acesso ao painel. O histórico do que ela fez continua registrado.', ok: 'Remover', danger: true }); if (!ok) return; delete DB.users[u.email]; logAct(c, 'team', `Removeu ${u.name} da equipe`); save(); refreshPage(); toast('Pessoa removida da equipe.'); } },
+    { label: 'Remover da equipe', icon: 'trash', danger: true, run: async () => {
+      const ok = await confirmBox({ title: `Remover ${u.name}?`, text: 'A pessoa perde o acesso ao painel. O histórico do que ela fez continua registrado.', ok: 'Remover', danger: true }); if (!ok) return;
+      if (Cloud.on) { const res = await callFn('team', { action: 'remove', user_id: u.id }); if (res.error) { toast(fnError(res.error), { type: 'bad' }); return; } }
+      delete DB.users[u.email]; logAct(c, 'team', `Removeu ${u.name} da equipe`); save(); refreshPage(); toast('Pessoa removida da equipe.');
+    } },
   ];
   openMenu(el, items);
 };
@@ -6730,11 +7010,15 @@ function changeRoleModal(u) {
     foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-role" class="btn btn-primary">Salvar</button>`,
   });
 }
-F.role = (f) => {
+F.role = async (f) => {
   const c = co();
   const u = DB.users[f.dataset.email];
   const role = formValues(f).role;
-  if (!u || !ROLES[role]) return;
+  if (!u || !ROLES[role] || role === 'owner') return;
+  if (Cloud.on) {
+    const { error } = await Cloud.sb.rpc('manage_member', { p_user: u.id, p_action: 'role', p_role: role });
+    if (error) { toast(fnError('not_allowed'), { type: 'bad' }); return; }
+  }
   u.role = role;
   logAct(c, 'team', `Mudou a função de ${u.name} para ${ROLES[role].label}`);
   save();
@@ -7107,8 +7391,8 @@ function viewBilling() {
     </div>
     <div class="row-wrap" style="justify-content:flex-end">
       ${bs.kind === 'trial' || bs.kind === 'trial-ended' || bs.kind === 'canceled-ended' ? html`<button type="button" class="btn btn-primary" data-act="checkout" data-plan="${c.plan}">Assinar o ${p.name}</button>` : ''}
-      ${bs.kind === 'active' ? html`<button type="button" class="btn btn-danger-outline" data-act="cancelSub">Cancelar assinatura</button>` : ''}
-      ${bs.kind === 'canceled-active' ? html`<button type="button" class="btn btn-primary" data-act="reactivate">Reativar assinatura</button>` : ''}
+      ${bs.kind === 'active' ? (c.cloud ? html`<button type="button" class="btn" data-act="billingPortal">${icon('card')}Gerenciar assinatura</button>` : html`<button type="button" class="btn btn-danger-outline" data-act="cancelSub">Cancelar assinatura</button>`) : ''}
+      ${bs.kind === 'canceled-active' ? html`<button type="button" class="btn btn-primary" data-act="${c.cloud ? 'billingPortal' : 'reactivate'}">Reativar assinatura</button>` : ''}
     </div>
   </section>
   <section class="card"><div class="card-head"><div><h3>Uso do plano</h3></div></div>
@@ -7133,7 +7417,7 @@ function viewBilling() {
   </section>
   <section class="card"><div class="card-head"><div><h3>Faturas</h3><p class="card-sub">Histórico de pagamentos da assinatura</p></div></div>
     <div class="card-body flush">${c.invoices.length ? html`<div class="table-wrap"><table class="table responsive"><thead><tr><th>Data</th><th>Descrição</th><th>Forma</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
-      ${c.invoices.slice(0, 24).map((iv) => html`<tr><td data-label="Data" class="tnum nowrap">${fmtDate(iv.date)}</td><td data-label="Descrição">${iv.desc}</td><td data-label="Forma">${METHODS[iv.method] || '—'}</td><td data-label="Valor" class="num">${fmtMoney(iv.amount)}</td><td data-label="Situação"><span class="chip st-pago">${icon('checkCircle')}Paga</span></td></tr>`)}
+      ${c.invoices.slice(0, 24).map((iv) => html`<tr><td data-label="Data" class="tnum nowrap">${fmtDate(iv.date)}</td><td data-label="Descrição">${iv.url && /^https:\/\/[a-z0-9.-]*stripe\.com\//.test(iv.url) ? html`<a href="${iv.url}" target="_blank" rel="noopener">${iv.desc}</a>` : iv.desc}</td><td data-label="Forma">${METHODS[iv.method] || '—'}</td><td data-label="Valor" class="num">${fmtMoney(iv.amount)}</td><td data-label="Situação"><span class="chip st-pago">${icon('checkCircle')}Paga</span></td></tr>`)}
     </tbody></table></div>` : emptyMini('card', 'Nenhuma fatura ainda', bs.kind === 'trial' ? 'Durante o teste grátis não há cobrança. A primeira fatura aparece quando você assinar.' : 'As faturas da assinatura aparecem aqui.')}</div>
   </section>`;
 }
@@ -7151,6 +7435,7 @@ A.changePlan = async (el) => {
   }
   const bs = billingState(c).kind;
   if (bs === 'trial-ended' || bs === 'canceled-ended') { openCheckout(to); return; }
+  if (c.cloud && (bs === 'active' || bs === 'canceled-active')) { A.billingPortal(); return; }
   const members = usersOf(c).filter((u) => u.role !== 'owner').length;
   const loseTeam = !np.features.team && members > 0;
   const lost = Object.keys(FEATURE_PLAN).filter((f) => planHas(f, c) && !np.features[f]).map((f) => FEATURE_INFO[f].title);
@@ -7162,6 +7447,10 @@ A.changePlan = async (el) => {
   });
   if (!ok) return;
   const from = planOf(c).name;
+  if (c.cloud) {
+    const { error } = await Cloud.sb.rpc('set_trial_plan', { p_plan: to });
+    if (error) { toast(fnError('network'), { type: 'bad' }); return; }
+  }
   c.plan = to;
   if (bs === 'canceled-active') { c.billing.status = 'active'; c.billing.canceledAt = null; }
   logAct(c, 'plan', `Mudou do plano ${from} para o ${np.name}`);
@@ -7183,12 +7472,12 @@ function openCheckout(planId) {
         <label class="radio-card"><input type="radio" name="cycle" value="anual" data-change="checkoutCycle"><span class="grow"><span class="rc-title">Anual <span class="tag tag-accent">economize ${fmtMoney(save12)}</span></span><br><span class="rc-sub">${fmtMoney(p.annualMonthly * 12)} por ano, equivalente a ${fmtMoney(p.annualMonthly)} por mês.</span></span><span class="rc-price">${fmtMoney(p.annualMonthly)}<span class="muted" style="font-weight:500">/mês</span></span></label>
       </div></fieldset>
       <div class="fieldset" id="co-sum"><div class="between"><span>Plano ${p.name} · mensal</span><strong class="tnum">${fmtMoney(p.price)}</strong></div><div class="between muted"><span>Próxima cobrança</span><span>${fmtDate(addMonths(todayISO(), 1))}</span></div></div>
-      <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Forma de pagamento</legend><div class="radio-cards">
+      ${c.cloud ? html`<div class="callout">${icon('shield')}<div>Você vai para a página de pagamento segura da Stripe. A assinatura renova sozinha no cartão, e você pode cancelar quando quiser em <strong>Gerenciar assinatura</strong>.</div></div>` : html`<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Forma de pagamento</legend><div class="radio-cards">
         ${[['pix', 'Pix', 'Aprovação na hora'], ['cartao', 'Cartão de crédito', 'Renovação automática todo mês'], ['boleto', 'Boleto', 'Compensação em até 3 dias úteis']].map(([k, l, s], i) => html`<label class="radio-card"><input type="radio" name="method" value="${k}"${chk(i === 0)}><span class="grow"><span class="rc-title">${l}</span><br><span class="rc-sub">${s}</span></span></label>`)}
       </div></fieldset>
-      <div class="callout">${icon('info')}<div>Ambiente de demonstração: nenhuma cobrança real é feita e nenhum dado de pagamento é pedido. O pagamento de verdade entra quando o Quitaí for ligado a um meio de pagamento.</div></div>
+      <div class="callout">${icon('info')}<div>Na demonstração, nenhuma cobrança real é feita e nenhum dado de pagamento é pedido.</div></div>`}
     </form>`,
-    foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-checkout" class="btn btn-primary">Confirmar assinatura</button>`,
+    foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-checkout" class="btn btn-primary">${c.cloud ? 'Ir para o pagamento' : 'Confirmar assinatura'}</button>`,
   });
 }
 CH.checkoutCycle = (el) => {
@@ -7198,10 +7487,18 @@ CH.checkoutCycle = (el) => {
   const box = document.getElementById('co-sum');
   if (box) box.innerHTML = html`<div class="between"><span>Plano ${p.name} · ${cy}</span><strong class="tnum">${fmtMoney(planCharge(p.id, cy))}</strong></div><div class="between muted"><span>Próxima cobrança</span><span>${fmtDate(addMonths(todayISO(), cycleMonths(cy)))}</span></div>`.s;
 };
-F.checkout = (f) => {
+F.checkout = async (f) => {
   const c = co();
   const planId = f.dataset.plan;
   const v = formValues(f);
+  if (c.cloud) {
+    const btn = $('[form="f-checkout"]');
+    setBusy(btn, true, 'Abrindo o pagamento…');
+    const res = await callFn('billing', { action: 'checkout', plan: planId, cycle: v.cycle === 'anual' ? 'anual' : 'mensal' });
+    if (res.error || !res.url) { setBusy(btn, false); formError(f, fnError(res.error)); return; }
+    location.href = res.url;
+    return;
+  }
   const method = v.method || 'pix';
   const cycle = v.cycle === 'anual' ? 'anual' : 'mensal';
   subscribe(c, planId, method, cycle);
@@ -7210,6 +7507,13 @@ F.checkout = (f) => {
   closeModal(true);
   refreshPage(false);
   toast(`Assinatura do plano ${PLANS[planId].name} ativada. Obrigado!`);
+};
+A.billingPortal = async (el) => {
+  if (me().role !== 'owner' || isImpersonating()) { toast('Só o proprietário da conta pode gerenciar a assinatura.', { type: 'warn' }); return; }
+  if (el) setBusy(el, true, 'Abrindo…');
+  const res = await callFn('billing', { action: 'portal' });
+  if (res.error || !res.url) { if (el && el.isConnected) setBusy(el, false); toast(fnError(res.error), { type: 'bad' }); return; }
+  location.href = res.url;
 };
 A.cancelSub = async () => {
   const c = co();
@@ -7346,7 +7650,7 @@ function setAccount() {
   return html`<section class="card set-card" aria-labelledby="st-acc">
     <div><h3 id="st-acc">Seus dados</h3><p class="set-desc">Você entra no Quitaí com este e-mail.</p></div>
     <form id="f-account" class="stack-lg" data-form="account" novalidate>
-      <div class="form-grid"><div class="field"><label for="ac-name">Nome</label><input id="ac-name" name="name" class="input" value="${u.name}" autocomplete="name" required></div><div class="field"><label for="ac-email">E-mail de acesso</label><input id="ac-email" name="email" type="email" class="input" value="${u.email}" autocomplete="email" required></div></div>
+      <div class="form-grid"><div class="field"><label for="ac-name">Nome</label><input id="ac-name" name="name" class="input" value="${u.name}" autocomplete="name" required></div><div class="field"><label for="ac-email">E-mail de acesso</label><input id="ac-email" name="email" type="email" class="input" value="${u.email}" autocomplete="email" required${Cloud.on ? raw(' readonly') : ''}>${Cloud.on ? html`<p class="hint">Para trocar o e-mail de acesso, escreva para ${APP.supportEmail}.</p>` : ''}</div></div>
       <div class="between"><span class="muted">Função: <strong style="color:var(--ink)">${ROLES[u.role].label}</strong></span><button type="submit" class="btn btn-primary">Salvar</button></div>
     </form>
   </section>
@@ -7363,7 +7667,7 @@ function setAccount() {
   </section>
   <section class="card set-card"><div class="between"><div><h3>Sair do Quitaí</h3><p class="set-desc">Encerra a sessão neste navegador.</p></div><button type="button" class="btn" data-act="logout">${icon('logout')}Sair</button></div></section>`;
 }
-F.account = (f) => {
+F.account = async (f) => {
   const u = me();
   const v = formValues(f);
   const errs = {};
@@ -7372,6 +7676,14 @@ F.account = (f) => {
   if (!validEmail(email)) errs.email = 'Digite um e-mail válido.';
   else if (email !== u.email && DB.users[email]) errs.email = 'Este e-mail já está em uso.';
   if (!showErrors(f, errs)) return;
+  if (Cloud.on) {
+    const { error } = await Cloud.sb.rpc('update_my_name', { p_name: v.name });
+    if (error) { formError(f, fnError('network')); return; }
+    u.name = v.name;
+    refreshPage(false);
+    toast('Seus dados foram salvos.');
+    return;
+  }
   u.name = v.name;
   if (email !== u.email) {
     delete DB.users[u.email];
@@ -7389,10 +7701,24 @@ F.password = async (f) => {
   const u = me();
   const cur = f.elements.cur.value, p1 = f.elements.p1.value, p2 = f.elements.p2.value;
   const errs = {};
-  if ((await hashPass(cur, u.salt)) !== u.hash) errs.cur = 'A senha atual não confere.';
+  if (Cloud.on) {
+    if (!cur) errs.cur = 'Digite a senha atual.';
+  } else if ((await hashPass(cur, u.salt)) !== u.hash) errs.cur = 'A senha atual não confere.';
   if (p1.length < 8) errs.p1 = 'A nova senha precisa ter pelo menos 8 caracteres.';
   else if (p1 !== p2) errs.p2 = 'As senhas não são iguais.';
   if (!showErrors(f, errs)) return;
+  if (Cloud.on) {
+    const btn = f.querySelector('[type=submit]');
+    setBusy(btn, true, 'Alterando…');
+    const chk = await Cloud.sb.auth.signInWithPassword({ email: realUser().email, password: cur });
+    if (chk.error) { setBusy(btn, false); showErrors(f, { cur: /invalid login/i.test(chk.error.message) ? 'A senha atual não confere.' : authErrorText(chk.error) }); return; }
+    const { error } = await Cloud.sb.auth.updateUser({ password: p1 });
+    setBusy(btn, false);
+    if (error) { showErrors(f, { p1: /different|same/i.test(error.message) ? 'A nova senha precisa ser diferente da atual.' : authErrorText(error) }); return; }
+    f.reset();
+    toast('Senha alterada.');
+    return;
+  }
   u.salt = uid('s_');
   u.hash = await hashPass(p1, u.salt);
   u.mustChange = false;
@@ -7400,7 +7726,12 @@ F.password = async (f) => {
   f.reset();
   toast('Senha alterada.');
 };
-A.setTheme = (el) => { me().theme = el.dataset.k; save(); applyTheme(); refreshPage(false); };
+A.setTheme = (el) => {
+  me().theme = el.dataset.k;
+  if (Cloud.on) lsSet(themeKey(me().id), el.dataset.k); else save();
+  applyTheme();
+  refreshPage(false);
+};
 
 /* ---------- mensagens ---------- */
 function sampleForPreview(c) {
@@ -7680,6 +8011,13 @@ A.deleteAccount = async () => {
   if (me().role !== 'owner' || isImpersonating()) return readOnlyToast();
   const ok = await confirmBox({ title: 'Excluir a conta da empresa?', text: `A empresa ${c.name}, todos os dados e os acessos da equipe serão apagados de forma permanente.`, ok: 'Excluir conta', danger: true, typed: c.name });
   if (!ok) return;
+  if (c.cloud) {
+    const res = await callFn('team', { action: 'delete_account' });
+    if (res.error) { toast(fnError(res.error), { type: 'bad' }); return; }
+    await cloudSignOut();
+    toast('Conta excluída. Todos os dados foram apagados.', { type: 'info' });
+    return;
+  }
   const wasDemo = c.isDemo;
   for (const u of usersOf(c)) delete DB.users[u.email];
   delete DB.companies[c.id];
@@ -8883,33 +9221,74 @@ function tick() {
   if (!c) return;
   if (runAutomations(c)) { save(); if (!modalStack.length && !menuState) refreshPage(); }
 }
-function boot() {
-  DB = loadLocal() || emptyDB();
-  DB = migrate(DB);
-  Sync.localOk = lsProbe();
-  Sync.state = Sync.localOk ? 'local' : 'memory';
-  if (DB.session.email && !DB.users[DB.session.email]) DB.session = { email: null, realEmail: null };
-  loadRoute();
-  runMaintenance();
-  bindGlobalEvents();
-  bindTooltips();
-  const hash = (location.hash || '').replace(/^#/, '');
+function firstRender(hash) {
   if (!me()) {
     if (hash === 'entrar') ui.route.name = 'login';
     else if (hash === 'criar-conta') ui.route.name = 'signup';
     else if (ui.route.name !== 'login' && ui.route.name !== 'signup') ui.route.name = 'landing';
-  }
+  } else if (hash === 'assinatura' || hash === 'assinatura-ok') ui.route = { name: 'app', page: 'assinatura', id: null };
+  const root = document.getElementById('app');
+  if (root) root.innerHTML = '';
   render();
   if (hash === 'demo' && !me()) A.startDemo();
   else if (!me() && ['planos', 'recursos', 'duvidas', 'como-funciona', 'fechamento', 'para-quem'].includes(hash)) requestAnimationFrame(() => { const el = document.getElementById(hash); if (el) el.scrollIntoView(); });
+}
+/* volta da Stripe: espera o aviso de pagamento chegar e atualiza a tela */
+async function waitForPayment() {
+  toast('Pagamento enviado. Estamos confirmando sua assinatura…', { type: 'info', timeout: 6000 });
+  for (let i = 0; i < 15 && Cloud.on; i++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    await cloudPoll();
+    const c = co();
+    if (c && c.billing.status === 'active') { toast(`Assinatura do plano ${planOf(c).name} ativada. Obrigado!`); return; }
+  }
+  if (Cloud.on) toast('O pagamento ainda está sendo confirmado. A tela atualiza sozinha assim que a Stripe avisar.', { type: 'info', timeout: 9000 });
+}
+async function bootCloudSession(hash, recovery) {
+  const root = document.getElementById('app');
+  const { data } = await Cloud.sb.auth.getSession();
+  if (data && data.session) {
+    if (root) root.innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;color:var(--ink-3);font:500 15px system-ui">Carregando…</div>';
+    const r = await cloudLoad().catch(() => ({ error: 'Não conseguimos falar com o servidor. Confira a internet e recarregue a página.' }));
+    if (r.error) { await Cloud.sb.auth.signOut().catch(() => {}); leaveCloud(); firstRender(''); toast(r.error, { type: 'warn', timeout: 9000 }); return; }
+    Cloud.sb.rpc('touch_login');
+    runMaintenance();
+  }
+  if (/[#&](access_token|type)=|^#?error/.test(location.hash) || hash === 'assinatura-ok') history.replaceState(null, '', location.pathname + location.search);
+  firstRender(Cloud.on ? hash : (hash.includes('=') ? '' : hash));
+  if (Cloud.on && recovery) askNewPassword(true);
+  else if (Cloud.on && me().mustChange) askNewPassword();
+  if (Cloud.on && hash === 'assinatura-ok') waitForPayment();
+  Cloud.sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT' && Cloud.on) { leaveCloud(); closeAllModals(); ui.route = { name: 'landing', page: 'dashboard', id: null }; const el = document.getElementById('app'); if (el) el.innerHTML = ''; render(); }
+    if (event === 'PASSWORD_RECOVERY' && Cloud.on && !modalStack.length) askNewPassword(true);
+  });
+}
+function boot() {
+  const hash = (location.hash || '').replace(/^#/, '');
+  const recovery = /type=recovery/.test(hash);
+  DB = loadLocal() || emptyDB();
+  DB = migrate(DB);
+  Sync.localOk = lsProbe();
+  Sync.state = Sync.localOk ? 'local' : 'memory';
+  if (!localSessionOk()) DB.session = { email: null, realEmail: null };
+  loadRoute();
+  runMaintenance();
+  bindGlobalEvents();
+  bindTooltips();
+  if (cloudReady()) bootCloudSession(hash, recovery);
+  else firstRender(hash);
   getDownloads();
-  bootCloud();
   aiProbe();
-  setInterval(tick, 60000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLocal(); else tick(); });
-  window.addEventListener('pagehide', flushLocal);
+  setInterval(() => { tick(); cloudPoll(); }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { if (Cloud.on) { if (Cloud.t) flushCloudSave(); } else flushLocal(); }
+    else { tick(); cloudPoll(); }
+  });
+  window.addEventListener('pagehide', () => { if (Cloud.on) { if (Cloud.t) flushCloudSave(); } else flushLocal(); });
+  window.addEventListener('beforeunload', (e) => { if (Cloud.on && (Cloud.t || Cloud.saving)) { flushCloudSave(); e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('storage', (e) => {
-    if (e.key !== LS_KEY || !e.newValue) return;
+    if (Cloud.on || e.key !== LS_KEY || !e.newValue) return;
     try {
       const d = JSON.parse(e.newValue);
       if (validDB(d) && (d.savedAt || 0) > (DB.savedAt || 0)) { DB = migrate(d); onExternalData(); }
