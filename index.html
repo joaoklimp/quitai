@@ -34,7 +34,7 @@ body.is-live .live { display:grid; }
 <body>
 <main>
   <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2B3FCB"/><g fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 20.4A7.6 7.6 0 1 1 23.4 14"/><path d="m17.2 18.2 3.2 3.2 6.3-7.4"/></g></svg>Quitaí</div>
-  <div class="eyebrow">Lançamento hoje · 15h</div>
+  <div class="eyebrow" id="eb">Lançamento hoje · 15h</div>
   <h1>Do “depois eu te pago” ao dinheiro na conta.</h1>
   <p class="lead">Cobrança e fechamento financeiro para pequenos negócios: mensalidades automáticas, Pix com QR Code, baixa pelo extrato do banco e conferência da maquininha.</p>
   <div class="clock" role="timer" aria-live="off">
@@ -43,7 +43,7 @@ body.is-live .live { display:grid; }
     <div class="unit"><div class="num" id="s">--</div><div class="lbl">segundos</div></div>
   </div>
   <p class="when">Abrimos hoje, 1º de outubro, às 15h (horário de Brasília). Volte aqui nesse horário e comece seu teste grátis de 7 dias.</p>
-  <div class="live"><p class="lead">Estamos abrindo as portas. A página atualiza sozinha em instantes.</p><a href="./">Recarregar agora</a></div>
+  <div class="live"><p class="lead">Estamos dando os últimos retoques. Abrimos em instantes, e esta página atualiza sozinha quando o Quitaí estiver no ar.</p><a href="./">Recarregar agora</a></div>
 </main>
 <script>
 (function () {
@@ -52,7 +52,7 @@ body.is-live .live { display:grid; }
   function tick() {
     var left = LAUNCH - Date.now();
     if (left <= 0) {
-      document.body.classList.add('is-live');
+      document.body.classList.add("is-live"); document.getElementById("eb").textContent = "Lançamento hoje · em instantes";
       return;
     }
     var t = Math.floor(left / 1000);
@@ -63,7 +63,7 @@ body.is-live .live { display:grid; }
   tick();
   setInterval(tick, 1000);
   // depois das 15h, tenta carregar o site novo a cada 30 segundos
-  setInterval(function () { if (Date.now() >= LAUNCH) location.reload(); }, 30000);
+  setInterval(function () { if (Date.now() >= LAUNCH) location.reload(); }, 60000);
 })();
 </script>
 </body>
