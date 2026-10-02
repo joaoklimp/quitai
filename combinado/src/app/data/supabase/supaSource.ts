@@ -1,6 +1,6 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
-import type { AdminOverview, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import type { AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import type { AgentReply, AiSettings, Company, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
 import type { ProductRow } from '../sheet';
 
@@ -17,6 +17,9 @@ const FRIENDLY: Record<string, string> = {
   'Email not confirmed': 'Confirme seu e-mail pelo link que enviamos antes de entrar.',
   'User already registered': 'Já existe uma conta com esse e-mail. Tente entrar ou recuperar a senha.',
   'Password should be at least 6 characters': 'A senha precisa ter pelo menos 8 caracteres.',
+  'For security purposes, you can only request this': 'Por segurança, aguarde um minuto antes de pedir outro link.',
+  'Email rate limit exceeded': 'Muitos e-mails enviados em pouco tempo. Tente de novo em alguns minutos.',
+  'provider is not enabled': 'Esse jeito de entrar ainda não foi ativado. Use o e-mail por enquanto.',
 };
 function friendly(e: unknown): AppError {
   const msg = (e as { message?: string })?.message ?? String(e);
@@ -87,7 +90,12 @@ export class SupabaseSource implements DataSource {
       if (tokenHash && type && LINK_TYPES.includes(type)) ok = !(await this.sb.auth.verifyOtp({ token_hash: tokenHash, type })).error;
       else if (access && refresh) ok = !(await this.sb.auth.setSession({ access_token: access, refresh_token: refresh })).error;
     } catch { ok = false; }
-    if (!ok) this.linkNotice = 'Este link expirou ou já foi usado. Entre com seu e-mail e senha ou peça um novo em “Esqueci minha senha”.';
+    // erro do login social (Google, Apple, Microsoft) é diferente de link de e-mail vencido
+    const errDesc = q.get('error_description') ?? frag.get('error_description');
+    const errCode = q.get('error_code') ?? frag.get('error_code') ?? '';
+    const oauthError = !tokenHash && !access && errDesc && !/otp|email link/i.test(`${errCode} ${errDesc}`) ? errDesc : null;
+    if (oauthError) this.linkNotice = /provider is not enabled|unsupported provider/i.test(oauthError) ? 'Esse jeito de entrar ainda não foi ativado. Use o e-mail por enquanto.' : /cancel|denied/i.test(oauthError) ? 'Você cancelou o acesso. Tente de novo quando quiser.' : 'Não foi possível entrar com essa conta. Tente de novo ou use o e-mail.';
+    else if (!ok) this.linkNotice = 'Este link expirou ou já foi usado. Entre com seu e-mail e senha ou peça um novo em “Esqueci minha senha”.';
     for (const k of ['token_hash', 'type', 'error', 'error_code', 'error_description']) q.delete(k);
     url.hash = ok && (type === 'invite' || type === 'recovery') ? '#/nova-senha' : '#/';
     history.replaceState(history.state, '', url.toString());
@@ -120,7 +128,13 @@ export class SupabaseSource implements DataSource {
     const { data: m, error } = await this.sb.from('members').select('*').eq('user_id', user.id).eq('active', true).maybeSingle();
     if (error) throw friendly(error);
     const { data: adm } = await this.sb.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle();
-    if (!m) return { user_id: user.id, email: user.email ?? '', name: (user.user_metadata?.name as string) ?? '', role: 'dono', company: null as unknown as Company, isPlatformAdmin: !!adm };
+    if (!m) {
+      // Google e Microsoft mandam o nome como full_name; o cadastro da empresa usa "name"
+      const meta = user.user_metadata ?? {};
+      const name = (meta.name as string) || (meta.full_name as string) || '';
+      if (!meta.name && name) await this.sb.auth.updateUser({ data: { name } });
+      return { user_id: user.id, email: user.email ?? '', name, role: 'dono', company: null as unknown as Company, isPlatformAdmin: !!adm };
+    }
     const { data: c, error: ce } = await this.sb.from('companies').select('*').eq('id', m.company_id).single();
     if (ce) throw friendly(ce);
     this.companyId = c.id;
@@ -137,6 +151,14 @@ export class SupabaseSource implements DataSource {
     });
     if (error) throw friendly(error);
     return { needsConfirmation: !data.session };
+  }
+  async signInWithProvider(provider: AuthProvider) {
+    const { error } = await this.sb.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}/app/`, ...(provider === 'azure' ? { scopes: 'email' } : {}) } });
+    if (error) throw friendly(error);
+  }
+  async signInWithEmailLink(email: string, name?: string) {
+    const { error } = await this.sb.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: `${location.origin}/app/`, shouldCreateUser: true, data: name?.trim() ? { name: name.trim() } : undefined } });
+    if (error) throw friendly(error);
   }
   async signOut() { await this.sb.auth.signOut(); this.companyId = null; }
   async requestPasswordReset(email: string) {

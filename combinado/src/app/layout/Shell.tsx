@@ -107,7 +107,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {isDemo && (
           <div className="demo-bar" role="note">
             <Info />
-            <span className="grow"><b>Modo demonstração.</b> Dados de exemplo da “Brilho Lar Higienização”. Teste à vontade: nada é cobrado nem enviado.</span>
+            <span className="grow"><b>Modo demonstração.</b> Dados de exemplo da “{me.company.name}”. Teste à vontade: nada é cobrado nem enviado.</span>
             {canUseRealAccount ? <Button size="sm" variant="solid" onClick={leaveDemo}>Criar minha conta</Button> : <Button size="sm" onClick={() => { api.resetDemo?.(); toast('Demonstração restaurada'); }}>Restaurar dados</Button>}
           </div>
         )}
@@ -206,7 +206,7 @@ function UserMenu() {
           ))}
           <div className="sep" />
           {isDemo
-            ? <button onClick={() => { close(); if (canUseRealAccount) leaveDemo(); else { api.resetDemo?.(); qc.invalidateQueries(); } }}><LogOut />{canUseRealAccount ? 'Sair da demonstração' : 'Restaurar demonstração'}</button>
+            ? <button onClick={async () => { close(); if (canUseRealAccount) leaveDemo(); else { await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); } }}><LogOut />{canUseRealAccount ? 'Sair da demonstração' : 'Sair'}</button>
             : <button className="danger" onClick={async () => { close(); await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); }}><LogOut />Sair</button>}
         </>
       )}

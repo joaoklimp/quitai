@@ -1,6 +1,6 @@
 // Escolhe a fonte de dados: Supabase (quando configurado) ou demonstração.
 import type { DataSource } from './source';
-import { DemoSource } from './demo/demoSource';
+import { DemoSource, demoSession, setDemoSession } from './demo/demoSource';
 import { SupabaseSource, hasSupabase } from './supabase/supaSource';
 
 const FLAG = 'orbyta-modo';
@@ -19,7 +19,20 @@ function pickMode(): 'demo' | 'supabase' {
   }
 }
 
-export const api: DataSource = pickMode() === 'demo' ? new DemoSource() : new SupabaseSource();
+const mode = pickMode();
+// Sem servidor configurado, o site funciona como vitrine: "Entrar" e "Teste grátis" (?real) mostram a tela de acesso
+// simulada; "Ver demonstração" (?demo) entra direto na empresa de exemplo.
+try {
+  const params = new URLSearchParams(location.search);
+  if (mode === 'demo' && params.has('demo')) setDemoSession({ ...demoSession(), state: demoSession().state === 'onboarding' ? 'onboarding' : 'on' });
+  if (mode === 'demo' && params.has('real') && !hasSupabase()) setDemoSession({ state: 'off' });
+  if (params.has('demo') || params.has('real')) {
+    params.delete('demo'); params.delete('real');
+    const q = params.toString();
+    history.replaceState(history.state, '', `${location.pathname}${q ? `?${q}` : ''}${location.hash}`);
+  }
+} catch { /* ignora */ }
+export const api: DataSource = mode === 'demo' ? new DemoSource() : new SupabaseSource();
 export const isDemo = api.mode === 'demo';
 export const canUseRealAccount = hasSupabase();
 

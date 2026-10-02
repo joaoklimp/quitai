@@ -9,6 +9,8 @@ import type { Cycle, PaidPlanId } from '../../shared/plans';
 
 export type IntegrationAction = 'connect_asaas' | 'connect_focus' | 'disconnect' | 'webhook_info' | 'charge_create' | 'charge_send' | 'charge_cancel' | 'charge_sync' | 'note_emit' | 'note_sync' | 'note_cancel' | 'demo_pay';
 export interface SignUpInput { name: string; email: string; password: string }
+/** Login social. 'azure' é a conta Microsoft (Outlook, Hotmail, Microsoft 365). */
+export type AuthProvider = 'google' | 'apple' | 'azure';
 export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean }
 export interface CheckoutInput { plan: PaidPlanId; cycle: Cycle; method: 'cartao' | 'pix_boleto'; cpfCnpj?: string }
 
@@ -19,6 +21,10 @@ export interface DataSource {
   me(): Promise<Me | null>;
   signIn(email: string, password: string): Promise<void>;
   signUp(input: SignUpInput): Promise<{ needsConfirmation: boolean }>;
+  /** Entrar ou criar conta com Google, Apple ou Microsoft (sai do site e volta já com a sessão). */
+  signInWithProvider(provider: AuthProvider, intent?: 'entrar' | 'cadastro'): Promise<void>;
+  /** Link de acesso por e-mail, sem senha (também cria a conta se for a primeira vez). */
+  signInWithEmailLink(email: string, name?: string): Promise<void>;
   signOut(): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
   updatePassword(password: string): Promise<void>;

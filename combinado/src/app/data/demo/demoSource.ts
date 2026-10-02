@@ -1,5 +1,6 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
-import type { DataSource, AdminOverview, IntegrationAction } from '../source';
+import type { DataSource, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import { PRESETS } from '../../../shared/presets';
 import type { AiSettings, Charge, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
 import type { ProductRow } from '../sheet';
 import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
@@ -15,16 +16,41 @@ const quoteLink = (q: Pick<Quote, 'public_token'>) => `${location.origin}/orcame
 export class DemoSource implements DataSource {
   readonly mode = 'demo' as const;
 
-  async me(): Promise<Me> {
+  async me(): Promise<Me | null> {
+    const sess = demoSession();
+    if (sess.state === 'off') return null;
     const d = demoDb();
-    return { user_id: DEMO_USER_ID, email: 'voce@brilholar.com.br', name: 'Você (demonstração)', role: 'dono', company: structuredClone(d.company), isPlatformAdmin: true };
+    const base = { user_id: DEMO_USER_ID, email: sess.email || 'voce@brilholar.com.br', name: sess.name || 'Você (demonstração)', role: 'dono' as const, isPlatformAdmin: true };
+    if (sess.state === 'onboarding') return { ...base, company: null as unknown as Company };
+    return { ...base, company: structuredClone(d.company) };
   }
-  async signIn() { await wait(); }
-  async signUp() { await wait(); return { needsConfirmation: false }; }
-  async signOut() { await wait(); }
+  // Na demonstração o acesso é simulado: qualquer e-mail entra na empresa de exemplo.
+  async signIn(email: string) {
+    await wait(500);
+    if (!/\S+@\S+\.\S+/.test(email)) throw new Error('Informe um e-mail válido.');
+    setDemoSession({ state: 'on', email: email.trim().toLowerCase() });
+  }
+  async signUp(input: SignUpInput) { await wait(600); setDemoSession({ state: 'onboarding', name: input.name.trim(), email: input.email.trim().toLowerCase() }); return { needsConfirmation: false }; }
+  async signInWithProvider(provider: AuthProvider, intent: 'entrar' | 'cadastro' = 'entrar') {
+    await wait(900);
+    const email = { google: 'voce@gmail.com', apple: 'voce@icloud.com', azure: 'voce@outlook.com' }[provider];
+    setDemoSession(intent === 'cadastro' ? { state: 'onboarding', name: 'Você', email } : { state: 'on', email });
+  }
+  async signInWithEmailLink() { await wait(600); }
+  async signOut() { await wait(); setDemoSession({ state: 'off' }); }
   async requestPasswordReset() { await wait(); }
   async updatePassword() { await wait(); }
-  async onboard() { await wait(); }
+  async onboard(input: OnboardInput) {
+    await wait(700);
+    const d = demoDb();
+    Object.assign(d.company, { name: input.company.trim(), segment: input.segment, ...(input.phone ? { phone: input.phone } : {}), ...(input.city ? { city: input.city } : {}) });
+    if (input.preset !== false && PRESETS[input.segment]) {
+      const now = new Date().toISOString();
+      d.services = PRESETS[input.segment].map((p, i) => ({ id: newId(), company_id: DEMO_COMPANY_ID, name: p.name, description: null, price: p.price, price_type: p.price_type, duration_min: p.duration_min, category: p.category, active: true, sort: i, created_at: now }));
+      emit('services');
+    }
+    setDemoSession({ ...demoSession(), state: 'on' });
+  }
   onAuthChange() { return () => {}; }
 
   async updateCompany(patch: Partial<Company>): Promise<Company> {
@@ -473,4 +499,16 @@ export function demoEmitNote(b: Record<string, unknown>, via: Via): FiscalNote {
     emit('fiscal_notes');
   }, instantDemo ? 0 : 3500);
   return n;
+}
+
+/* ---------- sessão simulada da demonstração ---------- */
+const SESSION_KEY = 'orbyta-demo-sessao';
+type DemoSession = { state: 'on' | 'off' | 'onboarding'; name?: string; email?: string };
+let memSession: DemoSession = { state: 'on' };
+export function demoSession(): DemoSession {
+  try { const raw = localStorage.getItem(SESSION_KEY); return raw ? (JSON.parse(raw) as DemoSession) : memSession; } catch { return memSession; }
+}
+export function setDemoSession(s: DemoSession) {
+  memSession = s;
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* navegador sem armazenamento: fica só na memória */ }
 }

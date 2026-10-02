@@ -439,7 +439,7 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 
 /* ---------- rodapé ---------- */
 .site-foot { padding: 56px 0 30px; background: var(--surface); border-top: 1px solid var(--line); }
-.foot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 32px; }
+.foot-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(4, minmax(0, 1fr)); gap: 32px; }
 .foot-brand p { margin-top: 14px; color: var(--ink-3); font-size: 14.5px; max-width: 300px; }
 .foot-brand .site-brand { font-size: 18px; }
 .foot-brand .site-brand img { width: 34px; height: 34px; border-radius: 11px; }
@@ -447,6 +447,12 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .foot-col b { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); margin-bottom: 4px; }
 .foot-col a { color: var(--ink-2); }
 .foot-col a:hover { color: var(--ink); text-decoration: underline; }
+/* rodapé: contato e idioma */
+.foot-mail { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 14px; font-weight: 650; color: var(--ink-2); }
+.foot-mail svg { width: 16px; height: 16px; color: var(--blue); }
+.foot-meta { display: inline-flex; gap: 18px; flex-wrap: wrap; }
+.foot-lang { display: inline-flex; align-items: center; gap: 6px; }
+.foot-lang svg { width: 14px; height: 14px; }
 .foot-bottom { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-3); }
 
 /* ---------- entrada suave ---------- */
@@ -487,7 +493,7 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
   .sec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .plans { grid-template-columns: minmax(0, 1fr); max-width: 520px; margin-inline: auto; }
   .plan-blurb { min-height: 0; }
-  .foot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .foot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .foot-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 680px) {
@@ -530,3 +536,19 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .soon { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--surface-3); font-size: 12px; font-weight: 650; color: var(--ink-2); }
 @media (max-width: 960px) { .one-layout { grid-template-columns: 1fr; } .one-layout .one-orbit { transform: scale(.9); } }
 @media (max-width: 640px) { .one-mods { grid-template-columns: 1fr; } .one-sec { padding-top: 80px; } }
+
+/* integrações e plano sob medida */
+.integ-band { padding: 26px 0 70px; text-align: center; }
+.integ-logos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+.integ-logos li { display: inline-flex; align-items: center; gap: 9px; padding: 11px 18px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-pill); font-size: 14px; font-weight: 650; color: var(--ink-2); }
+.integ-logos svg { width: 17px; height: 17px; color: var(--blue); }
+.integ-more { margin-top: 16px; font-size: 14px; color: var(--ink-3); }
+.integ-more a { color: var(--blue-ink); font-weight: 650; }
+.enterprise { margin: 26px auto 0; max-width: 980px; display: flex; align-items: center; gap: 18px; padding: 20px 24px; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); text-align: left; }
+.enterprise .ent-ic { flex: none; width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet-ink); }
+.enterprise .ent-ic svg { width: 22px; height: 22px; }
+.enterprise > div { flex: 1; display: grid; gap: 3px; font-size: 14px; color: var(--ink-2); }
+.enterprise b { color: var(--ink); font-size: 15.5px; }
+.enterprise .btn { flex: none; }
+.enterprise .btn svg { width: 16px; height: 16px; }
+@media (max-width: 720px) { .enterprise { flex-direction: column; align-items: flex-start; } }

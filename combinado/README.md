@@ -37,11 +37,13 @@ Para publicar de verdade, siga o **[DEPLOY.md](DEPLOY.md)**, um passo a passo do
 | Parte | O que faz |
 |---|---|
 | **Site** (`/`) | Página de vendas: recursos, simulação de conversa, planos e perguntas frequentes. |
+| **Acesso** (`/app/#/entrar`) | Entrar ou criar conta com Google, Apple, Microsoft, link por e-mail (sem senha) ou e-mail e senha. Sem servidor configurado, o site vira vitrine: o acesso é simulado e leva ao painel de exemplo. |
 | **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, cobranças e notas fiscais, catálogo, tarefas, financeiro, estoque, integrações, módulos, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
 | **Financeiro** | Contas a pagar e a receber, contas mensais (ao pagar, a do mês seguinte já fica lançada), vencidas em destaque, resultado do mês e caixa previsto das próximas 6 semanas. Só dono e gerente acessam. |
 | **Estoque** | Produtos com saldo, mínimo e custo; entradas, saídas e ajustes com histórico; alerta quando um produto fica abaixo do mínimo; importação de planilha do Excel (.xlsx) ou CSV e exportação. |
 | **Integrações** | WhatsApp oficial, planilhas, cobrança dos clientes com Pix e boleto (conta Asaas da própria empresa, baixa automática pelo webhook) e nota fiscal de serviço NFS-e (Focus NFe da empresa) funcionando, pelo painel ou por comando no WhatsApp. ERP (Bling, Tiny, Omie), NF-e de produto, Google Agenda e API estão listados como “em breve”. |
 | **Orçamento público** (`/orcamento/#…`) | Link enviado ao cliente para ver e aprovar o orçamento. A aprovação vai direto para o painel. |
+| **Institucional** (`/sobre/`, `/seguranca/`, `404.html`) | Sobre a ORBYTA (missão, princípios, contato por assunto com formulário), central de segurança (como os dados são protegidos, LGPD, subprocessadores, relato de vulnerabilidade) e página de erro. Cabeçalho e rodapé são os mesmos em todo o site (`src/site/chrome.ts`). |
 | **Termos e Privacidade** (`/termos/`, `/privacidade/`) | Textos-base de acordo com a LGPD, com os campos da empresa a preencher. |
 | **IA de atendimento** | Responde clientes com o catálogo, as regras e as **perguntas frequentes** que o dono cadastra (com pesquisa na internet opcional, só para dúvidas gerais), consulta horários livres, agenda, monta orçamentos, envia links e passa a conversa para a equipe (reclamação, pedido de humano ou assunto que não sabe). |
 | **IA de comandos** | O dono e a equipe falam com a IA pelo WhatsApp ou pelo painel: cadastrar, orçar, agendar, registrar venda, criar tarefa, lançar e consultar contas, dar entrada e saída no estoque, consultar números do dia. Ações sensíveis (registrar venda, dar baixa em conta, cancelar horário, mudar preço de serviço, mandar mensagem para um cliente, desconto acima do limite) ficam **aguardando confirmação**. |
@@ -99,6 +101,7 @@ combinado/
 ├── index.html                 site (landing page)
 ├── app/index.html             painel
 ├── orcamento/index.html       página pública do orçamento
+├── sobre/ · seguranca/        páginas institucionais (404.html é a página de erro)
 ├── termos/ · privacidade/     páginas legais
 ├── src/
 │   ├── site/                  script e estilos do site e das páginas legais
@@ -152,7 +155,7 @@ Sem o PostgREST, esse teste é pulado e os demais rodam normalmente.
 O nome aparece em poucos lugares:
 
 1. `src/shared/brand.ts` (nome, frase, e-mail de suporte, símbolo e logotipo)
-2. o `<title>` e as descrições dos arquivos `index.html`, `app/index.html`, `orcamento/index.html`, `termos/index.html` e `privacidade/index.html`
+2. o `<title>` e as descrições dos arquivos `index.html`, `app/index.html`, `orcamento/index.html`, `termos/index.html`, `privacidade/index.html`, `sobre/index.html` e `seguranca/index.html`
 3. `public/manifest.webmanifest`
 4. os e-mails em `supabase/templates/`
 5. os modelos de mensagem do WhatsApp em `src/shared/templates.ts` (“Lembrete da ORBYTA…”). Depois de mudar, rode `npm run sync:functions`.

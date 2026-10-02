@@ -14,14 +14,15 @@ const MARK = (id: string) => `<defs><linearGradient id="${id}g" x1=".15" y1=".9"
 <circle cx="23.5" cy="25" r="14" fill="url(#${id}g)" mask="url(#${id}m)"/><circle cx="33.4" cy="15.1" r="3.2" fill="url(#${id}d)"/>`;
 
 /** Ícone com fundo (favicon, app, avatar da marca). */
+let uid = 0; // ids únicos: duas marcas na mesma página não podem dividir o mesmo degradê
 export function logoSvg(size = 40, opts: { bg?: string; title?: boolean } = {}): string {
   const bg = opts.bg ?? '#050A1A';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48" ${opts.title === false ? 'aria-hidden="true"' : 'role="img" aria-label="ORBYTA"'}><rect width="48" height="48" rx="14" fill="${bg}"/>${MARK('ob')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48" ${opts.title === false ? 'aria-hidden="true"' : 'role="img" aria-label="ORBYTA"'}><rect width="48" height="48" rx="14" fill="${bg}"/>${MARK(`ob${++uid}`)}</svg>`;
 }
 
 /** Só o símbolo, sem fundo. */
 export function markSvg(size = 40): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="9 11 30 30" aria-hidden="true">${MARK('om')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="9 11 30 30" aria-hidden="true">${MARK(`om${++uid}`)}</svg>`;
 }
 
 /** Logotipo completo: o símbolo faz o "O" e o "A" final é um Λ, como na marca. */
