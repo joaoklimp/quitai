@@ -60,6 +60,8 @@ export interface DataSource {
 
   /* números */
   dailyStats(from: string, to: string): Promise<DailyStat[]>;
+  /** Mensagens recebidas por dia da semana (0 = domingo) e hora: matriz 7 × 24. */
+  peakHours(from: string, to: string): Promise<number[][]>;
   usage(): Promise<UsageMonth>;
 
   /* assinatura */

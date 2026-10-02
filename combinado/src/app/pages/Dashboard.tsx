@@ -6,18 +6,12 @@ import {
   UserPlus, Wand2, FileText, CalendarCheck, CircleDollarSign, BellRing, Bot,
 } from 'lucide-react';
 import { useMeCtx, useAssistant } from '../context';
-import { useList, useStats } from '../data/hooks';
+import { useList, useStats, usePeriod } from '../data/hooks';
 import { bucketize, change, chatRevenue, rangeFor, sum, avgResponse, aiShare, PERIOD_LABEL, PERIOD_SHORT, type Period } from '../data/metrics';
 import { PairBars, RadialGauge, GoalBar, Funnel, HBars, Sparkline } from '../charts';
 import { Badge, Button, Delta, Empty, IconButton, Menu, PageHeader, Avatar, cx, useToast } from '../ui';
 import { addDays, brl, brl0, brlShort, firstName, fmtAgo, fmtDuration, fmtLong, fmtTime, localDate, MONTHS, num, todayLocal, fromLocal } from '../../shared/format';
 import type { AuditEntry, Contact, DailyStat } from '../data/types';
-
-const PERIOD_KEY = 'combinado-periodo';
-function usePeriod(): [Period, (p: Period) => void] {
-  const [p, setP] = useState<Period>(() => { try { return (localStorage.getItem(PERIOD_KEY) as Period) || '7d'; } catch { return '7d'; } });
-  return [p, (v) => { setP(v); try { localStorage.setItem(PERIOD_KEY, v); } catch { /* ignora */ } }];
-}
 
 export default function Dashboard() {
   const { me } = useMeCtx();

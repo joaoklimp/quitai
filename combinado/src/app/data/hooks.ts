@@ -1,5 +1,7 @@
 // Ganchos de dados (React Query) usados pelas telas.
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import type { Period } from './metrics';
 import { api } from './api';
 import type { Query, RowMap, TableName } from './types';
 
@@ -50,4 +52,15 @@ export function useUpdate<T extends TableName>(table: T, also: TableName[] = [])
 export function useRemove(table: TableName, also: TableName[] = []) {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (id: string) => api.remove(table, id), onSuccess: () => inv(table, ...also) });
+}
+
+const PERIOD_KEY = 'combinado-periodo';
+/** Período escolhido (lembrado entre visitas). */
+export function usePeriod(): [Period, (p: Period) => void] {
+  const [p, setP] = useState<Period>(() => { try { return (localStorage.getItem(PERIOD_KEY) as Period) || '7d'; } catch { return '7d'; } });
+  return [p, (v) => { setP(v); try { localStorage.setItem(PERIOD_KEY, v); } catch { /* ignora */ } }];
+}
+
+export function usePeakHours(from: string, to: string) {
+  return useQuery({ queryKey: ['peak', from, to], queryFn: () => api.peakHours(from, to), staleTime: 60_000 });
 }

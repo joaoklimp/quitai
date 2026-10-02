@@ -240,6 +240,15 @@ export class DemoSource implements DataSource {
     }
     return [...rows.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
   }
+  async peakHours(from: string, to: string): Promise<number[][]> {
+    // distribuição típica de quem chama no WhatsApp (pico no fim da manhã e à noite), escalada pelo volume real do período
+    const d = demoDb();
+    const curve = [0.2, 0.1, 0.05, 0.03, 0.03, 0.06, 0.2, 0.55, 0.9, 1.15, 1.25, 1.2, 0.95, 0.85, 1.0, 1.05, 1.0, 0.95, 1.05, 1.25, 1.35, 1.1, 0.7, 0.4];
+    const byWd = [0, 0, 0, 0, 0, 0, 0];
+    for (const [day, v] of Object.entries(d.msgStats)) if (day >= from && day <= to) byWd[new Date(day + 'T12:00:00Z').getUTCDay()] += v.msgs_in;
+    const total = curve.reduce((a, b) => a + b, 0);
+    return byWd.map((n, wd) => curve.map((c, h) => Math.round((n * c) / total * (wd === 0 && h < 9 ? 0.6 : 1) * (0.92 + ((wd * 7 + h * 13) % 17) / 100))));
+  }
   async usage(): Promise<UsageMonth> {
     const d = demoDb();
     const month = localDate(new Date(), TZ).slice(0, 7);

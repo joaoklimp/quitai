@@ -243,6 +243,13 @@ export class SupabaseSource implements DataSource {
       return out as unknown as DailyStat;
     });
   }
+  async peakHours(from: string, to: string): Promise<number[][]> {
+    const { data, error } = await this.sb.rpc('peak_hours', { p_from: from, p_to: to });
+    if (error) throw friendly(error);
+    const m = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
+    for (const r of (data ?? []) as { dow: number; hour: number; total: number }[]) m[r.dow][r.hour] = Number(r.total);
+    return m;
+  }
   async usage(): Promise<UsageMonth> {
     const { data, error } = await this.sb.rpc('usage_current');
     if (error) throw friendly(error);
