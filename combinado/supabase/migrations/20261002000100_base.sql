@@ -1,4 +1,4 @@
--- Combinado — base do banco: tabelas, índices, funções de acesso e regras de segurança (RLS).
+-- ORBYTA — base do banco: tabelas, índices, funções de acesso e regras de segurança (RLS).
 -- Cada empresa só enxerga e altera os próprios dados. Quem escreve dados "de sistema" (mensagens do
 -- WhatsApp, cobrança, uso da IA) são as Edge Functions, com a chave de serviço, que ignora o RLS.
 

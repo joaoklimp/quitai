@@ -1,9 +1,9 @@
-# Supabase CLI — Combinado.
+# Supabase CLI — ORBYTA.
 # Nenhuma função depende da verificação automática de token do Supabase (verify_jwt): cada uma confere a sua.
 # - agent, whatsapp, billing e team: validam o login do usuário no Supabase Auth (caller() em _shared/db.ts),
 #   o que funciona tanto com as chaves antigas (anon) quanto com as novas chaves e chaves de assinatura do projeto;
 # - whatsapp-webhook, asaas-webhook e cron: conferem a assinatura da Meta, o token do Asaas e o x-cron-secret.
-project_id = "combinado"
+project_id = "orbyta"
 
 [functions.agent]
 verify_jwt = false

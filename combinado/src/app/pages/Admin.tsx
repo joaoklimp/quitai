@@ -19,7 +19,7 @@ export default function Admin() {
   const aiTotal = data.companies.reduce((s, c) => s + c.ai_replies_month, 0);
   return (
     <>
-      <PageHeader eyebrow={<><ShieldCheck style={{ width: 14 }} /> Só administradores da plataforma veem esta página</>} title="Admin da plataforma" subtitle={isDemo ? 'Exemplo com empresas fictícias. Na sua conta real, aparecem as empresas que assinam o Combinado.' : 'Empresas, planos, uso da IA e receita recorrente.'} />
+      <PageHeader eyebrow={<><ShieldCheck style={{ width: 14 }} /> Só administradores da plataforma veem esta página</>} title="Admin da plataforma" subtitle={isDemo ? 'Exemplo com empresas fictícias. Na sua conta real, aparecem as empresas que assinam a ORBYTA.' : 'Empresas, planos, uso da IA e receita recorrente.'} />
       <div className="stat-row">
         <div className="stat"><span>Receita recorrente (MRR)</span><b>{brl0(data.mrr)}</b><small>{brl0(data.mrr * 12)} por ano</small></div>
         <div className="stat"><span>Assinaturas ativas</span><b>{num(data.active)}</b><small>pagando hoje</small></div>

@@ -506,7 +506,7 @@ function AccountTab() {
   const run = async (k: string, fn: () => Promise<void>) => { setBusy(k); try { await fn(); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(null); } };
   const exportData = () => run('exp', async () => {
     const data = await api.exportAll();
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `combinado-dados-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `orbyta-dados-${new Date().toISOString().slice(0, 10)}.json`; a.click();
     toast('Arquivo com seus dados baixado');
   });
   const notifPerm = useMemo(() => ('Notification' in window ? window.Notification.permission : 'denied'), []);

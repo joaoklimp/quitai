@@ -23,7 +23,7 @@ serve(async (req) => {
       await insertMessage({ company_id: me.companyId, conversation_id: conv.id, direction: 'in', sender: 'dono', sender_name: me.name, body: text, channel: 'painel' });
       const r = await ownerTurn(b, conv, member, 'painel');
       if (r.usage.input) await countUsage(b, r.usage);
-      await insertMessage({ company_id: me.companyId, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'Combinado', body: r.reply, actions: r.actions.length ? r.actions : null, channel: 'painel' });
+      await insertMessage({ company_id: me.companyId, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'ORBYTA', body: r.reply, actions: r.actions.length ? r.actions : null, channel: 'painel' });
       const pendingId = r.actions.find((a) => a.status === 'aguardando' && a.pending_id)?.pending_id;
       const { data: pending } = pendingId ? await db.from('pending_actions').select('*').eq('id', pendingId).single() : { data: null };
       return json({ conversation_id: conv.id, reply: r.reply, actions: r.actions, pending }, 200, req);
@@ -32,7 +32,7 @@ serve(async (req) => {
     /* ---------- botões Confirmar / Cancelar ---------- */
     case 'resolve': {
       const r = await resolvePending(b, str(body.pending_id, 64), body.approve === true, member, 'painel');
-      if (r.conversationId) await insertMessage({ company_id: me.companyId, conversation_id: r.conversationId, direction: 'out', sender: 'ia', sender_name: 'Combinado', body: r.reply, actions: r.actions.length ? r.actions : null, channel: 'painel' });
+      if (r.conversationId) await insertMessage({ company_id: me.companyId, conversation_id: r.conversationId, direction: 'out', sender: 'ia', sender_name: 'ORBYTA', body: r.reply, actions: r.actions.length ? r.actions : null, channel: 'painel' });
       return json({ conversation_id: r.conversationId, reply: r.reply, actions: r.actions }, 200, req);
     }
 

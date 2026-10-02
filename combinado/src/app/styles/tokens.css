@@ -1,6 +1,6 @@
-/* Combinado — tokens de design.
-   Visual "céu aberto": vidro claro sobre céu azul, preto como cor de ação, e três cores vivas para dados
-   (azul = conversas/IA, laranja = vendas/orçamentos, verde = concluído/positivo). */
+/* ORBYTA — tokens de design.
+   Visual "órbita": vidro sobre um espaço azul com órbitas de luz (orbit.css), azul-marinho como cor de ação
+   e três cores vivas para dados (azul = conversas/IA, laranja = vendas/orçamentos, verde = concluído/positivo). */
 :root {
   --font: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-accent: "Playfair Display", Georgia, "Times New Roman", serif;
@@ -13,7 +13,7 @@
 
   /* superfícies */
   --bg: #EEF3FA;
-  --sky: url("/img/ceu-painel.webp");
+  --sky: none;
   --board: rgba(246, 248, 252, 0.84);
   --board-border: rgba(255, 255, 255, 0.85);
   --surface: #FFFFFF;
@@ -26,8 +26,8 @@
   --line-2: #D6DCE6;
 
   /* ação (botões ativos, pílula selecionada) */
-  --solid: #0B0D12;
-  --solid-hover: #23283A;
+  --solid: #0A1330;
+  --solid-hover: #172452;
   --on-solid: #FFFFFF;
 
   /* cores vivas */
@@ -72,7 +72,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --ink: #F2F4FA; --ink-2: #C3C9D7; --ink-3: #8E97AB; --ink-4: #5E677B;
-    --bg: #070A12; --sky: url("/img/ceu-noite.webp");
+    --bg: #070A12; --sky: none;
     --board: rgba(12, 16, 26, 0.86); --board-border: rgba(255, 255, 255, 0.06);
     --surface: #111726; --surface-2: #161D2E; --surface-3: #1D2538; --surface-hover: #182033;
     --glass: rgba(17, 23, 38, 0.72); --glass-strong: rgba(17, 23, 38, 0.92);
@@ -98,7 +98,7 @@
 }
 :root[data-theme="dark"] {
   --ink: #F2F4FA; --ink-2: #C3C9D7; --ink-3: #8E97AB; --ink-4: #5E677B;
-  --bg: #070A12; --sky: url("/img/ceu-noite.webp");
+  --bg: #070A12; --sky: none;
   --board: rgba(12, 16, 26, 0.86); --board-border: rgba(255, 255, 255, 0.06);
   --surface: #111726; --surface-2: #161D2E; --surface-3: #1D2538; --surface-hover: #182033;
   --glass: rgba(17, 23, 38, 0.72); --glass-strong: rgba(17, 23, 38, 0.92);

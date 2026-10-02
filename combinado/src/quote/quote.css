@@ -1,4 +1,4 @@
-body { background-image: url("/img/ceu.webp"); background-size: cover; background-attachment: fixed; }
+body { background: var(--space); background-attachment: fixed; }
 .pq { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 18px; }
 .pq-card { width: min(560px, 100%); background: var(--glass-strong); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border-radius: 32px; box-shadow: var(--shadow-3); padding: 30px; border: 1px solid var(--board-border); animation: rise .3s ease; }
 .pq-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding-bottom: 18px; border-bottom: 1px dashed var(--line-2); }

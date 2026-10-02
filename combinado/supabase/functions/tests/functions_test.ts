@@ -157,7 +157,7 @@ Deno.test('prompt de atendimento: regras, catálogo com ids, desconto e saudaç�
     company: { id: 'c1', name: 'Brilho Lar', segment: 'limpeza', city: 'Brasília', state: 'DF', address: null, phone: '5561999990000', business_hours: { '1': [['08:00', '18:00']], '6': [['08:00', '12:00']] }, min_notice_minutes: 120, max_days_ahead: 30, monthly_goal: 0 },
     ai: { assistant_name: 'Lia', tone: 'amigavel', use_emojis: false, instructions: 'Não atendemos aos domingos.', greeting: 'Oi! Aqui é a Lia da Brilho Lar.', can_quote: true, max_discount_pct: 10, booking_mode: 'confirmar', handoff_on_complaint: true },
     services: [{ id: 'svc-1', name: 'Limpeza de sofá 3 lugares', price: 180, price_type: 'a_partir_de', duration_min: 120, category: 'Sofás', description: null }],
-    plan: { id: 'profissional', name: 'Profissional', ai_replies: 1500, users: 5, automations: true }, tz: 'America/Sao_Paulo', writable: true, origin: 'https://combinado.app',
+    plan: { id: 'profissional', name: 'Profissional', ai_replies: 1500, users: 5, automations: true }, tz: 'America/Sao_Paulo', writable: true, origin: 'https://orbyta.com.br',
   } as unknown as Parameters<typeof customerSystem>[0];
   const p = customerSystem(b);
   assertStringIncludes(p, 'Você é Lia, assistente virtual da Brilho Lar');

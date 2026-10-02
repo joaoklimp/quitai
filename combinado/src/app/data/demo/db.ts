@@ -3,7 +3,7 @@ import type { Filter, Query, TableName, RowMap, AuditEntry, Notification, Messag
 import { buildDemo, DEMO_COMPANY_ID, DEMO_VERSION, type DemoDB } from './seed';
 import { fold } from '../../../shared/format';
 
-const KEY = 'combinado-demo';
+const KEY = 'orbyta-demo';
 let db: DemoDB | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<(t: TableName) => void>();

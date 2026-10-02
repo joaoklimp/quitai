@@ -16,7 +16,7 @@ export class AsaasError extends Error {
 export async function asaas<T = Record<string, unknown>>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const res = await fetch(`${BASE}/v3${path}`, {
     method: init.method ?? 'GET',
-    headers: { access_token: Deno.env.get('ASAAS_API_KEY') ?? '', 'Content-Type': 'application/json', 'User-Agent': 'Combinado/1.0' },
+    headers: { access_token: Deno.env.get('ASAAS_API_KEY') ?? '', 'Content-Type': 'application/json', 'User-Agent': 'ORBYTA/1.0' },
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   const text = await res.text();
@@ -88,7 +88,7 @@ export async function syncCompany(companyId: string): Promise<void> {
     const { error } = await db.from('invoices').upsert(payments.slice(0, 36).map((p) => ({
       company_id: companyId, asaas_payment_id: p.id, amount: Number(p.value), status: invoiceStatus(p.status), due_date: p.dueDate,
       paid_at: PAID.includes(p.status) ? new Date((p.paymentDate ?? p.confirmedDate ?? p.dueDate) + 'T12:00:00Z').toISOString() : null,
-      method: method(p.billingType), url: p.invoiceUrl ?? null, description: `Combinado ${planName}${mapped ? ` · ${mapped.cycle}` : ''}`.trim(),
+      method: method(p.billingType), url: p.invoiceUrl ?? null, description: `ORBYTA ${planName}${mapped ? ` · ${mapped.cycle}` : ''}`.trim(),
     })), { onConflict: 'asaas_payment_id' });
     if (error) console.error('faturas', error.message);
   }

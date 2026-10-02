@@ -1,0 +1,88 @@
+/* Fundo ORBYTA: planetas com bordas de luz que giram devagar, estrelas que piscam e uma lua em órbita.
+   Só CSS (nada de imagem pesada). No tema claro vira um céu azul-claro com as mesmas órbitas.
+   Marcação: <div class="orbit-bg" aria-hidden="true"><i class="stars"></i><i class="arc a1"></i><i class="arc a2"></i><i class="arc a3"></i><i class="moon-orbit"><b></b></i></div> */
+:root {
+  --space: radial-gradient(120% 90% at 15% -10%, #FFFFFF 0%, #EDF3FF 38%, #DDE8FF 100%);
+  --planet: rgba(255, 255, 255, 0.55);
+  --orbit-rgb: 37, 99, 235;
+  --orbit-glow: 0.55;
+  --stars: 0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --space: radial-gradient(110% 80% at 10% -5%, #0C1A44 0%, #070D24 42%, #03060F 100%);
+    --planet: rgba(9, 18, 48, 0.78);
+    --orbit-rgb: 56, 140, 255;
+    --orbit-glow: 0.95;
+    --stars: 1;
+  }
+}
+:root[data-theme="dark"] {
+  --space: radial-gradient(110% 80% at 10% -5%, #0C1A44 0%, #070D24 42%, #03060F 100%);
+  --planet: rgba(9, 18, 48, 0.78);
+  --orbit-rgb: 56, 140, 255;
+  --orbit-glow: 0.95;
+  --stars: 1;
+}
+
+.orbit-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--space); }
+
+/* estrelas: duas camadas que derivam e piscam em ritmos diferentes */
+.orbit-bg .stars, .orbit-bg .stars::after { position: absolute; inset: -40%; opacity: var(--stars); }
+.orbit-bg .stars {
+  background-image:
+    radial-gradient(1.2px 1.2px at 30px 40px, rgba(255, 255, 255, .85), transparent 60%),
+    radial-gradient(1px 1px at 140px 120px, rgba(170, 205, 255, .8), transparent 60%),
+    radial-gradient(1.4px 1.4px at 220px 60px, rgba(255, 255, 255, .7), transparent 60%),
+    radial-gradient(1px 1px at 90px 210px, rgba(255, 255, 255, .6), transparent 60%);
+  background-size: 260px 260px;
+  animation: orbit-drift 240s linear infinite, orbit-twinkle 7s ease-in-out infinite alternate;
+}
+.orbit-bg .stars::after {
+  content: "";
+  background-image: radial-gradient(1px 1px at 60px 90px, rgba(150, 195, 255, .9), transparent 60%), radial-gradient(1.6px 1.6px at 300px 260px, rgba(255, 255, 255, .8), transparent 60%);
+  background-size: 410px 410px;
+  animation: orbit-drift 360s linear infinite reverse, orbit-twinkle 11s ease-in-out infinite alternate-reverse;
+}
+
+/* planetas: o corpo escuro e uma borda de luz; um brilho percorre a borda girando devagar */
+.orbit-bg .arc { position: absolute; border-radius: 50%; background: radial-gradient(circle, var(--planet) 0 69.5%, rgba(var(--orbit-rgb), calc(var(--orbit-glow) * .45)) 69.75%, rgba(var(--orbit-rgb), 0) 70.6%); animation: orbit-float 28s ease-in-out infinite alternate; }
+.orbit-bg .arc::before, .orbit-bg .arc::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 40%, rgba(var(--orbit-rgb), .15) 52%, rgba(var(--orbit-rgb), var(--orbit-glow)) 66%, rgba(150, 210, 255, var(--orbit-glow)) 70%, rgba(var(--orbit-rgb), .35) 80%, transparent 92%);
+  -webkit-mask: radial-gradient(circle, transparent 69.1%, #000 69.6%, #000 70.1%, transparent 70.9%);
+  mask: radial-gradient(circle, transparent 69.1%, #000 69.6%, #000 70.1%, transparent 70.9%);
+  animation: orbit-spin var(--spin, 70s) linear infinite;
+}
+.orbit-bg .arc::after { filter: blur(10px); opacity: .9; -webkit-mask: radial-gradient(circle, transparent 66%, #000 69.6%, #000 70.2%, transparent 74%); mask: radial-gradient(circle, transparent 66%, #000 69.6%, #000 70.2%, transparent 74%); }
+.orbit-bg .a1 { width: 125vmax; height: 125vmax; left: -92vmax; top: -98vmax; --spin: 80s; }
+.orbit-bg .a1::before, .orbit-bg .a1::after { animation-delay: -20s; }
+.orbit-bg .a2 { width: 140vmax; height: 140vmax; right: -100vmax; bottom: -112vmax; --spin: 95s; animation-duration: 34s; }
+.orbit-bg .a2::before, .orbit-bg .a2::after { animation-direction: reverse; }
+.orbit-bg .a3 { width: 175vmax; height: 175vmax; right: -150vmax; bottom: -150vmax; --spin: 130s; opacity: .55; animation-duration: 40s; }
+
+/* uma lua em órbita, como no símbolo */
+.orbit-bg .moon-orbit { position: absolute; left: 8%; top: 12%; width: 46vmax; height: 46vmax; border-radius: 50%; border: 1px dashed rgba(var(--orbit-rgb), .14); animation: orbit-spin 60s linear infinite; }
+.orbit-bg .moon-orbit b { position: absolute; left: 50%; top: -5px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #B5ECFF, #2FA8FF); box-shadow: 0 0 14px 3px rgba(var(--orbit-rgb), .55); }
+
+@keyframes orbit-spin { to { transform: rotate(360deg); } }
+@keyframes orbit-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(1.5vmax, 1vmax, 0); } }
+@keyframes orbit-drift { to { transform: translate3d(-260px, 130px, 0); } }
+@keyframes orbit-twinkle { from { opacity: calc(var(--stars) * .45); } to { opacity: var(--stars); } }
+@media (prefers-reduced-motion: reduce) {
+  .orbit-bg *, .orbit-bg *::before, .orbit-bg *::after { animation: none !important; }
+}
+@media (max-width: 700px) { .orbit-bg .moon-orbit { width: 80vmin; height: 80vmin; left: 30%; top: 4%; } }
+
+/* sistema de módulos em órbita (página Módulos e site) */
+.one-orbit { position: relative; width: 280px; height: 280px; margin: 0 auto; }
+.one-orbit .ring { position: absolute; inset: 0; margin: auto; border-radius: 50%; border: 1px solid rgba(111,176,255,.28); }
+.one-orbit .r1 { width: 120px; height: 120px; } .one-orbit .r2 { width: 200px; height: 200px; border-style: dashed; } .one-orbit .r3 { width: 276px; height: 276px; border-color: rgba(111,176,255,.14); }
+.one-orbit .core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(56,140,255,.7)); }
+.one-orbit .sat { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 13px; display: grid; place-items: center;
+  background: rgba(10,20,48,.9); border: 1px solid rgba(140,180,255,.3); box-shadow: 0 0 18px rgba(56,140,255,.25); animation: orbit 26s linear infinite; }
+.one-orbit .sat svg { width: 19px; height: 19px; }
+.one-orbit .s0 { --r: 100px; animation-delay: 0s; } .one-orbit .s1 { --r: 138px; animation-delay: -5.2s; } .one-orbit .s2 { --r: 100px; animation-delay: -10.4s; }
+.one-orbit .s3 { --r: 138px; animation-delay: -15.6s; } .one-orbit .s4 { --r: 100px; animation-delay: -20.8s; }
+@keyframes orbit { from { transform: rotate(0deg) translateX(var(--r)) rotate(0deg); } to { transform: rotate(360deg) translateX(var(--r)) rotate(-360deg); } }
+@media (prefers-reduced-motion: reduce) { .one-orbit .sat { animation-play-state: paused; } }

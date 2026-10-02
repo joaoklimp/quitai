@@ -184,7 +184,7 @@ Deno.test({ name: 'dono pelo agente: a venda vira confirmação e o recibo da me
   const t = await ownerTurn(b, conv, member, 'painel');
   const pending = t.actions.find((a) => a.status === 'aguardando')!;
   assert(pending?.pending_id);
-  const msg = await insertMessage({ company_id: CID, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'Combinado', body: t.reply, actions: t.actions, channel: 'painel' });
+  const msg = await insertMessage({ company_id: CID, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'ORBYTA', body: t.reply, actions: t.actions, channel: 'painel' });
   await resolvePending(b, pending.pending_id!, true, member, 'painel');
   const { data: after } = await db.from('messages').select('actions').eq('id', msg.id).single();
   assertEquals((after!.actions as { status: string }[])[0].status, 'ok');

@@ -42,7 +42,7 @@ export default function Automations() {
   return (
     <>
       <PageHeader title="Automações" subtitle="Mensagens que saem sozinhas, na hora certa. Você liga, ajusta e acompanha tudo por aqui." />
-      <div className="callout" style={{ marginBottom: 18 }}><MessageSquareText /><span>Para falar com o cliente depois de 24 horas sem conversa, o WhatsApp exige <strong>modelos de mensagem aprovados</strong>. O Combinado usa os modelos indicados em cada automação. É só cadastrar uma vez: veja o passo a passo em <Link className="link" to="/configuracoes/whatsapp">Configurações → WhatsApp</Link>.</span></div>
+      <div className="callout" style={{ marginBottom: 18 }}><MessageSquareText /><span>Para falar com o cliente depois de 24 horas sem conversa, o WhatsApp exige <strong>modelos de mensagem aprovados</strong>. A ORBYTA usa os modelos indicados em cada automação. É só cadastrar uma vez: veja o passo a passo em <Link className="link" to="/configuracoes/whatsapp">Configurações → WhatsApp</Link>.</span></div>
       {isLoading ? <Loader /> : (
         <div className="auto-grid">
           {ORDER.map((k) => <AutoCard key={k} kind={k} a={byKind.get(k)} allowed={allowed(k)} canEdit={can(me, 'dono', 'gerente')} runs={runs.filter((r) => r.kind === k).length} />)}

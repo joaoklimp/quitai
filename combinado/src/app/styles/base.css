@@ -1,3 +1,4 @@
+@import './orbit.css';
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -8,16 +9,10 @@ body {
   line-height: 1.5;
   color: var(--ink);
   background: var(--bg);
-  background-image: var(--sky);
-  background-repeat: no-repeat;
-  background-size: 100% auto;
-  background-position: top center;
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "ss01" on, "cv11" on;
 }
-@media (max-width: 1100px) { body { background-size: 1600px auto; } }
 img, video { display: block; max-width: 100%; }
 svg { flex: none; }
 svg.ii { display: inline-block; vertical-align: -2px; width: 12px; height: 12px; }
@@ -72,3 +67,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { box-shadow: 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- logotipo ORBYTA (símbolo + RBYTΛ) ---------- */
+.wordmark { display: inline-flex; align-items: center; height: var(--wm, 28px); font-size: calc(var(--wm, 28px) * 0.66); font-weight: 700; line-height: 1; color: var(--ink); white-space: nowrap; }
+.wordmark > svg:first-child { width: var(--wm, 28px); height: var(--wm, 28px); flex: none; margin-right: .1em; overflow: visible; }
+.wordmark .wm-t { letter-spacing: .22em; }
+.wordmark .wm-a { height: .74em; width: .66em; flex: none; }

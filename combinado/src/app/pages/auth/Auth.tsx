@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { api, enterDemo } from '../../data/api';
 import { Button, Field, Input } from '../../ui';
-import { BRAND, logoSvg } from '../../../shared/brand';
+import { BRAND, wordmarkHtml } from '../../../shared/brand';
 import { TRIAL_DAYS } from '../../../shared/plans';
 
 type Mode = 'entrar' | 'cadastro' | 'recuperar';
@@ -14,7 +14,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="auth">
       <aside className="auth-side">
-        <a href="/" className="row" style={{ gap: 10 }}><span dangerouslySetInnerHTML={{ __html: logoSvg(40, { title: false }) }} style={{ display: 'contents' }} /><b style={{ fontSize: 20, letterSpacing: '-0.03em' }}>{BRAND.name}</b></a>
+        <a href="/" className="row" aria-label={`${BRAND.name}, página inicial`} dangerouslySetInnerHTML={{ __html: wordmarkHtml(36) }} />
         <div>
           <h1>Sua empresa funcionando <span className="accent">por uma conversa.</span></h1>
           <p>A IA atende seus clientes no WhatsApp, cria orçamentos, marca horários e executa o que você pedir. Você acompanha tudo por aqui.</p>

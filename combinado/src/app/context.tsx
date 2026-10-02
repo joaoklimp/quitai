@@ -24,7 +24,7 @@ export const useAssistant = () => useContext(AssistantCtx);
 
 /* tema claro / escuro / automático */
 export type ThemePref = 'auto' | 'light' | 'dark';
-const THEME_KEY = 'combinado-tema';
+const THEME_KEY = 'orbyta-tema';
 export function readTheme(): ThemePref { try { return (localStorage.getItem(THEME_KEY) as ThemePref) || 'auto'; } catch { return 'auto'; } }
 export function applyTheme(t: ThemePref) {
   const root = document.documentElement;

@@ -17,14 +17,14 @@ export default function Contacts() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [view, setView] = useState<'lista' | 'funil'>(() => (localStorage.getItem('combinado-clientes-view') as 'lista' | 'funil') || 'lista');
+  const [view, setView] = useState<'lista' | 'funil'>(() => (localStorage.getItem('orbyta-clientes-view') as 'lista' | 'funil') || 'lista');
   const [q, setQ] = useState('');
   const term = useDebounced(q, 220);
   const [temp, setTemp] = useState<Temperature | 'todas'>((params.get('temperatura') as Temperature) || 'todas');
   const [stage, setStage] = useState<Stage | 'todas'>('todas');
   const [limit, setLimit] = useState(200);
   const [editing, setEditing] = useState<Contact | 'new' | null>(params.get('novo') ? 'new' : null);
-  useEffect(() => { try { localStorage.setItem('combinado-clientes-view', view); } catch { /* ignora */ } }, [view]);
+  useEffect(() => { try { localStorage.setItem('orbyta-clientes-view', view); } catch { /* ignora */ } }, [view]);
 
   const filters = [
     ...(temp !== 'todas' ? [{ col: 'temperature', op: 'eq' as const, value: temp }] : []),

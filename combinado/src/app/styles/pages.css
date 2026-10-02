@@ -39,7 +39,7 @@
 }
 
 .ai-visual { position: relative; height: 178px; border-radius: 20px; overflow: hidden; background: linear-gradient(160deg, #3D86F6 0%, #79B3FA 55%, #CFE5FD 100%); padding: 18px 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
-.ai-visual::before { content: ""; position: absolute; inset: 0; background: url("/img/ceu-painel.webp") center/cover; opacity: .55; mix-blend-mode: screen; }
+.ai-visual::before { content: ""; position: absolute; width: 260%; aspect-ratio: 1; left: -120%; top: -205%; border-radius: 50%; background: conic-gradient(from 90deg, transparent 0 45%, rgba(120, 190, 255, .55) 62%, rgba(255, 255, 255, .8) 66%, rgba(120, 190, 255, .3) 74%, transparent 88%); -webkit-mask: radial-gradient(circle, transparent 68.5%, #000 69.5%, #000 70%, transparent 71.5%); mask: radial-gradient(circle, transparent 68.5%, #000 69.5%, #000 70%, transparent 71.5%); animation: orbit-spin 50s linear infinite; }
 .ai-visual .bubble { position: relative; max-width: 86%; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: rgba(255, 255, 255, 0.55); color: rgba(20, 40, 80, 0.75); font-size: 12px; backdrop-filter: blur(6px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-visual .bubble.b1 { align-self: flex-start; border-radius: 14px 14px 14px 4px; }
 .ai-visual .gen { position: relative; margin-top: auto; align-self: stretch; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.92); color: #23304A; font-size: 13px; font-weight: 600; box-shadow: 0 8px 20px rgba(20, 60, 140, 0.16); }
@@ -338,7 +338,7 @@
 .faq details p { margin-top: 10px; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
 
 /* autenticação */
-.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); background-image: url("/img/ceu.webp"); background-size: cover; background-position: center; }
+.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .auth-side { padding: 40px 56px; display: flex; flex-direction: column; justify-content: space-between; color: #0B0D12; }
 .auth-side h1 { font-size: 46px; font-weight: 600; letter-spacing: -0.045em; line-height: 1.05; max-width: 520px; }
 .auth-side h1 .accent { color: #1A4FC4; }
@@ -403,17 +403,6 @@
 .one-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .one-tags span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: rgba(255,255,255,.07); border: 1px solid rgba(140,180,255,.18); font-size: 12.5px; font-weight: 600; }
 .one-tags svg { width: 14px; height: 14px; color: #6fb0ff; }
-.one-orbit { position: relative; width: 280px; height: 280px; margin: 0 auto; }
-.one-orbit .ring { position: absolute; inset: 0; margin: auto; border-radius: 50%; border: 1px solid rgba(111,176,255,.28); }
-.one-orbit .r1 { width: 120px; height: 120px; } .one-orbit .r2 { width: 200px; height: 200px; border-style: dashed; } .one-orbit .r3 { width: 276px; height: 276px; border-color: rgba(111,176,255,.14); }
-.one-orbit .core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(56,140,255,.7)); }
-.one-orbit .sat { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 13px; display: grid; place-items: center;
-  background: rgba(10,20,48,.9); border: 1px solid rgba(140,180,255,.3); box-shadow: 0 0 18px rgba(56,140,255,.25); animation: orbit 26s linear infinite; }
-.one-orbit .sat svg { width: 19px; height: 19px; }
-.one-orbit .s0 { --r: 100px; animation-delay: 0s; } .one-orbit .s1 { --r: 138px; animation-delay: -5.2s; } .one-orbit .s2 { --r: 100px; animation-delay: -10.4s; }
-.one-orbit .s3 { --r: 138px; animation-delay: -15.6s; } .one-orbit .s4 { --r: 100px; animation-delay: -20.8s; }
-@keyframes orbit { from { transform: rotate(0deg) translateX(var(--r)) rotate(0deg); } to { transform: rotate(360deg) translateX(var(--r)) rotate(-360deg); } }
-@media (prefers-reduced-motion: reduce) { .one-orbit .sat { animation-play-state: paused; } }
 @media (max-width: 800px) { .one-hero { grid-template-columns: 1fr; } .one-orbit { transform: scale(.85); } }
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 18px; }
 .mod { display: flex; flex-direction: column; gap: 12px; }

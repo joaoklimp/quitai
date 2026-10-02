@@ -1,12 +1,12 @@
 {
-  "name": "Combinado",
-  "short_name": "Combinado",
+  "name": "ORBYTA",
+  "short_name": "ORBYTA",
   "description": "Sua empresa funcionando por uma conversa.",
   "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#EEF3FA",
-  "theme_color": "#3D86F0",
+  "background_color": "#050A1A",
+  "theme_color": "#050A1A",
   "lang": "pt-BR",
   "icons": [
     {

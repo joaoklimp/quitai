@@ -24,14 +24,14 @@ const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim
 const token = decodeURIComponent(location.hash.replace(/^#/, '')).trim();
 
 async function load(): Promise<PublicQuote | null> {
-  if (URL_ && KEY && !localStorage.getItem('combinado-modo')) {
+  if (URL_ && KEY && !localStorage.getItem('orbyta-modo')) {
     const sb = createClient(URL_, KEY, { auth: { persistSession: false } });
     const { data, error } = await sb.rpc('public_quote', { p_token: token });
     if (error) throw new Error(error.message);
     return data as PublicQuote | null;
   }
   // demonstração: lê os dados guardados no navegador
-  const raw = localStorage.getItem('combinado-demo');
+  const raw = localStorage.getItem('orbyta-demo');
   if (!raw) return null;
   const db = JSON.parse(raw);
   const q = db.quotes.find((x: { public_token: string }) => x.public_token === token);
@@ -40,18 +40,18 @@ async function load(): Promise<PublicQuote | null> {
   return { ...q, items: db.quote_items.filter((i: { quote_id: string }) => i.quote_id === q.id).sort((a: { sort: number }, b: { sort: number }) => a.sort - b.sort), company: { name: db.company.name, phone: db.company.phone, city: db.company.city }, contact_name: c?.name ?? null };
 }
 async function respond(decision: 'aprovado' | 'recusado', note: string): Promise<void> {
-  if (URL_ && KEY && !localStorage.getItem('combinado-modo')) {
+  if (URL_ && KEY && !localStorage.getItem('orbyta-modo')) {
     const sb = createClient(URL_, KEY, { auth: { persistSession: false } });
     const { error } = await sb.rpc('respond_quote', { p_token: token, p_decision: decision, p_note: note || null });
     if (error) throw new Error(error.message.includes('nao_disponivel') ? 'Este orçamento não está mais disponível para resposta.' : error.message);
     return;
   }
-  const db = JSON.parse(localStorage.getItem('combinado-demo') ?? '{}');
+  const db = JSON.parse(localStorage.getItem('orbyta-demo') ?? '{}');
   const q = db.quotes?.find((x: { public_token: string }) => x.public_token === token);
   if (q) {
     q.status = decision; q.responded_at = new Date().toISOString();
     db.notifications?.unshift({ id: crypto.randomUUID(), company_id: q.company_id, user_id: null, kind: 'orcamento', title: decision === 'aprovado' ? 'Orçamento aprovado pelo cliente' : 'Orçamento recusado', body: `nº ${String(q.number).padStart(4, '0')} · ${brl(q.total)}${note ? ` · “${note}”` : ''}`, link: `#/orcamentos/${q.id}`, read_at: null, created_at: new Date().toISOString() });
-    localStorage.setItem('combinado-demo', JSON.stringify(db));
+    localStorage.setItem('orbyta-demo', JSON.stringify(db));
   }
 }
 

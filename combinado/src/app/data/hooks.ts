@@ -54,7 +54,7 @@ export function useRemove(table: TableName, also: TableName[] = []) {
   return useMutation({ mutationFn: (id: string) => api.remove(table, id), onSuccess: () => inv(table, ...also) });
 }
 
-const PERIOD_KEY = 'combinado-periodo';
+const PERIOD_KEY = 'orbyta-periodo';
 /** Período escolhido (lembrado entre visitas). */
 export function usePeriod(): [Period, (p: Period) => void] {
   const [p, setP] = useState<Period>(() => { try { return (localStorage.getItem(PERIOD_KEY) as Period) || '7d'; } catch { return '7d'; } });

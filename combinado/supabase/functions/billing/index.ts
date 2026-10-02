@@ -51,7 +51,7 @@ serve(async (req) => {
       // já tem período pago (troca de plano ou reativação): a nova assinatura começa quando ele acabar
       const paidUntil = !acct?.access_revoked && ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null;
       const firstDue = paidUntil ?? today;
-      const desc = `Combinado · Plano ${plan.name} · ${cycle}`;
+      const desc = `ORBYTA · Plano ${plan.name} · ${cycle}`;
 
       if (method === 'cartao') {
         const checkout = await asaas<{ id: string; link?: string }>('/checkouts', {
@@ -62,7 +62,7 @@ serve(async (req) => {
             minutesToExpire: 60,
             externalReference: company.id,
             callback: { successUrl: page, cancelUrl: page, expiredUrl: page },
-            items: [{ name: `Combinado ${plan.name}`.slice(0, 30), description: desc.slice(0, 150), quantity: 1, value }],
+            items: [{ name: `ORBYTA ${plan.name}`.slice(0, 30), description: desc.slice(0, 150), quantity: 1, value }],
             // sem customerData: a própria página do Checkout pede os dados do pagador
             subscription: { cycle: asaasCycle, nextDueDate: `${firstDue} 12:00:00` },
           },

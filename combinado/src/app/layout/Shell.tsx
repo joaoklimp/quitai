@@ -7,7 +7,7 @@ import {
   Landmark, Package, Plug, Orbit, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BRAND, logoSvg } from '../../shared/brand';
+import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
 import { fmtAgo } from '../../shared/format';
 import { Avatar, Button, IconButton, Menu, cx, useToast } from '../ui';
 import { useAssistant, useMeCtx, useTheme } from '../context';
@@ -85,8 +85,8 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="board">
         <header className={cx('topbar', scrolled && 'scrolled')}>
           <NavLink to="/" className="brand" aria-label={`${BRAND.name} — início`}>
-            <span dangerouslySetInnerHTML={{ __html: logoSvg(38, { title: false }) }} style={{ display: 'contents' }} />
-            <span className="brand-name">{BRAND.name}</span>
+            <span className="brand-icon" dangerouslySetInnerHTML={{ __html: logoSvg(38, { title: false }) }} />
+            <span className="brand-name" dangerouslySetInnerHTML={{ __html: wordmarkHtml(30) }} />
           </NavLink>
           <ScrollPills>
             {allowed(PRIMARY, me.role).map((p) => (

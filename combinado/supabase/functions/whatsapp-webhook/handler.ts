@@ -157,7 +157,7 @@ async function onCustomerMessage(acc: WaAccount, m: WaMessage, profileName: stri
     await db.from('contacts').update({ opt_in: false }).eq('id', contact.id);
     const text = 'Pronto, você não vai mais receber lembretes nem mensagens automáticas nossas. Se precisar de algo, é só escrever aqui. 🙂';
     const waId = await sendText(acc, m.from, text).catch(() => '');
-    await insertMessage({ company_id: acc.company_id, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'Combinado', body: text, wa_message_id: waId || null, wa_status: waId ? 'enviada' : 'falhou', channel: 'whatsapp' });
+    await insertMessage({ company_id: acc.company_id, conversation_id: conv.id, direction: 'out', sender: 'ia', sender_name: 'ORBYTA', body: text, wa_message_id: waId || null, wa_status: waId ? 'enviada' : 'falhou', channel: 'whatsapp' });
     return;
   }
   await answerCustomer(acc, conv.id, msg.id, m.id);
@@ -249,6 +249,6 @@ async function replyOwner(acc: WaAccount, to: string, convId: string, text: stri
       ? await sendButtons(acc, to, full, [{ id: `ok:${pending.pending_id}`, title: 'Confirmar' }, { id: `no:${pending.pending_id}`, title: 'Cancelar' }])
       : await sendText(acc, to, full);
   } catch (e) { console.error('responder equipe', e); }
-  await insertMessage({ company_id: acc.company_id, conversation_id: convId, direction: 'out', sender: 'ia', sender_name: 'Combinado', body: text, actions: actions.length ? actions : null, wa_message_id: waId || null, wa_status: waId ? 'enviada' : 'falhou', channel: 'whatsapp' });
+  await insertMessage({ company_id: acc.company_id, conversation_id: convId, direction: 'out', sender: 'ia', sender_name: 'ORBYTA', body: text, actions: actions.length ? actions : null, wa_message_id: waId || null, wa_status: waId ? 'enviada' : 'falhou', channel: 'whatsapp' });
   if (waId) await db.rpc('bump_usage', { p_company: acc.company_id, p_wa: 1 });
 }

@@ -1,4 +1,4 @@
-// Landing do Combinado: HTML estático + este script leve (sem framework).
+// Landing da ORBYTA: HTML estático + este script leve (sem framework).
 // Faz: menu do celular, cabeçalho de vidro ao rolar, prévia do painel em escala, conversas animadas,
 // preços gerados a partir de shared/plans.ts e entrada suave das seções.
 import '@fontsource-variable/plus-jakarta-sans';

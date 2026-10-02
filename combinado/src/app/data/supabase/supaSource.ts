@@ -65,7 +65,7 @@ export class SupabaseSource implements DataSource {
 
   /**
    * Links dos e-mails de acesso (confirmação de cadastro, convite da equipe, nova senha):
-   * - modelos do Combinado (supabase/templates): ?token_hash=…&type=…, confirmado aqui e válido em qualquer aparelho;
+   * - modelos da ORBYTA (supabase/templates): ?token_hash=…&type=…, confirmado aqui e válido em qualquer aparelho;
    * - convite com o modelo padrão do Supabase: a sessão vem no fim do endereço (#…access_token=…),
    *   formato que o cliente em modo PKCE não aceita sozinho;
    * - ?code=… (cadastro e nova senha pedidos neste mesmo navegador): o próprio cliente resolve.

@@ -636,7 +636,7 @@ export function buildDemo(now = new Date()): DemoDB {
   // faturas e uso
   const invoices: Invoice[] = [0, 1, 2, 3, 4].map((k) => {
     const due = addDays(today, 17 - 30 * (k + 1));
-    return { id: demoId('9d'), company_id: DEMO_COMPANY_ID, amount: 299, status: 'paga', due_date: due, paid_at: fromLocal(due, '09:12', TZ).toISOString(), method: 'cartao', url: null, description: 'Combinado · Plano Profissional · mensal', created_at: fromLocal(addDays(due, -10), '08:00', TZ).toISOString() };
+    return { id: demoId('9d'), company_id: DEMO_COMPANY_ID, amount: 299, status: 'paga', due_date: due, paid_at: fromLocal(due, '09:12', TZ).toISOString(), method: 'cartao', url: null, description: 'ORBYTA · Plano Profissional · mensal', created_at: fromLocal(addDays(due, -10), '08:00', TZ).toISOString() };
   });
   const month = today.slice(0, 7);
   const monthAi = Object.entries(msgStats).filter(([d]) => d.startsWith(month)).reduce((s, [, v]) => s + v.msgs_ai, 0);

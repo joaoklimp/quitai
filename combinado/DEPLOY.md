@@ -1,4 +1,4 @@
-# Publicar o Combinado
+# Publicar a ORBYTA
 
 Passo a passo do zero até o primeiro cliente pagando. Siga na ordem: cada etapa usa o que a anterior criou.
 
@@ -13,7 +13,7 @@ Passo a passo do zero até o primeiro cliente pagando. Siga na ordem: cada etapa
 | [Meta for Developers](https://developers.facebook.com) e um portfólio empresarial da Meta | WhatsApp Cloud API | Respostas dentro de 24 horas da mensagem do cliente são gratuitas. Mensagens com modelo (lembretes, resumos) são cobradas por envio, conforme a tabela da Meta para o Brasil |
 | [Asaas](https://www.asaas.com) | Cobrar a assinatura (cartão, Pix e boleto) | Taxa por pagamento recebido |
 | Hospedagem do site: [Vercel](https://vercel.com), [Netlify](https://netlify.com) ou [Cloudflare Pages](https://pages.cloudflare.com) | Publicar o site e o painel | Grátis no começo |
-| Um domínio (ex.: `combinado.com.br`) e um serviço de e-mail transacional ([Resend](https://resend.com), [Brevo](https://brevo.com) ou Amazon SES) | Endereço do site e e-mails de cadastro | Baixo |
+| Um domínio (ex.: `orbyta.com.br`) e um serviço de e-mail transacional ([Resend](https://resend.com), [Brevo](https://brevo.com) ou Amazon SES) | Endereço do site e e-mails de cadastro | Baixo |
 
 Ferramentas no computador: [Node.js 22+](https://nodejs.org) e [Git](https://git-scm.com). A linha de comando do Supabase roda com `npx supabase`, sem instalar nada.
 
@@ -35,7 +35,7 @@ Nos exemplos abaixo, troque:
    npx supabase db push
    ```
 
-   O `db push` cria as tabelas, as regras de acesso por empresa (RLS), as funções e gatilhos, o tempo real do painel, a pasta privada de arquivos do WhatsApp (`whatsapp-media`) e os dois agendamentos (`combinado-automacoes` a cada 5 minutos e `combinado-manutencao` a cada 10).
+   O `db push` cria as tabelas (inclusive financeiro e estoque), as regras de acesso por empresa (RLS), as funções e gatilhos, o tempo real do painel, a pasta privada de arquivos do WhatsApp (`whatsapp-media`) e os dois agendamentos (`orbyta-automacoes` a cada 5 minutos e `orbyta-manutencao` a cada 10).
 
 3. Gere um segredo longo para o agendador (guarde, ele é usado de novo na etapa 2):
 
@@ -56,7 +56,7 @@ Nos exemplos abaixo, troque:
    select jobname, schedule, active from cron.job;
    ```
 
-   Devem aparecer `combinado-automacoes` e `combinado-manutencao`. Se a lista vier vazia, ative as extensões **pg_cron** e **pg_net** em **Database → Extensions** e rode `npx supabase db push` de novo.
+   Devem aparecer `orbyta-automacoes` e `orbyta-manutencao`. Se a lista vier vazia, ative as extensões **pg_cron** e **pg_net** em **Database → Extensions** e rode `npx supabase db push` de novo.
 
 ---
 
@@ -115,15 +115,15 @@ Sempre que mudar algo em `supabase/functions/`, rode esse comando de novo. Se mu
    - **Site URL:** `https://seudominio.com.br` (sem barra no final)
    - **Redirect URLs:** adicione `https://seudominio.com.br/app/**` e, para testar no computador, `http://localhost:5173/app/**`
 
-2. **Authentication → Emails → SMTP Settings:** configure o envio pelo seu serviço de e-mail (Resend, Brevo, SES). O envio padrão do Supabase serve só para testes: tem limite baixo e só entrega para endereços da sua equipe no Supabase. Remetente sugerido: `Combinado <nao-responda@seudominio.com.br>`.
+2. **Authentication → Emails → SMTP Settings:** configure o envio pelo seu serviço de e-mail (Resend, Brevo, SES). O envio padrão do Supabase serve só para testes: tem limite baixo e só entrega para endereços da sua equipe no Supabase. Remetente sugerido: `ORBYTA <nao-responda@seudominio.com.br>`.
 
 3. **Authentication → Emails → Templates:** cole os modelos em português que estão em `supabase/templates/`:
 
    | Modelo no Supabase | Arquivo | Assunto |
    |---|---|---|
-   | Confirm signup | `confirmacao.html` | Confirme seu e-mail no Combinado |
-   | Invite user | `convite.html` | Seu convite para a equipe no Combinado |
-   | Reset password | `nova-senha.html` | Crie uma nova senha no Combinado |
+   | Confirm signup | `confirmacao.html` | Confirme seu e-mail na ORBYTA |
+   | Invite user | `convite.html` | Seu convite para a equipe na ORBYTA |
+   | Reset password | `nova-senha.html` | Crie uma nova senha na ORBYTA |
 
    Esses modelos usam links que funcionam em qualquer aparelho (a pessoa pode pedir no computador e abrir no celular). O painel também aceita os links dos modelos padrão do Supabase, mas os padrão estão em inglês.
 
@@ -179,7 +179,7 @@ Há dois jeitos. Comece pelo primeiro.
 
 1. Em **WhatsApp → Configuração da API**, adicione e verifique o número da empresa. Anote o **Identificação do número de telefone** e o **Identificação da conta do WhatsApp Business (WABA)**.
 2. No portfólio empresarial, **Configurações → Usuários do sistema → Adicionar** (função Administrador). Em **Atribuir ativos**, dê controle total do app e da conta do WhatsApp. Gere um token **sem expiração** com as permissões `whatsapp_business_messaging` e `whatsapp_business_management`.
-3. No painel do Combinado: **Configurações → WhatsApp → Conectar com credenciais**. Informe os dois identificadores e o token. Se o número é novo na API, informe também um **PIN de 6 números**: o Combinado registra o número com ele (se o número já tem verificação em duas etapas, use o mesmo PIN).
+3. No painel da ORBYTA: **Configurações → WhatsApp → Conectar com credenciais**. Informe os dois identificadores e o token. Se o número é novo na API, informe também um **PIN de 6 números**: a ORBYTA registra o número com ele (se o número já tem verificação em duas etapas, use o mesmo PIN).
 
 **B) Cadastro incorporado (o cliente conecta sozinho, com o login da Meta)**
 
@@ -201,8 +201,8 @@ Fora das 24 horas depois da última mensagem do cliente, o WhatsApp só deixa a 
 | `pos_atendimento` | Marketing | Olá, {{1}}! Obrigado por escolher a {{2}}. {{3}} |
 | `reativacao_cliente` | Marketing | Olá, {{1}}! Sentimos sua falta na {{2}}. {{3}} |
 | `resumo_diario` | Utilidade | Resumo de hoje na {{1}}: {{2}}. Responda esta mensagem para ver os detalhes. |
-| `lembrete_tarefa` | Utilidade | Lembrete do Combinado: {{1}}. Responda esta mensagem se precisar de algo. |
-| `aviso_equipe` | Utilidade | Aviso do Combinado: {{1}}. Abra o painel para ver os detalhes. |
+| `lembrete_tarefa` | Utilidade | Lembrete da ORBYTA: {{1}}. Responda esta mensagem se precisar de algo. |
+| `aviso_equipe` | Utilidade | Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes. |
 
 Os modelos são de cada conta do WhatsApp: no cadastro incorporado, cada cliente precisa tê-los na própria conta (eles aparecem no painel para copiar).
 
@@ -313,7 +313,7 @@ No Console da Anthropic, defina um **limite de gasto mensal** (**Settings → Li
 
 **A mensagem chega no painel, mas a IA não responde.** Confira, em ordem: `ANTHROPIC_API_KEY` definida; IA ligada em **Configurações → Assistente IA**; conversa não está com a equipe (atendimento humano); limite de respostas do plano; assinatura em dia. Os registros ficam em **Edge Functions → whatsapp-webhook → Logs**.
 
-**Mensagens recebidas não aparecem.** O campo **messages** precisa estar assinado no webhook e o app precisa estar **Ao vivo**. Ao conectar, o Combinado inscreve o app na conta do WhatsApp; se trocou de token, conecte de novo.
+**Mensagens recebidas não aparecem.** O campo **messages** precisa estar assinado no webhook e o app precisa estar **Ao vivo**. Ao conectar, a ORBYTA inscreve o app na conta do WhatsApp; se trocou de token, conecte de novo.
 
 **“O WhatsApp só permite escrever com um modelo aprovado.”** Passaram 24 horas desde a última mensagem do cliente. A automação usa o modelo correspondente, que precisa estar aprovado com o nome exato.
 

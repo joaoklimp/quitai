@@ -25,7 +25,7 @@ serve(async (req) => {
     const redirectTo = str(body.redirect, 300) || `${(Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')}/app/#/nova-senha`;
     const { data: invited, error } = await db.auth.admin.inviteUserByEmail(email, { redirectTo, data: { name } });
     if (error || !invited?.user) {
-      throw bad(/already|registered|exists/i.test(error?.message ?? '') ? 'Este e-mail já tem uma conta no Combinado. Use outro e-mail ou peça para a pessoa excluir a conta atual.' : 'Não consegui enviar o convite. Tente de novo.');
+      throw bad(/already|registered|exists/i.test(error?.message ?? '') ? 'Este e-mail já tem uma conta na ORBYTA. Use outro e-mail ou peça para a pessoa excluir a conta atual.' : 'Não consegui enviar o convite. Tente de novo.');
     }
     const { data: member, error: e2 } = await db.from('members').insert({ company_id: me.companyId, user_id: invited.user.id, role, name, email, invited: true }).select('*').single();
     if (e2) { await db.auth.admin.deleteUser(invited.user.id); throw new Error(e2.message); }

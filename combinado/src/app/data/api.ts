@@ -3,7 +3,7 @@ import type { DataSource } from './source';
 import { DemoSource } from './demo/demoSource';
 import { SupabaseSource, hasSupabase } from './supabase/supaSource';
 
-const FLAG = 'combinado-modo';
+const FLAG = 'orbyta-modo';
 
 function pickMode(): 'demo' | 'supabase' {
   try {

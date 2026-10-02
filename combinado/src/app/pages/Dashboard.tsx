@@ -35,10 +35,10 @@ export default function Dashboard() {
   const exportCsv = () => {
     const lines = [['Período', 'Conversas', 'Vendas', 'Valor vendido (R$)', 'Orçamentos aprovados'].join(';'), ...buckets.map((b) => [b.long, b.stat.conversations, b.stat.sales_count, b.stat.sales_amount.toFixed(2).replace('.', ','), b.stat.quotes_approved].join(';'))];
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `combinado-visao-geral-${period}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `orbyta-visao-geral-${period}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const share = async () => {
-    const text = `Resumo ${PERIOD_LABEL[period].toLowerCase()} — ${me.company.name}\n• ${num(cur.conversations)} conversas no WhatsApp (${Math.round(aiShare(cur) * 100)}% respondidas pela IA)\n• ${num(cur.quotes_approved)} orçamentos aprovados\n• ${brl(cur.sales_amount)} em vendas (${num(cur.sales_count)})\n• Tempo médio de resposta: ${fmtDuration(avgResponse(cur))}\nGerado pelo Combinado`;
+    const text = `Resumo ${PERIOD_LABEL[period].toLowerCase()} — ${me.company.name}\n• ${num(cur.conversations)} conversas no WhatsApp (${Math.round(aiShare(cur) * 100)}% respondidas pela IA)\n• ${num(cur.quotes_approved)} orçamentos aprovados\n• ${brl(cur.sales_amount)} em vendas (${num(cur.sales_count)})\n• Tempo médio de resposta: ${fmtDuration(avgResponse(cur))}\nGerado pela ORBYTA`;
     try {
       if (navigator.share && /Mobi/.test(navigator.userAgent)) await navigator.share({ text });
       else { await navigator.clipboard.writeText(text); toast('Resumo copiado. É só colar no WhatsApp.'); }

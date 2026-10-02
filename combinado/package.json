@@ -1,8 +1,8 @@
 {
-  "name": "combinado",
+  "name": "orbyta",
   "private": true,
   "version": "1.0.0",
-  "description": "Combinado — sua empresa funcionando por uma conversa. SaaS com IA no WhatsApp para atendimento, orçamentos, agenda e gestão por comandos.",
+  "description": "ORBYTA — sua empresa funcionando por uma conversa. SaaS com IA no WhatsApp para atendimento, orçamentos, agenda e gestão por comandos.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
     "test:functions": "node scripts/deno.mjs test",
     "check:functions": "node scripts/deno.mjs check",
     "sync:functions": "node scripts/sync-functions.mjs",
-    "assets": "node scripts/gen-sky.mjs && node scripts/gen-assets.mjs"
+    "assets": "node scripts/gen-assets.mjs"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",

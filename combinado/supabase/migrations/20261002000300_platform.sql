@@ -1,4 +1,4 @@
--- Combinado — recursos da plataforma Supabase: tempo real, arquivos do WhatsApp e agendamentos.
+-- ORBYTA — recursos da plataforma Supabase: tempo real, arquivos do WhatsApp e agendamentos.
 -- Cada bloco verifica se o recurso existe, para a migração também rodar num Postgres comum (testes).
 
 /* ---------- tempo real: o painel atualiza sozinho quando chega mensagem, orçamento, etc. ---------- */
@@ -41,9 +41,9 @@ begin
     create extension if not exists pg_cron;
     create extension if not exists pg_net;
 
-    perform cron.unschedule(jobid) from cron.job where jobname in ('combinado-automacoes', 'combinado-manutencao');
+    perform cron.unschedule(jobid) from cron.job where jobname in ('orbyta-automacoes', 'orbyta-manutencao');
 
-    perform cron.schedule('combinado-automacoes', '*/5 * * * *', $job$
+    perform cron.schedule('orbyta-automacoes', '*/5 * * * *', $job$
       select net.http_post(
         url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/cron',
         headers := jsonb_build_object('Content-Type', 'application/json',
@@ -53,6 +53,6 @@ begin
       ) where exists (select 1 from vault.decrypted_secrets where name = 'project_url');
     $job$);
 
-    perform cron.schedule('combinado-manutencao', '*/10 * * * *', 'select public.housekeeping()');
+    perform cron.schedule('orbyta-manutencao', '*/10 * * * *', 'select public.housekeeping()');
   end if;
 end $$;

@@ -8,7 +8,7 @@ export interface WaTemplate {
   category: 'Utilidade' | 'Marketing';
   body: string; // {{1}}, {{2}}... na ordem dos parâmetros
   params: string[]; // o que vai em cada variável
-  use: string; // quando o Combinado usa
+  use: string; // quando a ORBYTA usa
 }
 
 export const TEMPLATES = {
@@ -50,13 +50,13 @@ export const TEMPLATES = {
   },
   tarefa: {
     name: 'lembrete_tarefa', category: 'Utilidade',
-    body: 'Lembrete do Combinado: {{1}}. Responda esta mensagem se precisar de algo.',
+    body: 'Lembrete da ORBYTA: {{1}}. Responda esta mensagem se precisar de algo.',
     params: ['tarefa'],
     use: 'Lembretes das tarefas pedidas à IA ("me lembra de...").',
   },
   avisoEquipe: {
     name: 'aviso_equipe', category: 'Utilidade',
-    body: 'Aviso do Combinado: {{1}}. Abra o painel para ver os detalhes.',
+    body: 'Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes.',
     params: ['aviso'],
     use: 'Avisar a equipe que um cliente precisa de atendimento.',
   },

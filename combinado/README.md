@@ -1,8 +1,8 @@
-# Combinado
+# ORBYTA
 
-**Sua empresa funcionando por uma conversa.**
+**Administre sua empresa conversando.**
 
-SaaS com inteligência artificial integrada ao WhatsApp para pequenas e médias empresas. A IA atende os clientes 24 horas, passa preços, monta orçamentos, marca horários e chama a equipe quando precisa. O dono e a equipe também mandam comandos pelo próprio WhatsApp, por exemplo:
+Plataforma de gestão para pequenas e médias empresas em que a inteligência artificial não só responde: ela executa. A IA atende os clientes no WhatsApp 24 horas, passa preços, monta orçamentos e marca horários. O dono e a equipe administram o negócio por mensagem (clientes, orçamentos, agenda, vendas, contas a pagar e a receber, estoque) e o painel se atualiza sozinho. Por exemplo:
 
 > “Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela.”
 >
@@ -37,11 +37,14 @@ Para publicar de verdade, siga o **[DEPLOY.md](DEPLOY.md)**, um passo a passo do
 | Parte | O que faz |
 |---|---|
 | **Site** (`/`) | Página de vendas: recursos, simulação de conversa, planos e perguntas frequentes. |
-| **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, catálogo, tarefas, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
+| **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, catálogo, tarefas, financeiro, estoque, integrações, módulos, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
+| **Financeiro** | Contas a pagar e a receber, contas mensais (ao pagar, a do mês seguinte já fica lançada), vencidas em destaque, resultado do mês e caixa previsto das próximas 6 semanas. Só dono e gerente acessam. |
+| **Estoque** | Produtos com saldo, mínimo e custo; entradas, saídas e ajustes com histórico; alerta quando um produto fica abaixo do mínimo; importação de planilha do Excel (.xlsx) ou CSV e exportação. |
+| **Integrações** | WhatsApp oficial e planilhas funcionando. Nota fiscal, cobrança dos clientes, ERP (Bling, Tiny, Omie), Google Agenda e API estão listados como “em breve”, sem prometer o que ainda não existe. |
 | **Orçamento público** (`/orcamento/#…`) | Link enviado ao cliente para ver e aprovar o orçamento. A aprovação vai direto para o painel. |
 | **Termos e Privacidade** (`/termos/`, `/privacidade/`) | Textos-base de acordo com a LGPD, com os campos da empresa a preencher. |
-| **IA de atendimento** | Responde clientes com o catálogo e as regras da empresa, consulta horários livres, agenda, monta orçamentos, envia links e passa a conversa para a equipe (reclamação, pedido de humano ou assunto que não sabe). |
-| **IA de comandos** | O dono e a equipe falam com a IA pelo WhatsApp ou pelo painel: cadastrar, orçar, agendar, registrar venda, criar tarefa, consultar números do dia. Ações sensíveis (registrar venda, cancelar horário, mudar preço de serviço, mandar mensagem para um cliente, desconto acima do limite) ficam **aguardando confirmação**. |
+| **IA de atendimento** | Responde clientes com o catálogo, as regras e as **perguntas frequentes** que o dono cadastra (com pesquisa na internet opcional, só para dúvidas gerais), consulta horários livres, agenda, monta orçamentos, envia links e passa a conversa para a equipe (reclamação, pedido de humano ou assunto que não sabe). |
+| **IA de comandos** | O dono e a equipe falam com a IA pelo WhatsApp ou pelo painel: cadastrar, orçar, agendar, registrar venda, criar tarefa, lançar e consultar contas, dar entrada e saída no estoque, consultar números do dia. Ações sensíveis (registrar venda, dar baixa em conta, cancelar horário, mudar preço de serviço, mandar mensagem para um cliente, desconto acima do limite) ficam **aguardando confirmação**. |
 | **WhatsApp** | API oficial da Meta (Cloud API): webhook com assinatura conferida, janela de 24 horas respeitada, modelos aprovados fora dela, fotos e documentos guardados de forma privada, indicador de “digitando”. |
 | **Automações** | Lembrete antes do horário, acompanhamento de orçamento sem resposta, resumo do dia no WhatsApp do dono, agradecimento com pedido de avaliação depois do serviço, lembretes de tarefas e reativação de clientes inativos. |
 | **Assinatura** | Teste grátis de 7 dias, planos mensal e anual pelo Asaas (cartão recorrente, Pix ou boleto), faturas no painel, troca de plano e cancelamento. |
@@ -125,12 +128,12 @@ Algumas regras (planos, formatos, modelos de mensagem, disponibilidade de horár
 | `npm run build` | Confere os tipos e gera a versão de produção em `dist/` |
 | `npm run preview` | Serve o `dist/` em <http://localhost:4173> |
 | `npm run typecheck` | Só confere os tipos do painel e do site |
-| `npm test` | Testes rápidos (IA de demonstração, comparação de períodos do painel, cópias sincronizadas) |
-| `npm run test:db` | Testes do banco num Postgres 17 de verdade: RLS entre empresas, papéis, gatilhos, numeração, funções |
+| `npm test` | Testes rápidos (IA de demonstração, leitura de planilhas, comparação de períodos do painel, cópias sincronizadas) |
+| `npm run test:db` | Testes do banco num Postgres 17 de verdade: RLS entre empresas, papéis, gatilhos, numeração, funções, financeiro e estoque |
 | `npm run test:functions` | Testes das Edge Functions (Deno, Claude simulado) |
 | `npm run check:functions` | Confere os tipos das Edge Functions |
 | `npm run sync:functions` | Copia `src/shared` para as Edge Functions |
-| `npm run assets` | Gera de novo o céu do site, os ícones e a imagem de compartilhamento. Usa o Playwright, que não vem instalado: antes, rode `npm i -D playwright` e `npx playwright install chromium` |
+| `npm run assets` | Gera de novo o favicon, os ícones e a imagem de compartilhamento. Usa o Playwright, que não vem instalado: antes, rode `npm i -D playwright` e `npx playwright install chromium` |
 
 ### Teste de ponta a ponta das funções
 
@@ -148,10 +151,12 @@ Sem o PostgREST, esse teste é pulado e os demais rodam normalmente.
 
 O nome aparece em poucos lugares:
 
-1. `src/shared/brand.ts` (nome, frase, e-mail de suporte e logotipo)
+1. `src/shared/brand.ts` (nome, frase, e-mail de suporte, símbolo e logotipo)
 2. o `<title>` e as descrições dos arquivos `index.html`, `app/index.html`, `orcamento/index.html`, `termos/index.html` e `privacidade/index.html`
 3. `public/manifest.webmanifest`
 4. os e-mails em `supabase/templates/`
-5. os modelos de mensagem do WhatsApp em `src/shared/templates.ts` (“Lembrete do Combinado…”). Depois de mudar, rode `npm run sync:functions`.
+5. os modelos de mensagem do WhatsApp em `src/shared/templates.ts` (“Lembrete da ORBYTA…”). Depois de mudar, rode `npm run sync:functions`.
 
-Depois, `npm run assets` gera de novo os ícones e a imagem de compartilhamento (veja a observação sobre o Playwright em “Comandos”).
+Depois, `npm run assets` gera de novo o favicon, os ícones e a imagem de compartilhamento a partir do `brand.ts` (precisa do Node 22.18 ou mais novo; veja a observação sobre o Playwright em “Comandos”).
+
+O fundo animado (planetas com bordas de luz, estrelas e a lua em órbita) é só CSS, em `src/app/styles/orbit.css`, e respeita quem desativa animações no sistema.

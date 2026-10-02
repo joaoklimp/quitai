@@ -1,4 +1,4 @@
--- Combinado — regras de negócio no banco: gatilhos, histórico de ações, avisos e funções (RPC)
+-- ORBYTA — regras de negócio no banco: gatilhos, histórico de ações, avisos e funções (RPC)
 -- chamadas pelo painel, pela página pública do orçamento e pelas Edge Functions.
 
 /* =========================================================================================
@@ -69,7 +69,7 @@ create or replace function public.audit(p_company uuid, p_action text, p_summary
 returns void language plpgsql security definer set search_path = public as $$
 declare v_type text := p_actor_type; v_name text := p_actor_name;
 begin
-  if current_setting('combinado.skip_audit', true) = 'on' then return; end if;
+  if current_setting('orbyta.skip_audit', true) = 'on' then return; end if;
   if v_type is null then v_type := case when auth.uid() is not null then 'usuario' else 'sistema' end; end if;
   if v_name is null and v_type = 'usuario' then select name into v_name from public.members where user_id = auth.uid() limit 1; end if;
   if v_name is null then v_name := case v_type when 'ia' then 'IA' when 'sistema' then 'Sistema' when 'cliente' then 'Cliente' else 'Equipe' end; end if;
@@ -227,7 +227,7 @@ create trigger quotes_after after insert or update of status on public.quotes fo
 create or replace function public.tg_quote_items_after() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if current_setting('combinado.saving_quote', true) = 'on' then return null; end if; -- save_quote recalcula no fim
+  if current_setting('orbyta.saving_quote', true) = 'on' then return null; end if; -- save_quote recalcula no fim
   update public.quotes set updated_at = now() where id = coalesce(new.quote_id, old.quote_id);
   return null;
 end $$;
@@ -389,7 +389,7 @@ declare
   i int := 0;
 begin
   if uid is null then raise exception 'Entre na sua conta para continuar.' using errcode = '42501'; end if;
-  perform set_config('combinado.skip_audit', 'on', true); -- os serviços de exemplo não entram no histórico
+  perform set_config('orbyta.skip_audit', 'on', true); -- os serviços de exemplo não entram no histórico
   if exists (select 1 from public.members where user_id = uid) then raise exception 'Você já faz parte de uma empresa.' using errcode = 'P0001'; end if;
   if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Informe o nome da empresa.' using errcode = 'P0001'; end if;
   select email, coalesce(raw_user_meta_data->>'name', split_part(email, '@', 1)) as name into u from auth.users where id = uid;
@@ -414,8 +414,8 @@ begin
       i := i + 1;
     end loop;
   end if;
-  perform public.notify(cid, 'sistema', 'Bem-vindo ao Combinado!', 'Teste a IA no Simulador e conecte o WhatsApp quando estiver pronto.', '#/simulador');
-  perform set_config('combinado.skip_audit', 'off', true);
+  perform public.notify(cid, 'sistema', 'Bem-vindo à ORBYTA!', 'Teste a IA no Simulador e conecte o WhatsApp quando estiver pronto.', '#/simulador');
+  perform set_config('orbyta.skip_audit', 'off', true);
   insert into public.audit_log (company_id, actor_type, actor_name, actor_user_id, channel, action, summary)
   values (cid, 'usuario', u.name, uid, 'painel', 'criar_empresa', format('Criou a empresa %s', trim(p_name)));
   return cid;
@@ -444,7 +444,7 @@ begin
     if not found then raise exception 'Orçamento não encontrado.' using errcode = 'P0001'; end if;
   end if;
 
-  perform set_config('combinado.saving_quote', 'on', true);
+  perform set_config('orbyta.saving_quote', 'on', true);
   if qid is null then
     insert into public.quotes (company_id, contact_id, title, status, discount, valid_until, notes, created_via)
     values (cid, (p_quote->>'contact_id')::uuid, nullif(p_quote->>'title', ''), coalesce(nullif(p_quote->>'status', ''), 'rascunho'),
@@ -458,10 +458,10 @@ begin
     values (qid, cid, nullif(it->>'service_id', '')::uuid, coalesce(nullif(trim(it->>'description'), ''), 'Item'), greatest(coalesce((it->>'qty')::numeric, 1), 0.01), greatest(coalesce((it->>'unit_price')::numeric, 0), 0), i);
     i := i + 1;
   end loop;
-  perform set_config('combinado.saving_quote', 'off', true);
+  perform set_config('orbyta.saving_quote', 'off', true);
 
   -- recalcula os totais e aplica os campos (o gatilho do orçamento faz as contas)
-  perform set_config('combinado.skip_audit', 'on', true);
+  perform set_config('orbyta.skip_audit', 'on', true);
   update public.quotes set
     contact_id = (p_quote->>'contact_id')::uuid,
     title = nullif(p_quote->>'title', ''),
@@ -470,7 +470,7 @@ begin
     valid_until = coalesce(nullif(p_quote->>'valid_until', '')::date, valid_until),
     notes = nullif(p_quote->>'notes', '')
   where id = qid;
-  perform set_config('combinado.skip_audit', 'off', true);
+  perform set_config('orbyta.skip_audit', 'off', true);
 
   select name into who from public.contacts where id = (p_quote->>'contact_id')::uuid;
   if is_new then
@@ -711,7 +711,7 @@ create or replace function public.housekeeping()
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare nq int; np int;
 begin
-  perform set_config('combinado.skip_audit', 'on', true);
+  perform set_config('orbyta.skip_audit', 'on', true);
   update public.quotes q set status = 'expirado'
   from public.companies c
   where c.id = q.company_id and q.status = 'enviado' and q.valid_until < (now() at time zone c.timezone)::date;
