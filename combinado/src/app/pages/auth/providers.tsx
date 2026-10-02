@@ -1,10 +1,10 @@
-// Botões de login social (Google, Apple e Microsoft) com os logotipos oficiais de cada serviço.
+// Botões de login social (Google e Microsoft; Apple fica disponível se ativado) com os logotipos oficiais de cada serviço.
 import type { AuthProvider } from '../../data/source';
 
 export const PROVIDER_LABEL: Record<AuthProvider, string> = { google: 'Google', apple: 'Apple', azure: 'Microsoft' };
 
-/** Quais aparecem: VITE_AUTH_PROVIDERS="google,apple,azure" (padrão) ou "nenhum". Cada um precisa estar ativo no Supabase. */
-export const ENABLED_PROVIDERS: AuthProvider[] = String(import.meta.env.VITE_AUTH_PROVIDERS ?? 'google,apple,azure')
+/** Quais aparecem: VITE_AUTH_PROVIDERS="google,microsoft" (padrão; dá para incluir "apple") ou "nenhum". Cada um precisa estar ativo no Supabase. */
+export const ENABLED_PROVIDERS: AuthProvider[] = String(import.meta.env.VITE_AUTH_PROVIDERS ?? 'google,azure')
   .split(',').map((x) => x.trim().toLowerCase()).map((x) => (x === 'microsoft' ? 'azure' : x))
   .filter((x): x is AuthProvider => x === 'google' || x === 'apple' || x === 'azure');
 

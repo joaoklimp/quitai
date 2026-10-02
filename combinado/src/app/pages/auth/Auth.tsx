@@ -1,4 +1,4 @@
-// Entrar, criar conta, link de acesso por e-mail e recuperar senha. Login social com Google, Apple e Microsoft.
+// Entrar, criar conta, link de acesso por e-mail e recuperar senha. Login social com Google e Microsoft.
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';

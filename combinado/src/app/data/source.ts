@@ -21,7 +21,7 @@ export interface DataSource {
   me(): Promise<Me | null>;
   signIn(email: string, password: string): Promise<void>;
   signUp(input: SignUpInput): Promise<{ needsConfirmation: boolean }>;
-  /** Entrar ou criar conta com Google, Apple ou Microsoft (sai do site e volta já com a sessão). */
+  /** Entrar ou criar conta com Google ou Microsoft (Apple opcional; sai do site e volta já com a sessão). */
   signInWithProvider(provider: AuthProvider, intent?: 'entrar' | 'cadastro'): Promise<void>;
   /** Link de acesso por e-mail, sem senha (também cria a conta se for a primeira vez). */
   signInWithEmailLink(email: string, name?: string): Promise<void>;

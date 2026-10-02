@@ -130,9 +130,9 @@ Sempre que mudar algo em `supabase/functions/`, rode esse comando de novo. Se mu
 
 4. **Authentication → Sign In / Providers → Email:** deixe **Confirm email** ligado. Se quiser, aumente o tamanho mínimo da senha para 8 (o painel já exige 8).
 
-5. **Entrar com Google, Apple e Microsoft** (**Authentication → Sign In / Providers**). A tela de acesso mostra os três botões; ative cada um no Supabase (enquanto um não estiver ativo, o botão dele avisa que ainda não está disponível). Em todos, a **Callback URL** é a que o Supabase mostra na página do provedor: `https://SEU_REF.supabase.co/auth/v1/callback`.
+5. **Entrar com Google e Microsoft** (**Authentication → Sign In / Providers**). A tela de acesso mostra os dois botões; ative cada um no Supabase (enquanto um não estiver ativo, o botão dele avisa que ainda não está disponível). Em todos, a **Callback URL** é a que o Supabase mostra na página do provedor: `https://SEU_REF.supabase.co/auth/v1/callback`.
    - **Google:** no [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crie um *OAuth client ID* do tipo **Web application**, com a Callback URL acima em *Authorized redirect URIs*. Na *OAuth consent screen*, coloque o nome ORBYTA, o logotipo e os links de `/privacidade/` e `/termos/`. Cole *Client ID* e *Client Secret* no Supabase.
-   - **Apple:** precisa de conta no Apple Developer Program. Crie um *Services ID* com **Sign in with Apple**, cadastre o domínio do site e a Callback URL, e gere uma chave (*Key*) com Sign in with Apple. No Supabase informe o Services ID, o Team ID, o Key ID e a chave (o Supabase gera o segredo; ele vence a cada 6 meses e precisa ser renovado).
+   - **Apple (opcional, desligado por padrão):** para mostrar o botão, inclua `apple` em `VITE_AUTH_PROVIDERS`. Precisa de conta no Apple Developer Program. Crie um *Services ID* com **Sign in with Apple**, cadastre o domínio do site e a Callback URL, e gere uma chave (*Key*) com Sign in with Apple. No Supabase informe o Services ID, o Team ID, o Key ID e a chave (o Supabase gera o segredo; ele vence a cada 6 meses e precisa ser renovado).
    - **Microsoft:** no [portal do Azure](https://portal.azure.com) → *App registrations* → *New registration*, em *Supported account types* escolha contas de qualquer organização **e** contas pessoais da Microsoft, e use a Callback URL como *Redirect URI (Web)*. Crie um *client secret* e cole *Application (client) ID* e o segredo no provedor **Azure** do Supabase, com a URL `https://login.microsoftonline.com/common`.
    - Para esconder algum botão, defina no site `VITE_AUTH_PROVIDERS` (ex.: `google,microsoft`; `nenhum` esconde todos).
    - Quem entra pela primeira vez com um desses botões cai direto na criação da empresa, já com o nome que veio da conta.
@@ -150,7 +150,7 @@ Variáveis de ambiente do site (modelo em `.env.example`):
 | `VITE_SITE_URL` | `https://seudominio.com.br` (vai nas tags de compartilhamento do site) |
 | `VITE_META_APP_ID` | Opcional: ID do app da Meta, para o botão “Conectar com a Meta” |
 | `VITE_META_CONFIG_ID` | Opcional: ID da configuração do cadastro incorporado (etapa 6) |
-| `VITE_AUTH_PROVIDERS` | Opcional: botões de login social que aparecem (padrão `google,apple,microsoft`; `nenhum` esconde) |
+| `VITE_AUTH_PROVIDERS` | Opcional: botões de login social que aparecem (padrão `google,microsoft`; inclua `apple` se ativar; `nenhum` esconde) |
 
 **Vercel:** *Add New → Project*, escolha o repositório, **Root Directory** `combinado`, preset **Vite**, comando `npm run build`, saída `dist`. Coloque as variáveis acima e publique.
 

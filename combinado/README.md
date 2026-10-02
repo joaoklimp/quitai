@@ -37,7 +37,7 @@ Para publicar de verdade, siga o **[DEPLOY.md](DEPLOY.md)**, um passo a passo do
 | Parte | O que faz |
 |---|---|
 | **Site** (`/`) | Página de vendas: recursos, simulação de conversa, planos e perguntas frequentes. |
-| **Acesso** (`/app/#/entrar`) | Entrar ou criar conta com Google, Apple, Microsoft, link por e-mail (sem senha) ou e-mail e senha. Sem servidor configurado, o site vira vitrine: o acesso é simulado e leva ao painel de exemplo. |
+| **Acesso** (`/app/#/entrar`) | Entrar ou criar conta com Google, Microsoft, link por e-mail (sem senha) ou e-mail e senha. Sem servidor configurado, o site vira vitrine: o acesso é simulado e leva ao painel de exemplo. |
 | **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, cobranças e notas fiscais, catálogo, tarefas, financeiro, estoque, integrações, módulos, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
 | **Financeiro** | Contas a pagar e a receber, contas mensais (ao pagar, a do mês seguinte já fica lançada), vencidas em destaque, resultado do mês e caixa previsto das próximas 6 semanas. Só dono e gerente acessam. |
 | **Estoque** | Produtos com saldo, mínimo e custo; entradas, saídas e ajustes com histórico; alerta quando um produto fica abaixo do mínimo; importação de planilha do Excel (.xlsx) ou CSV e exportação. |

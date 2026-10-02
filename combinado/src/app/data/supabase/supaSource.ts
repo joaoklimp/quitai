@@ -90,7 +90,7 @@ export class SupabaseSource implements DataSource {
       if (tokenHash && type && LINK_TYPES.includes(type)) ok = !(await this.sb.auth.verifyOtp({ token_hash: tokenHash, type })).error;
       else if (access && refresh) ok = !(await this.sb.auth.setSession({ access_token: access, refresh_token: refresh })).error;
     } catch { ok = false; }
-    // erro do login social (Google, Apple, Microsoft) é diferente de link de e-mail vencido
+    // erro do login social (Google, Microsoft) é diferente de link de e-mail vencido
     const errDesc = q.get('error_description') ?? frag.get('error_description');
     const errCode = q.get('error_code') ?? frag.get('error_code') ?? '';
     const oauthError = !tokenHash && !access && errDesc && !/otp|email link/i.test(`${errCode} ${errDesc}`) ? errDesc : null;
