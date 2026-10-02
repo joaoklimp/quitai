@@ -1,5 +1,5 @@
 // Gera as imagens de céu com nuvens usadas no site e no painel.
-// Uso: node scripts/gen-sky.mjs   (precisa do Playwright com Chromium instalado)
+// Uso: node scripts/gen-sky.mjs [arquivo.webp ...]   (precisa do Playwright com Chromium instalado; sem argumentos gera todos)
 // Nuvens procedurais: cada nuvem é um cacho de "algodões" (gaussianas) com base achatada,
 // bordas corroídas por ruído fBm e sombreamento pelo campo de densidade (topo claro, base azulada).
 import { chromium } from 'playwright';
@@ -149,6 +149,11 @@ const variants = [
     haze: { from: 0.55, amount: 1.0, color: [238, 243, 250] },
   },
   {
+    file: 'ceu-noite-hero.webp', w: 2400, h: 1500, seed: 11, quality: 0.82, night: true, clouds: heroClouds,
+    stops: [[0, '#0B1A40'], [0.40, '#10204A'], [0.72, '#0C1530'], [1, '#070A12']],
+    haze: { from: 0.78, amount: 1.0, color: [7, 10, 18] },
+  },
+  {
     file: 'ceu-noite.webp', w: 2400, h: 900, seed: 5, quality: 0.82, night: true, clouds: panelClouds,
     stops: [[0, '#0C1C44'], [0.45, '#0E1A38'], [0.8, '#0A1226'], [1, '#070A12']],
     haze: { from: 0.55, amount: 1.0, color: [7, 10, 18] },
@@ -159,7 +164,8 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.setContent('<html><body></body></html>');
 await page.addScriptTag({ content: pageCode });
-for (const v of variants) {
+const only = process.argv.slice(2);
+for (const v of variants.filter((x) => !only.length || only.includes(x.file))) {
   const t = Date.now();
   const url = await page.evaluate((o) => window.render(o), v);
   const buf = Buffer.from(url.split(',')[1], 'base64');

@@ -13,7 +13,7 @@ const FAQ: [string, string][] = [
   ['Preciso de um número novo de WhatsApp?', 'O número precisa estar ligado à API oficial do WhatsApp (Meta). Você pode usar um número novo ou migrar o atual. Um número na API oficial não fica no aplicativo comum ao mesmo tempo, salvo nos casos em que a Meta permite a coexistência com o WhatsApp Business.'],
   ['Quanto custam as mensagens do WhatsApp?', 'Responder clientes que chamaram você nas últimas 24 horas não tem custo da Meta. Mensagens fora dessa janela (lembretes, acompanhamentos) usam modelos aprovados e são cobradas pela Meta direto na sua conta, por mensagem.'],
   ['Meus dados ficam seguros?', 'Cada empresa só enxerga os próprios dados (regra aplicada direto no banco). Senhas e tokens não aparecem para a equipe. Você pode baixar ou apagar tudo em Configurações → Sua conta.'],
-  ['Posso cancelar quando quiser?', 'Sim, sem multa. O acesso continua até o fim do período pago. Depois, o painel fica só para consulta e a IA para de responder. Seus dados continuam guardados até você pedir a exclusão.'],
+  ['Posso cancelar quando quiser?', 'Sim, sem multa. O acesso continua até o fim do período pago. Depois, o painel fica só para consulta e a IA para de responder. Seus dados continuam guardados para consulta e exportação até você pedir a exclusão (contas sem assinatura por mais de 12 meses podem ser excluídas, sempre com aviso antes).'],
 ];
 
 export default function Help() {
