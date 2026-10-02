@@ -1,0 +1,15 @@
+{
+  "name": "Combinado",
+  "short_name": "Combinado",
+  "description": "Sua empresa funcionando por uma conversa.",
+  "start_url": "/app/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EEF3FA",
+  "theme_color": "#3D86F0",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

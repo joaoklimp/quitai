@@ -1,0 +1,123 @@
+/* Combinado — tokens de design.
+   Visual "céu aberto": vidro claro sobre céu azul, preto como cor de ação, e três cores vivas para dados
+   (azul = conversas/IA, laranja = vendas/orçamentos, verde = concluído/positivo). */
+:root {
+  --font: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-accent: "Playfair Display", Georgia, "Times New Roman", serif;
+
+  /* texto */
+  --ink: #0B0D12;
+  --ink-2: #394154;
+  --ink-3: #6E7890;
+  --ink-4: #A3ABBC;
+
+  /* superfícies */
+  --bg: #EEF3FA;
+  --sky: url("/img/ceu-painel.webp");
+  --board: rgba(246, 248, 252, 0.84);
+  --board-border: rgba(255, 255, 255, 0.85);
+  --surface: #FFFFFF;
+  --surface-2: #F5F7FB;
+  --surface-3: #ECF0F6;
+  --surface-hover: #F7F9FC;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+  --line: #E6EAF1;
+  --line-2: #D6DCE6;
+
+  /* ação (botões ativos, pílula selecionada) */
+  --solid: #0B0D12;
+  --solid-hover: #23283A;
+  --on-solid: #FFFFFF;
+
+  /* cores vivas */
+  --blue: #2F7BFF;   --blue-2: #6AA6FF;   --blue-soft: #E8F1FF;   --blue-ink: #1A5FE0;
+  --orange: #FF7A30; --orange-2: #FFAA70; --orange-soft: #FFF0E6; --orange-ink: #C9520F;
+  --green: #12C08B;  --green-2: #5FDDB4;  --green-soft: #E2F7EF;  --green-ink: #078561;
+  --red: #F2465E;    --red-2: #FF8A9A;    --red-soft: #FDE9EC;    --red-ink: #C22640;
+  --violet: #7C5CFF; --violet-2: #A993FF; --violet-soft: #EFEBFF; --violet-ink: #5B3DE0;
+  --yellow: #FFB020; --yellow-soft: #FFF5DD; --yellow-ink: #8F5D00;
+  --pink: #FF5FA2;   --pink-soft: #FFE8F2;
+  --teal: #10B5C9;   --teal-soft: #E1F7FA;
+
+  --ai: linear-gradient(135deg, #2F7BFF 0%, #7C5CFF 100%);
+  --ai-soft: linear-gradient(135deg, #E8F1FF 0%, #EFEBFF 100%);
+  --hatch: repeating-linear-gradient(135deg, rgba(150, 162, 186, 0.30) 0 1.4px, transparent 1.4px 6px);
+  --grid: #EDF0F5;
+
+  /* sombras */
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --shadow-2: 0 8px 22px rgba(16, 24, 40, 0.06), 0 2px 6px rgba(16, 24, 40, 0.04);
+  --shadow-3: 0 30px 70px rgba(16, 24, 40, 0.16), 0 8px 20px rgba(16, 24, 40, 0.07);
+  --shadow-pill: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
+  --shadow-solid: 0 8px 18px rgba(11, 13, 18, 0.22);
+  --ring: 0 0 0 3px rgba(47, 123, 255, 0.28);
+
+  /* raios */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r: 18px;
+  --r-lg: 24px;
+  --r-xl: 34px;
+  --r-pill: 999px;
+
+  /* medidas */
+  --topbar-h: 76px;
+  --rail-w: 76px;
+  --page-max: 1480px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #F2F4FA; --ink-2: #C3C9D7; --ink-3: #8E97AB; --ink-4: #5E677B;
+    --bg: #070A12; --sky: url("/img/ceu-noite.webp");
+    --board: rgba(12, 16, 26, 0.86); --board-border: rgba(255, 255, 255, 0.06);
+    --surface: #111726; --surface-2: #161D2E; --surface-3: #1D2538; --surface-hover: #182033;
+    --glass: rgba(17, 23, 38, 0.72); --glass-strong: rgba(17, 23, 38, 0.92);
+    --line: #212A3D; --line-2: #2C3650;
+    --solid: #F2F4FA; --solid-hover: #DDE2EC; --on-solid: #0B0D12;
+    --blue: #4D8DFF; --blue-2: #7FB0FF; --blue-soft: #14244A; --blue-ink: #8DB8FF;
+    --orange: #FF8A47; --orange-2: #FFB582; --orange-soft: #3A2212; --orange-ink: #FFB07A;
+    --green: #22D39C; --green-2: #6BE6BF; --green-soft: #0F2E25; --green-ink: #5FE3B8;
+    --red: #FF5C73; --red-2: #FF9AA8; --red-soft: #3A1520; --red-ink: #FF8E9F;
+    --violet: #9278FF; --violet-2: #B6A5FF; --violet-soft: #231B4A; --violet-ink: #B9A8FF;
+    --yellow: #FFC24D; --yellow-soft: #33280D; --yellow-ink: #FFD47F;
+    --pink: #FF77B1; --pink-soft: #3A1729; --teal: #2CCCDF; --teal-soft: #0E2C33;
+    --ai-soft: linear-gradient(135deg, #14244A 0%, #231B4A 100%);
+    --hatch: repeating-linear-gradient(135deg, rgba(140, 152, 180, 0.16) 0 1.4px, transparent 1.4px 6px);
+    --grid: #1A2132;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 10px 26px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --shadow-3: 0 30px 70px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(0, 0, 0, 0.35);
+    --shadow-pill: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.2);
+    --shadow-solid: 0 8px 18px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #F2F4FA; --ink-2: #C3C9D7; --ink-3: #8E97AB; --ink-4: #5E677B;
+  --bg: #070A12; --sky: url("/img/ceu-noite.webp");
+  --board: rgba(12, 16, 26, 0.86); --board-border: rgba(255, 255, 255, 0.06);
+  --surface: #111726; --surface-2: #161D2E; --surface-3: #1D2538; --surface-hover: #182033;
+  --glass: rgba(17, 23, 38, 0.72); --glass-strong: rgba(17, 23, 38, 0.92);
+  --line: #212A3D; --line-2: #2C3650;
+  --solid: #F2F4FA; --solid-hover: #DDE2EC; --on-solid: #0B0D12;
+  --blue: #4D8DFF; --blue-2: #7FB0FF; --blue-soft: #14244A; --blue-ink: #8DB8FF;
+  --orange: #FF8A47; --orange-2: #FFB582; --orange-soft: #3A2212; --orange-ink: #FFB07A;
+  --green: #22D39C; --green-2: #6BE6BF; --green-soft: #0F2E25; --green-ink: #5FE3B8;
+  --red: #FF5C73; --red-2: #FF9AA8; --red-soft: #3A1520; --red-ink: #FF8E9F;
+  --violet: #9278FF; --violet-2: #B6A5FF; --violet-soft: #231B4A; --violet-ink: #B9A8FF;
+  --yellow: #FFC24D; --yellow-soft: #33280D; --yellow-ink: #FFD47F;
+  --pink: #FF77B1; --pink-soft: #3A1729; --teal: #2CCCDF; --teal-soft: #0E2C33;
+  --ai-soft: linear-gradient(135deg, #14244A 0%, #231B4A 100%);
+  --hatch: repeating-linear-gradient(135deg, rgba(140, 152, 180, 0.16) 0 1.4px, transparent 1.4px 6px);
+  --grid: #1A2132;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 10px 26px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-3: 0 30px 70px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(0, 0, 0, 0.35);
+  --shadow-pill: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.2);
+  --shadow-solid: 0 8px 18px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
