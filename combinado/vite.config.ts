@@ -1,14 +1,20 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { wordmarkHtml } from './src/shared/brand';
 import { SITE_FOOTER, SITE_HEADER } from './src/site/chrome';
+import { SEO_PAGES, jsonLd, llmsTxt, pageMeta, robotsTxt, sitemapXml, socialTags } from './src/site/seo';
 
 const page = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+const root = page('./');
 
-// Endereço público do site (usado nas tags de compartilhamento). Defina VITE_SITE_URL no deploy.
-const SITE_URL = (process.env.VITE_SITE_URL || 'https://orbyta.com.br').replace(/\/$/, '');
+// Endereço público do site (canonical, sitemap, compartilhamento). Ordem: VITE_SITE_URL (domínio próprio),
+// o endereço de produção que a Vercel informa no build e, por último, o domínio planejado.
+const SITE_URL = (process.env.VITE_SITE_URL
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+  || 'https://orbyta.com.br').replace(/\/$/, '');
 
 /** Páginas estáticas (landing, institucionais e legais): monta cabeçalho e rodapé compartilhados, troca <i data-icon="nome"></i> pelo SVG do Lucide, <i data-wordmark="altura"></i> pelo logotipo e __SITE_URL__ pelo endereço do site. */
 function staticHtml(): Plugin {
@@ -30,7 +36,9 @@ function staticHtml(): Plugin {
   };
   return {
     name: 'orbyta-static-html',
-    transformIndexHtml(html) {
+    transformIndexHtml(html, ctx) {
+      const seo = SEO_PAGES.find((p) => p.file === relative(root, ctx.filename).replaceAll('\\', '/'));
+      if (seo) html = html.replace('</head>', `${socialTags('__SITE_URL__', seo, html)}\n${jsonLd('__SITE_URL__', seo, html)}\n</head>`);
       return html
         .replace('<header data-site-header></header>', SITE_HEADER)
         .replace('<footer data-site-footer></footer>', SITE_FOOTER)
@@ -42,9 +50,35 @@ function staticHtml(): Plugin {
   };
 }
 
+/** robots.txt, sitemap.xml e llms.txt gerados no build com o endereço certo (e servidos também no modo dev). */
+function seoFiles(): Plugin {
+  const files = () => {
+    const metas = new Map(SEO_PAGES.map((p) => [p.path, pageMeta(readFileSync(page(`./${p.file}`), 'utf8'))]));
+    return {
+      'robots.txt': robotsTxt(SITE_URL),
+      'sitemap.xml': sitemapXml(SITE_URL, new Date().toISOString().slice(0, 10)),
+      'llms.txt': llmsTxt(SITE_URL, metas),
+    } as Record<string, string>;
+  };
+  return {
+    name: 'orbyta-seo-files',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const body = files()[(req.url ?? '').slice(1).split('?')[0]];
+        if (body === undefined) return next();
+        res.setHeader('Content-Type', req.url!.includes('.xml') ? 'application/xml; charset=utf-8' : 'text/plain; charset=utf-8');
+        res.end(body);
+      });
+    },
+    generateBundle() {
+      for (const [fileName, source] of Object.entries(files())) this.emitFile({ type: 'asset', fileName, source });
+    },
+  };
+}
+
 // Site em várias páginas: landing estática, painel (SPA), orçamento público e páginas legais.
 export default defineConfig({
-  plugins: [react(), staticHtml()],
+  plugins: [react(), staticHtml(), seoFiles()],
   build: {
     target: 'es2022',
     rollupOptions: {

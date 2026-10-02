@@ -149,7 +149,7 @@ Variáveis de ambiente do site (modelo em `.env.example`):
 |---|---|
 | `VITE_SUPABASE_URL` | `https://SEU_REF.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Chave pública do projeto (**Project Settings → API Keys**, a chave `anon`/publishable. Nunca use a `service_role` aqui) |
-| `VITE_SITE_URL` | `https://seudominio.com.br` (vai nas tags de compartilhamento do site) |
+| `VITE_SITE_URL` | `https://seudominio.com.br`: endereço oficial usado em canonical, sitemap.xml, robots.txt, llms.txt, dados estruturados e compartilhamento. Sem ele, o build usa o endereço de produção da Vercel |
 | `VITE_META_APP_ID` | Opcional: ID do app da Meta, para o botão “Conectar com a Meta” |
 | `VITE_META_CONFIG_ID` | Opcional: ID da configuração do cadastro incorporado (etapa 6) |
 | `VITE_AUTH_PROVIDERS` | Opcional: botões de login social que aparecem (padrão `google,microsoft`; inclua `apple` se ativar; `nenhum` esconde) |

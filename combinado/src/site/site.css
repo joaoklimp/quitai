@@ -137,7 +137,7 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .ai-visual .gen svg { width: 18px; height: 18px; color: #2F7BFF; }
 .ai-visual .gen .typing { color: #2F7BFF; }
 .ai-visual .send { position: absolute; left: 14px; bottom: 64px; width: 18px; height: 18px; color: rgba(255, 255, 255, 0.9); }
-.ai-title { font-size: 16px; margin: 16px 8px 4px; }
+.ai-title { font-size: 16px; font-weight: 700; margin: 16px 8px 4px; }
 .ai-sub { font-size: 12.5px; color: var(--ink-3); margin: 0 8px 10px; }
 .ai-list { display: grid; gap: 4px; padding: 0 2px; }
 .ai-list li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 8px; border-radius: 14px; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
@@ -589,3 +589,6 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
   .day-t { grid-column: 2; padding: 0; text-align: left; order: -1; }
   .day-ic { grid-row: 1 / span 2; }
 }
+/* títulos da prévia do painel são ilustração, não estrutura da página (o H1 do site é um só) */
+.pv-h { margin: 0; font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; font-size: 16px; }
+.pv-board .page-head .pv-h1 { font-size: 42px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.05; }
