@@ -14,7 +14,8 @@
     "test:functions": "node scripts/deno.mjs test",
     "check:functions": "node scripts/deno.mjs check",
     "sync:functions": "node scripts/sync-functions.mjs",
-    "assets": "node scripts/gen-assets.mjs"
+    "assets": "node scripts/gen-assets.mjs",
+    "seo:check": "node scripts/seo-check.mjs"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
