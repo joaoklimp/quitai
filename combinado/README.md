@@ -125,7 +125,7 @@ Algumas regras (planos, formatos, modelos de mensagem, disponibilidade de horár
 | `npm run build` | Confere os tipos e gera a versão de produção em `dist/` |
 | `npm run preview` | Serve o `dist/` em <http://localhost:4173> |
 | `npm run typecheck` | Só confere os tipos do painel e do site |
-| `npm test` | Testes rápidos (IA de demonstração, cópias sincronizadas) |
+| `npm test` | Testes rápidos (IA de demonstração, comparação de períodos do painel, cópias sincronizadas) |
 | `npm run test:db` | Testes do banco num Postgres 17 de verdade: RLS entre empresas, papéis, gatilhos, numeração, funções |
 | `npm run test:functions` | Testes das Edge Functions (Deno, Claude simulado) |
 | `npm run check:functions` | Confere os tipos das Edge Functions |
