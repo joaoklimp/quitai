@@ -1,7 +1,8 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
 import type { DataSource, AdminOverview } from '../source';
-import type { AiSettings, Company, DailyStat, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount } from '../types';
-import { audit, contactById, demoDb, emit, newId, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
+import type { AiSettings, Company, DailyStat, FinanceEntry, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
+import type { ProductRow } from '../sheet';
+import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
 import { resolvePendingDemo, runOwnerCommand, runSimulator, suggestReplyDemo } from './agent';
 import { ZERO } from '../metrics';
@@ -78,7 +79,8 @@ export class DemoSource implements DataSource {
   async insert<T extends TableName>(name: T, row: Partial<RowMap[T]>): Promise<RowMap[T]> {
     await wait(120);
     const now = new Date().toISOString();
-    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(name === 'contacts' || name === 'appointments' || name === 'quotes' ? { updated_at: now } : {}), ...row } as unknown as RowMap[T];
+    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(['contacts', 'appointments', 'quotes', 'finance_entries', 'products'].includes(name) ? { updated_at: now } : {}), ...row } as unknown as RowMap[T];
+    if (name === 'stock_movements') applyMovement(full as unknown as StockMovement); // valida e atualiza o saldo (no servidor é um gatilho)
     const rows = table(name) as unknown as RowMap[T][];
     rows.unshift(full);
     this.afterWrite(name, full as never, 'insert');
@@ -126,9 +128,60 @@ export class DemoSource implements DataSource {
     if (name === 'services' && op === 'update' && before && before.price !== row.price) {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'atualizar_servico', summary: `Alterou o preço de "${row.name}" de ${brl(Number(before.price))} para ${brl(Number(row.price))}`, target_type: 'service', target_id: row.id as string, status: 'ok' });
     }
+    if (name === 'products' && op === 'insert') {
+      const p = row as unknown as Product;
+      audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'cadastrar_produto', summary: `Cadastrou o produto ${p.name}`, target_type: 'product', target_id: p.id, status: 'ok' });
+      if (Number(p.stock)) { table('stock_movements').unshift({ id: newId(), company_id: DEMO_COMPANY_ID, product_id: p.id, kind: 'ajuste', qty: Number(p.stock), balance_after: Number(p.stock), unit_cost: null, note: 'Saldo inicial', created_by: DEMO_USER_ID, created_via: 'painel', created_at: new Date().toISOString() }); emit('stock_movements'); }
+    }
+    if (name === 'stock_movements') {
+      const m = row as unknown as StockMovement;
+      const p = table('products').find((x) => x.id === m.product_id);
+      audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'movimentar_estoque', summary: `${m.kind[0].toUpperCase() + m.kind.slice(1)} de ${m.qty} ${p?.name ?? 'produto'} (saldo: ${m.balance_after})`, target_type: 'product', target_id: m.product_id, status: 'ok' });
+      emit('products');
+    }
+    if (name === 'finance_entries') {
+      const f = row as unknown as FinanceEntry;
+      if (op === 'insert') audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'lancar_conta', summary: `Lançou conta a ${f.kind}: ${f.description} (${brl(f.amount)})`, target_type: 'finance', target_id: f.id, status: 'ok' });
+      if (op === 'update' && f.paid_at && !before?.paid_at) {
+        audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'baixar_conta', summary: `Marcou como ${f.kind === 'pagar' ? 'paga' : 'recebida'}: ${f.description} (${brl(f.amount)})`, target_type: 'finance', target_id: f.id, status: 'ok' });
+        if (f.recurrence === 'mensal') {
+          const next = addMonth(f.due_date);
+          if (!table('finance_entries').some((x) => x.description === f.description && x.kind === f.kind && x.due_date === next)) {
+            const now = new Date().toISOString();
+            table('finance_entries').unshift({ ...f, id: newId(), due_date: next, paid_at: null, method: null, created_via: 'automacao', created_at: now, updated_at: now });
+          }
+        }
+      }
+    }
     if (name === 'tasks' && op === 'insert') {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'criar_tarefa', summary: `Criou a tarefa "${row.title}"`, target_type: 'task', target_id: row.id as string, status: 'ok' });
     }
+  }
+
+  async importProducts(rows: ProductRow[]): Promise<ImportResult> {
+    await wait(300);
+    let created = 0, updated = 0, skipped = 0;
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      const name = r.name?.trim();
+      if (!name || name.length > 120) { skipped++; continue; }
+      const sku = r.sku?.trim() || null;
+      const stock = r.stock != null && r.stock !== '' ? Math.max(0, Number(r.stock)) : null;
+      const p = table('products').find((x) => (sku ? x.sku?.toLowerCase() === sku.toLowerCase() : x.name.toLowerCase() === name.toLowerCase()));
+      if (!p) {
+        const np: Product = { id: newId(), company_id: DEMO_COMPANY_ID, name, sku, unit: r.unit?.trim() || 'un', category: r.category?.trim() || 'Geral', stock: stock ?? 0, min_stock: Number(r.min_stock ?? 0) || 0, cost: r.cost != null ? Number(r.cost) : null, price: r.price != null ? Number(r.price) : null, active: true, created_at: now, updated_at: now };
+        table('products').unshift(np);
+        if (np.stock) table('stock_movements').unshift({ id: newId(), company_id: DEMO_COMPANY_ID, product_id: np.id, kind: 'ajuste', qty: np.stock, balance_after: np.stock, unit_cost: null, note: 'Importação de planilha', created_by: DEMO_USER_ID, created_via: 'painel', created_at: now });
+        created++;
+      } else {
+        Object.assign(p, { name, unit: r.unit?.trim() || p.unit, category: r.category?.trim() || p.category, min_stock: r.min_stock != null ? Number(r.min_stock) : p.min_stock, cost: r.cost != null ? Number(r.cost) : p.cost, price: r.price != null ? Number(r.price) : p.price, updated_at: now });
+        if (stock != null) { p.stock = stock; table('stock_movements').unshift({ id: newId(), company_id: DEMO_COMPANY_ID, product_id: p.id, kind: 'ajuste', qty: stock, balance_after: stock, unit_cost: null, note: 'Importação de planilha', created_by: DEMO_USER_ID, created_via: 'painel', created_at: now }); }
+        updated++;
+      }
+    }
+    audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'importar_produtos', summary: `Importou uma planilha de produtos: ${created} novos, ${updated} atualizados`, target_type: null, target_id: null, status: 'ok' });
+    emit('products'); emit('stock_movements');
+    return { created, updated, skipped };
   }
 
   async getQuote(id: string): Promise<Quote | null> {
@@ -285,3 +338,23 @@ export class DemoSource implements DataSource {
 }
 
 const LABEL: Partial<Record<TableName, string>> = { contacts: 'o cliente', services: 'o serviço', quotes: 'o orçamento', appointments: 'o agendamento', sales: 'a venda', tasks: 'a tarefa', automations: 'a automação' };
+
+/** Saída maior que o saldo é recusada; avisa quando o produto fica abaixo do mínimo (como o gatilho do banco). */
+export function applyMovement(m: StockMovement) {
+  const p = table('products').find((x) => x.id === m.product_id);
+  if (!p) throw new Error('Produto não encontrado.');
+  const qty = Number(m.qty);
+  if (!(qty > 0) && m.kind !== 'ajuste') throw new Error('Informe uma quantidade maior que zero.');
+  const novo = m.kind === 'entrada' ? p.stock + qty : m.kind === 'saida' ? p.stock - qty : qty;
+  if (novo < 0) throw new Error(`Estoque insuficiente de ${p.name}: há ${p.stock} ${p.unit}.`);
+  if (novo <= p.min_stock && p.min_stock > 0 && p.stock > p.min_stock) notify({ kind: 'estoque', title: `Estoque baixo: ${p.name}`, body: `Restam ${novo} ${p.unit} (mínimo: ${p.min_stock}).`, link: '#/estoque' });
+  m.balance_after = novo;
+  p.stock = novo;
+  p.updated_at = new Date().toISOString();
+}
+function addMonth(d: string): string {
+  const [y, mo, day] = d.split('-').map(Number);
+  const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+  const dt = new Date(Date.UTC(y, mo, Math.min(day, last)));
+  return dt.toISOString().slice(0, 10);
+}

@@ -1,8 +1,9 @@
 // Agente local do modo demonstração. Entende comandos comuns em português e executa as mesmas ações
 // que a IA de verdade (Claude + ferramentas) faz no servidor. Serve para experimentar o produto sem chaves.
-import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, PayMethod, PendingAction, Quote, Sale, Service } from '../types';
+import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, FinanceEntry, PayMethod, PendingAction, Product, Quote, Sale, Service } from '../types';
 import { audit, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
+import { applyMovement } from './demoSource';
 import { isFree, slotsForDate } from '../availability';
 import { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime } from '../../../shared/parse';
 export { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime };
@@ -194,7 +195,111 @@ function executePending(p: PendingAction): ActionReceipt {
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'criar_orcamento', summary: `Criou o orçamento nº ${qn(q.number)} de ${brl(q.total)} com desconto acima do limite — confirmado pelo dono`, target_type: 'quote', target_id: q.id, status: 'ok' });
     return { tool: p.tool, label: `Orçamento nº ${qn(q.number)} criado`, status: 'ok', detail: `${brl(q.total)} · desconto de ${brl(q.discount)}` };
   }
+  if (p.tool === 'baixar_conta') {
+    const e = table('finance_entries').find((x) => x.id === a.entry_id);
+    if (!e) return { tool: p.tool, label: 'Conta não encontrada', status: 'erro' };
+    if (e.paid_at) return { tool: p.tool, label: 'Conta já estava baixada', status: 'ok' };
+    const now = new Date().toISOString();
+    e.paid_at = now; e.method = a.method ?? 'pix'; e.updated_at = now;
+    if (e.recurrence === 'mensal') {
+      const [y, m, d] = e.due_date.split('-').map(Number);
+      const next = new Date(Date.UTC(y, m, Math.min(d, new Date(Date.UTC(y, m + 1, 0)).getUTCDate()))).toISOString().slice(0, 10);
+      if (!table('finance_entries').some((x) => x.description === e.description && x.due_date === next)) table('finance_entries').unshift({ ...e, id: newId(), due_date: next, paid_at: null, method: null, created_via: 'automacao', created_at: now, updated_at: now });
+    }
+    emit('finance_entries');
+    const verb = e.kind === 'pagar' ? 'paga' : 'recebida';
+    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'baixar_conta', summary: `Marcou como ${verb}: ${e.description} (${brl(e.amount)}) — confirmado pelo dono`, target_type: 'finance', target_id: e.id, status: 'ok' });
+    return { tool: p.tool, label: `Conta ${verb}`, status: 'ok', detail: `${e.description} · ${brl(e.amount)}`, link: '#/financeiro' };
+  }
   return { tool: p.tool, label: 'Ação desconhecida', status: 'erro' };
+}
+
+/* ================= financeiro e estoque (comandos) ================= */
+const STOP = new Set(['para', 'pra', 'com', 'uma', 'umas', 'uns', 'dos', 'das', 'que', 'conta', 'contas', 'estoque', 'produto', 'produtos', 'entrada', 'saida', 'baixa', 'chegou', 'chegaram', 'usei', 'gastei', 'vendi', 'unidades', 'unidade', 'litros', 'galao', 'galoes', 'frasco', 'frascos', 'pacote', 'pacotes', 'caixa', 'caixas', 'mais', 'registra', 'lanca', 'paguei', 'recebi', 'quanto', 'tenho', 'temos', 'ainda', 'hoje']);
+const words = (t: string) => fold(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w));
+function bestMatch<T>(items: T[], text: (x: T) => string, query: string): T | null {
+  const q = words(query);
+  let best: T | null = null, score = 0;
+  for (const it of items) {
+    const w = words(text(it));
+    const hits = q.filter((x) => w.some((y) => y.startsWith(x.slice(0, Math.max(4, x.length - 2))) || x.startsWith(y.slice(0, Math.max(4, y.length - 2))))).length;
+    if (hits > score) { score = hits; best = it; }
+  }
+  return score > 0 ? best : null;
+}
+const qtyIn = (f: string) => { const m = f.match(/(\d+(?:[.,]\d+)?)\s*(?:un|unidades?|litros?|l\b|galo(?:es|ns)?|galao|frascos?|pacotes?|caixas?|pares?|kits?|kg)?/); return m ? Number(m[1].replace(',', '.')) : null; };
+
+function handleGestao(ctx: Ctx, clause: string, f: string): boolean {
+  const today = ctx.today;
+  // dar baixa numa conta (sensível)
+  if (/\b(paguei|recebi|pago|quitei|baixa)\b.*\b(conta|aluguel|boleto|salario|fornecedor|luz|energia|internet|contrato)\b|\bmarca\b.*\b(paga|recebida)\b/.test(f)) {
+    const open = table('finance_entries').filter((e) => !e.paid_at);
+    const e = bestMatch(open, (x) => `${x.description} ${x.counterpart ?? ''} ${x.category}`, clause);
+    if (!e) { ctx.lines.push('Qual conta? Ex.: "paguei o aluguel" ou "recebi o contrato da clínica".'); return true; }
+    const method = parseMethod(f) ?? 'pix';
+    ctx.pending = createPending(ctx.conv, 'baixar_conta', { entry_id: e.id, method }, `Marcar como ${e.kind === 'pagar' ? 'paga' : 'recebida'}: ${e.description} (${brl(e.amount)})`);
+    ctx.actions.push({ tool: 'baixar_conta', label: 'Baixa aguardando confirmação', status: 'aguardando', detail: `${e.description} · ${brl(e.amount)}`, pending_id: ctx.pending.id });
+    ctx.lines.push(`Encontrei ${e.description} de ${brl(e.amount)}, vencimento ${fmtDate(e.due_date)}. Confirma que foi ${e.kind === 'pagar' ? 'paga' : 'recebida'}${method !== 'pix' ? ` no ${METHOD_LABEL[method]}` : ''}? Responda SIM ou NÃO.`);
+    return true;
+  }
+  // lançar conta
+  if (/\b(lanc|anot|registr|cadastr|coloc|bot)\w*\b.*\b(conta|despesa|boleto|aluguel|salario|fornecedor|receber|a pagar)\b|\bconta (de|do|da)\b.*\d/.test(f) && parseMoneyIn(clause)) {
+    const amount = parseMoneyIn(clause)!;
+    const kind: FinanceEntry['kind'] = /\b(receber|recebimento|cliente me deve|entrada de)\b/.test(f) ? 'receber' : 'pagar';
+    const day = f.match(/\bdia (\d{1,2})\b/);
+    let due = parseDate(f, today) ?? today;
+    if (day) { const d = Number(day[1]); const cand = `${today.slice(0, 8)}${String(d).padStart(2, '0')}`; due = cand >= today ? cand : addDays(`${today.slice(0, 8)}01`, 32).slice(0, 8) + String(d).padStart(2, '0'); }
+    const desc = clause.replace(/^(.*?\b(lanca|lança|anota|registra|cadastra|coloca|bota)\w*\s+(uma\s+)?)/i, '').replace(/\b(de\s+)?R\$\s*[\d.,]+.*$/i, '').replace(/\b(a pagar|a receber)\b/i, '').replace(/^(conta|despesa)\s+(de|do|da)\s+/i, '').trim() || (kind === 'pagar' ? 'Conta' : 'Recebimento');
+    const monthly = /\b(todo mes|mensal|todos os meses|por mes|todo dia \d{1,2})\b/.test(f);
+    const now = new Date().toISOString();
+    const e: FinanceEntry = { id: newId(), company_id: DEMO_COMPANY_ID, kind, description: desc[0].toUpperCase() + desc.slice(1), category: kind === 'pagar' ? (/aluguel/.test(f) ? 'Aluguel' : /salario/.test(f) ? 'Pessoal' : /luz|energia|agua|internet|telefone/.test(f) ? 'Contas da casa' : /imposto|das\b|simples/.test(f) ? 'Impostos' : /fornecedor|produto|compra/.test(f) ? 'Fornecedores' : 'Outros') : 'Serviços', amount, due_date: due, paid_at: null, method: null, contact_id: null, counterpart: null, recurrence: monthly ? 'mensal' : 'nenhuma', notes: null, created_via: 'ia_dono', created_at: now, updated_at: now };
+    table('finance_entries').unshift(e); emit('finance_entries');
+    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'lancar_conta', summary: `Lançou conta a ${kind}: ${e.description} (${brl(amount)}, vence ${fmtDate(due)})`, target_type: 'finance', target_id: e.id, status: 'ok' });
+    ctx.actions.push({ tool: 'lancar_conta', label: `Conta a ${kind} lançada`, status: 'ok', detail: `${e.description} · ${brl(amount)} · ${fmtDate(due).slice(0, 5)}`, link: '#/financeiro' });
+    ctx.lines.push(`• Lancei ${e.description} (${brl(amount)}) a ${kind}, vencimento ${fmtDate(due)}${monthly ? ', repetindo todo mês' : ''}`);
+    return true;
+  }
+  // consultar contas
+  if (/\b(contas?|boletos?)\b.*\b(pagar|vence|vencid|abert|receber|semana|mes)\w*|\b(o que|quanto)\b.*\b(vence|tenho a pagar|tenho a receber|a pagar|a receber)\b|\bfinanceiro\b/.test(f)) {
+    const open = table('finance_entries').filter((e) => !e.paid_at && (/\breceber\b/.test(f) ? e.kind === 'receber' : /\bpagar\b/.test(f) ? e.kind === 'pagar' : true));
+    const horizon = /\bsemana\b/.test(f) ? addDays(today, 7) : null;
+    const list = open.filter((e) => !horizon || e.due_date <= horizon).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
+    const late = list.filter((e) => e.due_date < today);
+    const sum = (l: FinanceEntry[], k: string) => l.filter((e) => e.kind === k).reduce((t, e) => t + e.amount, 0);
+    ctx.lines.push(list.length ? `${horizon ? 'Até o fim da semana' : 'Em aberto'}: ${brl(sum(list, 'pagar'))} a pagar e ${brl(sum(list, 'receber'))} a receber.${late.length ? ` ⚠️ ${late.length} ${late.length === 1 ? 'está vencida' : 'estão vencidas'}.` : ''}\n` + list.slice(0, 7).map((e) => `• ${fmtDate(e.due_date).slice(0, 5)} — ${e.description}: ${e.kind === 'pagar' ? '−' : '+'}${brl(e.amount)}${e.due_date < today ? ' (vencida)' : ''}`).join('\n') : 'Nenhuma conta em aberto nesse período. 👌');
+    ctx.actions.push({ tool: 'consultar_contas', label: 'Contas consultadas', status: 'ok', link: '#/financeiro' });
+    return true;
+  }
+  // estoque: consultar
+  if (/\b(o que|quais|precis)\w*\b.*\brepor\b|\bestoque\b.*\b(baixo|acabando|repor|como esta|como ta)\b|\bcomo (esta|ta) o estoque\b|\b(quanto|quantos?|quantas?)\b.*\b(tem|temos|tenho|sobrou|resta)\b.*\b(estoque)?\b/.test(f) && !/\b(vend|fatur|orcament|agenda|horario)\w*/.test(f)) {
+    const products = table('products').filter((p) => p.active);
+    const specific = /\b(quanto|quantos?|quantas?)\b/.test(f) ? bestMatch(products, (p) => `${p.name} ${p.sku ?? ''}`, clause) : null;
+    if (specific) { ctx.lines.push(`${specific.name}: ${specific.stock} ${specific.unit} em estoque${specific.min_stock > 0 ? ` (mínimo ${specific.min_stock})` : ''}.${specific.stock <= specific.min_stock && specific.min_stock > 0 ? ' Já está na hora de repor.' : ''}`); }
+    else {
+      const low = products.filter((p) => p.min_stock > 0 && p.stock <= p.min_stock);
+      ctx.lines.push(low.length ? `${low.length} ${low.length === 1 ? 'produto precisa' : 'produtos precisam'} de reposição:\n` + low.map((p) => `• ${p.name}: ${p.stock} ${p.unit} (mínimo ${p.min_stock})`).join('\n') : 'Estoque em dia: nenhum produto abaixo do mínimo. 👌');
+    }
+    ctx.actions.push({ tool: 'consultar_estoque', label: 'Estoque consultado', status: 'ok', link: '#/estoque' });
+    return true;
+  }
+  // estoque: entrada e saída
+  const entrada = /\b(chegou|chegaram|entrada|comprei|repus|recebi)\b/.test(f);
+  const saida = /\b(saida|baixa|usei|usamos|gastei|gastamos|vendi|perdi|quebrou|tira|retira)\b/.test(f);
+  if ((entrada || saida) && qtyIn(f) != null) {
+    const p = bestMatch(table('products').filter((x) => x.active), (x) => `${x.name} ${x.sku ?? ''}`, clause) as Product | null;
+    if (!p) { ctx.lines.push('Qual produto? Ex.: "dá baixa de 2 removedores de mancha" ou "chegaram 10 panos de microfibra".'); return true; }
+    const qty = qtyIn(f)!;
+    try {
+      const m = { id: newId(), company_id: DEMO_COMPANY_ID, product_id: p.id, kind: (entrada ? 'entrada' : 'saida') as 'entrada' | 'saida', qty, balance_after: null, unit_cost: null, note: null, created_by: DEMO_USER_ID, created_via: 'ia_dono' as const, created_at: new Date().toISOString() };
+      applyMovement(m);
+      table('stock_movements').unshift(m); emit('stock_movements'); emit('products');
+      audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'movimentar_estoque', summary: `${entrada ? 'Entrada' : 'Saída'} de ${qty} ${p.unit} de ${p.name} (saldo: ${p.stock})`, target_type: 'product', target_id: p.id, status: 'ok' });
+      ctx.actions.push({ tool: 'movimentar_estoque', label: `${entrada ? 'Entrada' : 'Saída'} de estoque`, status: 'ok', detail: `${qty} ${p.unit} · ${p.name} · saldo ${p.stock}`, link: '#/estoque' });
+      ctx.lines.push(`• ${entrada ? 'Entrada' : 'Saída'} de ${qty} ${p.unit} de ${p.name}. Saldo agora: ${p.stock} ${p.unit}${p.min_stock > 0 && p.stock <= p.min_stock ? ' ⚠️ abaixo do mínimo, vale repor' : ''}`);
+    } catch (e) { ctx.lines.push((e as Error).message); }
+    return true;
+  }
+  return false;
 }
 
 /* ================= comandos do dono ================= */
@@ -211,7 +316,7 @@ function resolveContact(ctx: Ctx, clause: string): Contact | null | 'ambiguous' 
   return found[0];
 }
 
-const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\nAções sensíveis (vendas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
+const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\nAções sensíveis (vendas, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
 
 function handleClause(ctx: Ctx, clause: string) {
   const f = fold(clause);
@@ -219,6 +324,9 @@ function handleClause(ctx: Ctx, clause: string) {
 
   // ajuda
   if (/\b(ajuda|o que (voce|vc) (faz|sabe|consegue)|comandos|como (te|funciona))\b/.test(f)) { ctx.lines.push(HELP); return; }
+
+  // financeiro e estoque
+  if (handleGestao(ctx, clause, f)) return;
 
   // registrar venda (sensível)
   if (/\b(registr|lanc|anot|bot)\w*\b.*\bvenda\b|\bvend(i|emos)\b.*\d/.test(f)) {
@@ -525,6 +633,24 @@ function simConversation(name: string): Conversation {
   return c;
 }
 
+/** Pergunta do cliente (não é nome nem endereço). */
+const isQuestion = (text: string, f: string) => text.includes('?') || /^(qual|quais|quanto|quantos|como|onde|quando|porque|por que|voces|vcs|voce|aceita|aceitam|tem|da pra|e possivel|pode|posso|faz|fazem|precisa|preciso|serve|demora|funciona)\b/.test(f);
+const FAQ_STOP = new Set(['qual', 'quais', 'como', 'voces', 'voce', 'para', 'pra', 'esse', 'essa', 'isso', 'tenho', 'quero', 'sobre', 'mais', 'muito', 'fazer', 'fazem', 'pode', 'posso', 'preciso', 'precisa', 'algum', 'alguma', 'quanto', 'tempo', 'serve', 'onde', 'quando', 'tambem', 'aqui']);
+const sig = (t: string) => fold(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !FAQ_STOP.has(w));
+/** Resposta da base de conhecimento cadastrada pelo dono, quando a pergunta bate com uma delas. */
+export function faqAnswer(f: string): string | null {
+  const q = sig(f);
+  if (!q.length) return null;
+  let best: { a: string } | null = null, score = 0;
+  for (const item of demoDb().ai.faq ?? []) {
+    const w = [...sig(item.q), ...sig(item.a).slice(0, 12)];
+    const hits = q.filter((x) => w.some((y) => y.slice(0, 5) === x.slice(0, 5))).length;
+    const sc = hits / Math.min(q.length, Math.max(1, sig(item.q).length));
+    if (hits && sc > score) { score = sc; best = item; }
+  }
+  return best && score >= 0.5 ? best.a : null;
+}
+
 function priceLine(s: Service): string {
   if (s.price_type === 'sob_consulta') return `${s.name}: o valor depende de uma avaliação, então fazemos uma visita técnica sem custo`;
   return `${s.name} ${s.price_type === 'a_partir_de' ? 'começa em' : 'sai por'} ${brl(s.price)}`;
@@ -563,7 +689,9 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
     const pct = Number(f.match(/(\d{1,2})\s*%/)?.[1] ?? 0);
     if (pct > ai.max_discount_pct) { handoff = true; reply = `Entendo! Esse desconto passa do que eu posso autorizar por aqui, então já pedi para o responsável avaliar. Ele te responde em instantes${emo ? ' 🙏' : '.'}`; }
     else reply = `Consigo sim te ajudar: no Pix tem 5% de desconto${service ? `, então ${service.name.toLowerCase()} sai por ${brl(service.price * 0.95)}` : ''}. Quer que eu reserve um horário?`;
-  } else if (sim.askedData && !sim.booked && sim.date && sim.time && (/^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f) || text.includes(',') || text.trim().split(/\s+/).length >= 3)) {
+  } else if (isQuestion(text, f) && faqAnswer(f)) {
+    reply = faqAnswer(f)!;
+  } else if (sim.askedData && !sim.booked && sim.date && sim.time && !isQuestion(text, f) && (/^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f) || text.includes(',') || text.trim().split(/\s+/).length >= 3)) {
     // cliente mandou nome e endereço
     const isYes = /^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f);
     const nameGuess = text.split(/[,\n]/)[0].trim();
@@ -587,7 +715,7 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
       notify({ kind: 'agendamento', title: 'Novo horário reservado pela IA', body: `${contact.name} · ${fmtDate(sim.date)} às ${sim.time}`, link: '#/agenda' });
       reply = `Combinado, ${firstName(contact.name)}! ${emo ? '✅ ' : ''}Reservei ${fmtLong(sim.date)} às ${sim.time}${service ? ` para ${service.name.toLowerCase()}` : ''}${service && service.price_type !== 'sob_consulta' ? ` (${service.price_type === 'a_partir_de' ? 'a partir de ' : ''}${brl(service.price)})` : ''}. ${ap.status === 'pendente' ? 'A equipe confirma em instantes.' : 'Está tudo certo na agenda.'} Qualquer coisa, é só me chamar por aqui!`;
     }
-  } else if (!date && !time && sim.date && !sim.time && !sim.booked && !/\?/.test(text) && (text.includes(',') || text.trim().split(/\s+/).length >= 3) && !/\b(quanto|valor|preco|horario|atende|pagamento)\b/.test(f)) {
+  } else if (!date && !time && sim.date && !sim.time && !sim.booked && !isQuestion(text, f) && (text.includes(',') || text.trim().split(/\s+/).length >= 3) && !/\b(quanto|valor|preco|horario|atende|pagamento)\b/.test(f)) {
     // mandou nome e endereço antes de escolher o horário: guarda e pede a escolha
     const nameGuess = text.split(/[,\n]/)[0].trim();
     if (nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) contact.name = titleCase(nameGuess);
@@ -631,6 +759,11 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
     reply = ai.greeting || `Oi! Aqui é ${ai.assistant_name}, de ${company.name}. Como posso te ajudar?`;
   } else {
     reply = `Posso te ajudar com preços, horários e orçamentos${emo ? ' 😊' : '.'} Qual serviço você precisa?`;
+  }
+
+  // respondeu uma dúvida no meio do agendamento: lembra o que falta para reservar
+  if (reply && !handoff && !sim.booked && sim.askedData && sim.date && sim.time && isQuestion(text, f) && !/reserv|nome completo/.test(reply)) {
+    reply += ` E para eu reservar ${fmtLong(sim.date)} às ${sim.time}, só preciso do seu nome completo e do endereço.`;
   }
 
   if (handoff) {

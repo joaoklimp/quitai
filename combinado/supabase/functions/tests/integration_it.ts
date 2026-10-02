@@ -192,6 +192,36 @@ Deno.test({ name: 'dono pelo agente: a venda vira confirmação e o recibo da me
   assertEquals([Number(sale!.amount), sale!.origin, sale!.method], [300, 'balcao', 'dinheiro']);
 }});
 
+Deno.test({ name: 'dono: financeiro e estoque pelos comandos (conta mensal, baixa com confirmação, entrada e saída)', ...opts, fn: async () => {
+  const b = await loadBase(CID);
+  const conv = await findOrCreateConversation({ companyId: CID, kind: 'dono', channel: 'painel', memberUserId: UID });
+  const ctx = { ...b, mode: 'dono', channel: 'painel', conversationId: conv.id, member };
+  let r = await run(OWNER_TOOLS, 'lancar_conta', { tipo: 'pagar', descricao: 'Aluguel da sala', valor: 1800, vencimento: DAY, categoria: 'Aluguel', mensal: true }, ctx);
+  assert(!r.error, r.content);
+  r = await run(OWNER_TOOLS, 'consultar_contas', { filtro: 'abertas', tipo: 'pagar' }, ctx);
+  has(r.content, 'Aluguel da sala · R$ 1.800,00');
+  const contaId = r.content.match(/\[([0-9a-f-]{36})\] A PAGAR · Aluguel da sala/)![1];
+  r = await run(OWNER_TOOLS, 'baixar_conta', { conta_id: contaId, metodo: 'pix' }, ctx);
+  assertEquals(r.receipt?.status, 'aguardando');
+  const res = await resolvePending(b, r.receipt!.pending_id!, true, member, 'painel');
+  assertEquals(res.actions[0].status, 'ok');
+  const { data: rows } = await db.from('finance_entries').select('due_date, paid_at').eq('company_id', CID).eq('description', 'Aluguel da sala').order('due_date');
+  assertEquals(rows!.map((x) => !!x.paid_at), [true, false]); // a do mês seguinte já ficou lançada
+
+  r = await run(OWNER_TOOLS, 'cadastrar_produto', { nome: 'Removedor de manchas 1L', unidade: 'frasco', saldo: 5, minimo: 3 }, ctx);
+  assert(!r.error, r.content);
+  r = await run(OWNER_TOOLS, 'consultar_estoque', { busca: 'removedor' }, ctx);
+  const prodId = r.content.match(/\[([0-9a-f-]{36})\]/)![1];
+  r = await run(OWNER_TOOLS, 'movimentar_estoque', { produto_id: prodId, tipo: 'saida', quantidade: 9 }, ctx);
+  assert(r.error); has(r.content, 'Estoque insuficiente');
+  r = await run(OWNER_TOOLS, 'movimentar_estoque', { produto_id: prodId, tipo: 'saida', quantidade: 3, observacao: 'Serviço do condomínio' }, ctx);
+  has(r.content, 'Saldo agora: 2 frasco');
+  r = await run(OWNER_TOOLS, 'consultar_estoque', {}, ctx);
+  has(r.content, 'REPOR');
+  const { data: n } = await db.from('notifications').select('title').eq('company_id', CID).eq('kind', 'estoque');
+  assertEquals(n!.map((x) => x.title), ['Estoque baixo: Removedor de manchas 1L']);
+}});
+
 Deno.test({ name: 'histórico: conversa iniciada pela empresa ganha um turno inicial do cliente', ...opts, fn: async () => {
   const { contact } = await findOrCreateContact(CID, '5561933332222', 'Bianca');
   const conv = await findOrCreateConversation({ companyId: CID, kind: 'cliente', channel: 'whatsapp', contactId: contact.id });

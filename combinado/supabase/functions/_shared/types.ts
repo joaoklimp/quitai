@@ -54,8 +54,13 @@ export interface AiSettings {
   can_quote: boolean;
   max_discount_pct: number;
   handoff_on_complaint: boolean;
+  /** perguntas e respostas cadastradas pelo dono: a IA responde com base nelas */
+  faq: FaqItem[];
+  /** pesquisa na internet para dúvidas gerais (nunca para preço, horário ou regra da empresa) */
+  web_search: boolean;
   updated_at?: ISO;
 }
+export interface FaqItem { q: string; a: string }
 
 export interface WhatsAppAccount {
   company_id: UUID;
@@ -312,7 +317,7 @@ export interface Notification {
   id: UUID;
   company_id: UUID;
   user_id: UUID | null;
-  kind: 'atendimento' | 'agendamento' | 'orcamento' | 'venda' | 'sistema' | 'tarefa' | 'assinatura';
+  kind: 'atendimento' | 'agendamento' | 'orcamento' | 'venda' | 'sistema' | 'tarefa' | 'assinatura' | 'estoque' | 'financeiro';
   title: string;
   body: string | null;
   link: string | null;
@@ -383,16 +388,68 @@ export interface AgentReply {
   handoff?: boolean;
 }
 
+/* ---------- gestão: financeiro e estoque ---------- */
+export type FinanceKind = 'pagar' | 'receber';
+export interface FinanceEntry {
+  id: UUID;
+  company_id: UUID;
+  kind: FinanceKind;
+  description: string;
+  category: string;
+  amount: number;
+  due_date: DateStr;
+  paid_at: ISO | null;
+  method: PayMethod | null;
+  contact_id: UUID | null;
+  counterpart: string | null; // fornecedor ou pagador sem cadastro
+  recurrence: 'nenhuma' | 'mensal';
+  notes: string | null;
+  created_via: Channel;
+  created_at: ISO;
+  updated_at: ISO;
+}
+export interface Product {
+  id: UUID;
+  company_id: UUID;
+  name: string;
+  sku: string | null;
+  unit: string;
+  category: string;
+  stock: number;
+  min_stock: number;
+  cost: number | null;
+  price: number | null;
+  active: boolean;
+  created_at: ISO;
+  updated_at: ISO;
+}
+export type StockKind = 'entrada' | 'saida' | 'ajuste';
+export interface StockMovement {
+  id: UUID;
+  company_id: UUID;
+  product_id: UUID;
+  kind: StockKind;
+  qty: number;
+  balance_after: number | null;
+  unit_cost: number | null;
+  note: string | null;
+  created_by: UUID | null;
+  created_via: Channel;
+  created_at: ISO;
+}
+export interface ImportResult { created: number; updated: number; skipped: number }
+
 export type TableName =
   | 'contacts' | 'services' | 'quotes' | 'quote_items' | 'appointments' | 'sales' | 'tasks'
   | 'conversations' | 'messages' | 'pending_actions' | 'audit_log' | 'automations' | 'automation_runs'
-  | 'notifications' | 'members' | 'invoices' | 'usage_monthly';
+  | 'notifications' | 'members' | 'invoices' | 'usage_monthly' | 'finance_entries' | 'products' | 'stock_movements';
 
 export interface RowMap {
   contacts: Contact; services: Service; quotes: Quote; quote_items: QuoteItem; appointments: Appointment;
   sales: Sale; tasks: Task; conversations: Conversation; messages: Message; pending_actions: PendingAction;
   audit_log: AuditEntry; automations: Automation; automation_runs: AutomationRun; notifications: Notification;
   members: Member; invoices: Invoice; usage_monthly: UsageMonth;
+  finance_entries: FinanceEntry; products: Product; stock_movements: StockMovement;
 }
 
 export type Filter =

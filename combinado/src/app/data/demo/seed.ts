@@ -6,6 +6,8 @@ import type {
   PayMethod, ContactSource, AutomationKind, ActionReceipt, PendingAction,
 } from '../types';
 import { addDays, fromLocal, localDate, localParts, normalizePhone, weekdayOf } from '../../../shared/format';
+import type { FinanceEntry, Product, StockMovement } from '../types';
+import { buildGestao, DEMO_FAQ } from './gestao';
 
 export const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
 export const DEMO_USER_ID = '00000000-0000-4000-8000-0000000000aa';
@@ -34,6 +36,9 @@ export interface DemoDB {
   notifications: Notification[];
   invoices: Invoice[];
   usage_monthly: UsageMonth[];
+  finance_entries: FinanceEntry[];
+  products: Product[];
+  stock_movements: StockMovement[];
   /** campos de mensagens por dia (o resto do agregado vem das linhas) */
   msgStats: Record<string, Pick<DailyStat, 'msgs_in' | 'msgs_ai' | 'msgs_team' | 'conversations' | 'response_sum' | 'response_count' | 'handoffs'>>;
   /** agregados de vendas/orçamentos para dias anteriores à janela de linhas */
@@ -41,7 +46,7 @@ export interface DemoDB {
   seq: { quote: number; id: number };
 }
 
-export const DEMO_VERSION = 3;
+export const DEMO_VERSION = 4;
 const HISTORY_DAYS = 365;
 const RAW_DAYS = 75;
 const AI_START = 120; // a empresa começou a usar a IA há 120 dias
@@ -297,6 +302,7 @@ export function buildDemo(now = new Date()): DemoDB {
     instructions: 'Atendemos todo o DF. Entorno (Valparaíso, Águas Lindas, Luziânia) tem taxa de deslocamento de R$ 30.\nPagamento: Pix (5% de desconto), cartão em até 3x sem juros ou dinheiro.\nSecagem: de 4 a 8 horas, dependendo do tecido.\nGarantia: se alguma mancha voltar em até 7 dias, refazemos sem custo.\nNão atendemos aos domingos.',
     greeting: 'Oi! Aqui é a Bia, da Brilho Lar. Como posso te ajudar?',
     schedule_mode: 'sempre', booking_mode: 'automatico', can_quote: true, max_discount_pct: 10, handoff_on_complaint: true,
+    faq: DEMO_FAQ, web_search: false,
   };
   const whatsapp: WhatsAppAccount = {
     company_id: DEMO_COMPANY_ID, phone_number_id: '109876543210987', waba_id: '102938475610293', display_phone: '+55 61 99876-5432',
@@ -637,7 +643,9 @@ export function buildDemo(now = new Date()): DemoDB {
   const usage_monthly: UsageMonth[] = [{ company_id: DEMO_COMPANY_ID, month, ai_replies: Math.min(1480, Math.round(monthAi * 0.42)), wa_sent: Math.round(monthAi * 0.5), ai_input_tokens: 0, ai_output_tokens: 0 }];
 
   contacts.sort((a, b) => ((b.last_interaction_at ?? '') > (a.last_interaction_at ?? '') ? 1 : -1));
+  const gestao = buildGestao(now, today, contacts);
   return {
+    ...gestao,
     version: DEMO_VERSION, seededAt: nowIso, company, ai, whatsapp, members, contacts, services, quotes, quote_items, appointments, sales, tasks,
     conversations, messages, pending_actions: [], audit_log, automations, automation_runs, notifications, invoices, usage_monthly, msgStats, oldStats,
     seq: { quote: quoteSeq, id: idCounter },

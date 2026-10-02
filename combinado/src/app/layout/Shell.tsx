@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Bell, CalendarDays, CheckCheck, ClipboardList, CreditCard, FileText, HelpCircle, History, LayoutGrid, LogOut, Menu as MenuIcon, MessageCircle,
   Monitor, Moon, Search, Settings, ShieldCheck, Smartphone, Sparkles, Sun, Tag, Users, Wallet, Workflow, CalendarCheck, CircleDollarSign, Bot, Info,
+  Landmark, Package, Plug, Orbit, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg } from '../../shared/brand';
@@ -13,25 +14,32 @@ import { useAssistant, useMeCtx, useTheme } from '../context';
 import { useList, useInvalidate } from '../data/hooks';
 import { api, isDemo, leaveDemo, canUseRealAccount } from '../data/api';
 import { CommandPalette } from './CommandPalette';
-import type { Notification } from '../data/types';
+import type { Notification, Role } from '../data/types';
 
-export const PRIMARY = [
+type NavItem = { to: string; label: string; icon: typeof Bell; end?: boolean; roles?: Role[] };
+const MANAGERS: Role[] = ['dono', 'gerente'];
+export const PRIMARY: NavItem[] = [
   { to: '/', label: 'Visão geral', icon: LayoutGrid, end: true },
   { to: '/conversas', label: 'Conversas', icon: MessageCircle },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/orcamentos', label: 'Orçamentos', icon: FileText },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/analises', label: 'Análises', icon: BarChart3 },
-  { to: '/automacoes', label: 'Automações', icon: Workflow },
+  { to: '/financeiro', label: 'Financeiro', icon: Landmark, roles: MANAGERS },
+  { to: '/estoque', label: 'Estoque', icon: Package },
 ];
-export const SECONDARY = [
-  { to: '/vendas', label: 'Vendas', icon: Wallet },
+export const SECONDARY: NavItem[] = [
+  { to: '/modulos', label: 'Módulos ORBYTA', icon: Orbit },
+  { to: '/vendas', label: 'Vendas', icon: Wallet, roles: MANAGERS },
   { to: '/catalogo', label: 'Serviços e preços', icon: Tag },
   { to: '/tarefas', label: 'Tarefas', icon: ClipboardList },
+  { to: '/analises', label: 'Análises', icon: BarChart3 },
+  { to: '/automacoes', label: 'Automações', icon: Workflow },
+  { to: '/integracoes', label: 'Integrações', icon: Plug },
   { to: '/simulador', label: 'Simulador do WhatsApp', icon: Smartphone },
   { to: '/historico', label: 'Histórico de ações', icon: History },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
+export const allowed = (items: NavItem[], role: Role) => items.filter((i) => !i.roles || i.roles.includes(role));
 
 function useAttentionCount() {
   const { data } = useList('conversations', { filters: [{ col: 'needs_attention', op: 'eq', value: true }, { col: 'status', op: 'eq', value: 'aberta' }] });
@@ -68,7 +76,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <nav className="rail" aria-label="Atalhos">
         <IconButton label="Assistente (Ctrl+J)" active={assistant.open} onClick={() => assistant.setOpen(!assistant.open)}><Sparkles /><span className="tip">Assistente IA</span></IconButton>
         <div className="rail-sep" />
-        {SECONDARY.map((s) => (
+        {allowed(SECONDARY, me.role).map((s) => (
           <IconButton key={s.to} label={s.label} active={loc.pathname.startsWith(s.to)} onClick={() => nav(s.to)}><s.icon /><span className="tip">{s.label}</span></IconButton>
         ))}
         {me.isPlatformAdmin && <IconButton label="Admin da plataforma" active={loc.pathname.startsWith('/admin')} onClick={() => nav('/admin')}><ShieldCheck /><span className="tip">Admin da plataforma</span></IconButton>}
@@ -80,13 +88,13 @@ export function Shell({ children }: { children: ReactNode }) {
             <span dangerouslySetInnerHTML={{ __html: logoSvg(38, { title: false }) }} style={{ display: 'contents' }} />
             <span className="brand-name">{BRAND.name}</span>
           </NavLink>
-          <nav className="pills" aria-label="Principal">
-            {PRIMARY.map((p) => (
+          <ScrollPills>
+            {allowed(PRIMARY, me.role).map((p) => (
               <NavLink key={p.to} to={p.to} end={p.end} className={({ isActive }) => cx('pill', isActive && 'active')}>
                 <p.icon />{p.label}{p.to === '/conversas' && attention > 0 && <span className="n">{attention}</span>}
               </NavLink>
             ))}
-          </nav>
+          </ScrollPills>
           <div className="topbar-tools">
             <button className="search-btn" onClick={() => setCmdOpen(true)} aria-label="Buscar"><Search /><span>Buscar...</span><span className="kbd">Ctrl K</span></button>
             <Notifications />
@@ -125,9 +133,36 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+/** Abas do topo: quando não cabem, aparecem setas e a roda do mouse rola para o lado (nada fica escondido). */
+function ScrollPills({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setEdge({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    const onWheel = (e: WheelEvent) => { if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); } };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
+    const ro = new ResizeObserver(update); ro.observe(el);
+    // a aba ativa fica sempre à vista
+    el.querySelector<HTMLElement>('.pill.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return () => { el.removeEventListener('scroll', update); el.removeEventListener('wheel', onWheel); ro.disconnect(); };
+  }, []);
+  const go = (dir: number) => ref.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  return (
+    <div className={cx('pills-wrap', edge.left && 'at-left', edge.right && 'at-right')}>
+      {edge.left && <button className="pills-arrow left" onClick={() => go(-1)} aria-label="Ver abas anteriores"><ChevronLeft /></button>}
+      <nav ref={ref} className="pills" aria-label="Principal">{children}</nav>
+      {edge.right && <button className="pills-arrow right" onClick={() => go(1)} aria-label="Ver mais abas"><ChevronRight /></button>}
+    </div>
+  );
+}
+
 function MoreSheet({ onClose }: { onClose: () => void }) {
   const { me } = useMeCtx();
-  const items = [...PRIMARY.filter((p) => !['/', '/conversas', '/agenda'].includes(p.to)), ...SECONDARY, ...(me.isPlatformAdmin ? [{ to: '/admin', label: 'Admin da plataforma', icon: ShieldCheck }] : [])];
+  const items = [...allowed(PRIMARY, me.role).filter((p) => !['/', '/conversas', '/agenda'].includes(p.to)), ...allowed(SECONDARY, me.role), ...(me.isPlatformAdmin ? [{ to: '/admin', label: 'Admin da plataforma', icon: ShieldCheck }] : [])];
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-label="Menu">
@@ -186,6 +221,8 @@ const N_ICON: Record<Notification['kind'], [typeof Bell, string, string]> = {
   tarefa: [ClipboardList, 'var(--yellow-soft)', 'var(--yellow-ink)'],
   assinatura: [CreditCard, 'var(--red-soft)', 'var(--red-ink)'],
   sistema: [Bot, 'var(--surface-3)', 'var(--ink-2)'],
+  estoque: [Package, 'var(--orange-soft)', 'var(--orange-ink)'],
+  financeiro: [Landmark, 'var(--green-soft)', 'var(--green-ink)'],
 };
 
 function Notifications() {

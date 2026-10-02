@@ -20,7 +20,7 @@ const EXAMPLES = [
   'Registra uma venda de R$ 180 no Pix para a Juliana Ribeiro',
   'Me lembra de ligar para o fornecedor amanhã às 9h',
 ];
-const CHIPS = ['Resumo de hoje', 'Agenda de amanhã', 'Orçamentos parados', 'Quem está esperando?', 'Vendas do mês'];
+const CHIPS = ['Resumo de hoje', 'Agenda de amanhã', 'Orçamentos parados', 'Quem está esperando?', 'O que vence essa semana?', 'O que preciso repor?'];
 const STEPS = ['Entendendo o pedido', 'Executando no sistema', 'Conferindo o resultado'];
 
 export function AssistantDrawer() {

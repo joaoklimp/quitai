@@ -72,7 +72,15 @@ function companyBlock(b: Base): string {
     '',
     `# Regras da empresa (escritas pelo dono; seguem valendo junto com as regras acima)`,
     b.ai.instructions?.trim() || 'Nenhuma regra extra.',
+    ...faqBlock(b),
   ].join('\n');
+}
+
+/** Perguntas e respostas cadastradas pelo dono: a fonte oficial para essas dúvidas. */
+function faqBlock(b: Base): string[] {
+  const faq = (Array.isArray(b.ai.faq) ? b.ai.faq : []).filter((f) => f?.q?.trim() && f?.a?.trim()).slice(0, 80);
+  if (!faq.length) return [];
+  return ['', '# Perguntas frequentes (respostas oficiais da empresa: use o conteúdo delas, com suas palavras)', ...faq.map((f) => `P: ${f.q.trim()}\nR: ${f.a.trim()}`)];
 }
 
 const TONE: Record<string, string> = {
@@ -99,6 +107,8 @@ export function customerSystem(b: Base): string {
     '',
     '# O que você pode fazer',
     '- Informar serviços, preços, duração e horário de funcionamento usando SOMENTE os dados abaixo.',
+    '- Responder dúvidas comuns (pagamento, prazos, garantia, cuidados) com as perguntas frequentes e as regras da empresa abaixo.',
+    ...(ai.web_search ? ['- Pesquisar na internet (web_search) só para dúvidas gerais que não dependem da empresa, como cuidados com um tecido ou o que é um procedimento. Nunca use a internet para preço, prazo, horário, política ou qualquer informação da empresa: isso vem só dos dados abaixo.'] : []),
     '- Ver horários livres e agendar (consultar_horarios e agendar_horario). Nunca diga que um horário está livre sem consultar antes.',
     ai.can_quote ? '- Criar e enviar orçamentos com os preços da tabela (criar_orcamento). O link do orçamento vem no resultado da ferramenta: mande o link ao cliente.' : '- Orçamentos: a empresa prefere que a equipe faça. Colete o que o cliente precisa e chame a equipe.',
     '- Ver, remarcar ou cancelar os horários do próprio cliente (meus_horarios, remarcar_horario, cancelar_horario) e registrar quando ele confirma presença, por exemplo respondendo SIM a um lembrete (confirmar_presenca).',
@@ -143,13 +153,15 @@ const ROLE_TEXT: Record<Role, string> = { dono: 'dono(a)', gerente: 'gerente', a
 /** Prompt dos comandos da equipe (estável, com cache). */
 export function ownerSystem(b: Base): string {
   return [
-    `Você é o assistente de gestão da ${b.company.name}. Quem fala com você é alguém da equipe da empresa (o papel vem logo abaixo). Você executa os pedidos do dia a dia usando as ferramentas: buscar e cadastrar clientes, criar e enviar orçamentos, consultar e mexer na agenda, registrar vendas, criar e concluir tarefas, criar e alterar serviços e preços, ver resumos e conversas que precisam de resposta.`,
+    `Você é o assistente de gestão da ${b.company.name}. Quem fala com você é alguém da equipe da empresa (o papel vem logo abaixo). Você executa os pedidos do dia a dia usando as ferramentas: buscar e cadastrar clientes, criar e enviar orçamentos, consultar e mexer na agenda, registrar vendas, criar e concluir tarefas, criar e alterar serviços e preços, lançar e consultar contas a pagar e a receber, consultar e movimentar o estoque, ver resumos e conversas que precisam de resposta.`,
     '',
     '# Como agir',
     '- Entenda pedidos em português informal ("cadastra a Maria", "manda o orçamento pra ela", "quanto vendi hoje?"). Um pedido pode ter várias ações: faça todas, na ordem certa, sem pedir licença para cada uma.',
     '- Antes de agir para um cliente existente, encontre-o com buscar_clientes. Se houver mais de um com o mesmo nome, pergunte qual. Se o pedido é cadastrar, cadastre (a ferramenta avisa se o telefone já existe).',
     '- Datas relativas ("amanhã", "sexta", "dia 15") usam a data de hoje informada abaixo. Valores são em reais.',
-    `- Ações sensíveis ficam aguardando confirmação: registrar venda, cancelar horário, mudar preço ou desativar serviço, dar desconto acima de ${Number(b.ai.max_discount_pct)}% e mandar mensagem para cliente. A ferramenta registra o pedido e você pede para a pessoa confirmar. Nunca diga que foi feito antes da confirmação.`,
+    '- Financeiro: "lança o aluguel de R$ 2.800 todo dia 5" vira lancar_conta (mensal). Para dar baixa, encontre a conta com consultar_contas.',
+    '- Estoque: para entrada ou saída, encontre o produto com consultar_estoque e use movimentar_estoque. Se o saldo não der para a saída, avise.',
+    `- Ações sensíveis ficam aguardando confirmação: registrar venda, dar baixa em conta, cancelar horário, mudar preço ou desativar serviço, dar desconto acima de ${Number(b.ai.max_discount_pct)}% e mandar mensagem para cliente. A ferramenta registra o pedido e você pede para a pessoa confirmar. Nunca diga que foi feito antes da confirmação.`,
     '- Se faltar algo essencial (por exemplo, o valor de um item que não está na tabela), pergunte antes de agir.',
     '- Não invente números: para totais e resumos, use a ferramenta resumo.',
     '- Responda curto e direto, confirmando o que foi feito. O sistema já mostra a lista de ações realizadas abaixo da sua resposta: não repita tudo em detalhe.',
@@ -163,7 +175,7 @@ export function ownerDynamic(b: Base, who: { name: string; role: Role }, channel
   const now = new Date();
   return [
     `Agora: ${WEEKDAYS[new Date(localDate(now, b.tz) + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(now, b.tz)}, ${localTime(now, b.tz)} (fuso ${b.tz}). Hoje é ${localDate(now, b.tz)}.`,
-    `Falando com: ${who.name} (${ROLE_TEXT[who.role]}), pelo ${channel === 'whatsapp' ? 'WhatsApp — use a formatação do WhatsApp (*negrito*), sem markdown' : 'painel do Combinado'}.`,
+    `Falando com: ${who.name} (${ROLE_TEXT[who.role]}), pelo ${channel === 'whatsapp' ? 'WhatsApp — use a formatação do WhatsApp (*negrito*), sem markdown' : 'painel'}.`,
     `Meta de vendas do mês: ${Number(b.company.monthly_goal) > 0 ? brl(b.company.monthly_goal) : 'não definida'}.`,
   ].join('\n');
 }

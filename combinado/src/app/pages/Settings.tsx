@@ -146,7 +146,7 @@ function AssistantTab() {
   const set = <K extends keyof AiSettings>(k: K, v: AiSettings[K]) => setF((x) => (x ? { ...x, [k]: v } : x));
   const dirty = JSON.stringify(f) !== JSON.stringify(ai);
   const owner = can(me, 'dono', 'gerente');
-  const save = async () => { setBusy(true); try { const r = await api.updateAiSettings(f); qc.setQueryData(['ai'], r); toast('Assistente atualizado. Vale a partir da próxima mensagem.'); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); } };
+  const save = async () => { setBusy(true); try { const r = await api.updateAiSettings({ ...f, faq: (f.faq ?? []).map((x) => ({ q: x.q.trim(), a: x.a.trim() })).filter((x) => x.q && x.a) }); setF(r); qc.setQueryData(['ai'], r); toast('Assistente atualizado. Vale a partir da próxima mensagem.'); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); } };
   return (
     <>
       <section className="card set-section">
@@ -168,6 +168,26 @@ function AssistantTab() {
         <div className="muted small" style={{ marginTop: 8 }}>{f.instructions.length} caracteres · Evite colocar dados pessoais de clientes aqui.</div>
       </section>
       <section className="card set-section">
+        <div className="card-head"><div><h3>Perguntas frequentes</h3><div className="sub">As dúvidas que os clientes mais mandam e a resposta oficial da empresa. A IA responde com base nelas, com as próprias palavras.</div></div></div>
+        <div className="faq-list">
+          {(f.faq ?? []).map((item, i) => (
+            <div key={i} className="faq-item">
+              <div className="grow col" style={{ gap: 8 }}>
+                <Input value={item.q} onChange={(e) => set('faq', f.faq.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)))} disabled={!owner} placeholder="Pergunta do cliente. Ex.: Vocês emitem nota fiscal?" aria-label={`Pergunta ${i + 1}`} maxLength={200} />
+                <Textarea value={item.a} onChange={(e) => set('faq', f.faq.map((x, j) => (j === i ? { ...x, a: e.target.value } : x)))} disabled={!owner} placeholder="Resposta da empresa" aria-label={`Resposta ${i + 1}`} rows={2} maxLength={800} />
+              </div>
+              {owner && <button className="icon-btn xs" aria-label="Remover pergunta" onClick={() => set('faq', f.faq.filter((_, j) => j !== i))}><Trash2 /></button>}
+            </div>
+          ))}
+          {!(f.faq ?? []).length && <div className="muted small">Nenhuma pergunta ainda. Comece pelas 3 dúvidas que você mais responde no WhatsApp.</div>}
+        </div>
+        {owner && (f.faq ?? []).length < 80 && <Button size="sm" icon={<Plus />} style={{ marginTop: 12 }} onClick={() => set('faq', [...(f.faq ?? []), { q: '', a: '' }])}>Adicionar pergunta</Button>}
+        <div className="opt-row" style={{ marginTop: 16 }}>
+          <div><div className="t">Pesquisar na internet para dúvidas gerais</div><div className="d">Para perguntas que não dependem da empresa (ex.: “como tirar mancha de vinho?”). Preço, prazo, horário e regras vêm sempre só do que você cadastrou. Deixe desligado se quiser respostas apenas com as suas informações.</div></div>
+          <Switch checked={!!f.web_search} disabled={!owner} label="Pesquisar na internet" onChange={(v) => set('web_search', v)} />
+        </div>
+      </section>
+      <section className="card set-section">
         <div className="card-head"><div><h3>Regras de atendimento</h3><div className="sub">O que a IA pode fazer sozinha.</div></div></div>
         <div className="opt-row"><div><div className="t">Quando a IA responde</div><div className="d">Fora do horário, a IA garante que ninguém fica sem resposta.</div></div>
           <Select value={f.schedule_mode} disabled={!owner} onChange={(e) => set('schedule_mode', e.target.value as AiSettings['schedule_mode'])} style={{ width: 240 }}><option value="sempre">Sempre, 24 horas</option><option value="fora_do_horario">Só fora do horário comercial</option><option value="horario_comercial">Só no horário comercial</option></Select></div>
@@ -176,7 +196,7 @@ function AssistantTab() {
         <div className="opt-row"><div><div className="t">IA monta orçamentos para clientes</div><div className="d">Com base na tabela de preços. Itens “sob consulta” sempre vão para a equipe.</div></div><Switch checked={f.can_quote} disabled={!owner} label="IA monta orçamentos" onChange={(v) => set('can_quote', v)} /></div>
         <div className="opt-row"><div><div className="t">Desconto máximo sem pedir sua confirmação</div><div className="d">Acima disso, a IA pede sua aprovação (para clientes, ela chama a equipe).</div></div><div className="row" style={{ gap: 6 }}><Input type="number" min={0} max={100} value={f.max_discount_pct} disabled={!owner} onChange={(e) => set('max_discount_pct', Math.min(100, Math.max(0, Number(e.target.value))))} style={{ width: 90 }} />%</div></div>
         <div className="opt-row"><div><div className="t">Chamar uma pessoa em reclamações</div><div className="d">Quando o cliente reclama, a IA pede desculpas e passa para a equipe na hora.</div></div><Switch checked={f.handoff_on_complaint} disabled={!owner} label="Chamar pessoa em reclamações" onChange={(v) => set('handoff_on_complaint', v)} /></div>
-        <div className="callout" style={{ marginTop: 14 }}><ShieldCheck /><span><strong>Sempre com sua confirmação:</strong> registrar vendas, cancelar horários, mudar preços, excluir clientes, mandar mensagens em seu nome e descontos acima do limite. Clientes nunca acessam funções da empresa.</span></div>
+        <div className="callout" style={{ marginTop: 14 }}><ShieldCheck /><span><strong>Sempre com sua confirmação:</strong> registrar vendas, dar baixa em contas, cancelar horários, mudar preços, mandar mensagens em seu nome e descontos acima do limite. Clientes nunca acessam funções da empresa.</span></div>
       </section>
       <div className="row" style={{ justifyContent: 'flex-end', gap: 10 }}><Button icon={<Smartphone />} onClick={() => nav('/simulador')}>Testar no simulador</Button></div>
       <SaveBar dirty={dirty} busy={busy} onSave={save} onReset={() => setF(ai)} />

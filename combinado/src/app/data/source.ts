@@ -2,8 +2,9 @@
 // - demo (localStorage, sem servidor) para quem quer ver o produto funcionando na hora;
 // - Supabase (banco real com RLS + Edge Functions com a IA e o WhatsApp).
 import type {
-  AgentReply, AiSettings, Company, DailyStat, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role,
+  AgentReply, AiSettings, Company, DailyStat, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role,
 } from './types';
+import type { ProductRow } from './sheet';
 import type { Cycle, PaidPlanId } from '../../shared/plans';
 
 export interface SignUpInput { name: string; email: string; password: string }
@@ -43,6 +44,8 @@ export interface DataSource {
   insert<T extends TableName>(table: T, row: Partial<RowMap[T]>): Promise<RowMap[T]>;
   update<T extends TableName>(table: T, id: string, patch: Partial<RowMap[T]>): Promise<RowMap[T]>;
   remove(table: TableName, id: string): Promise<void>;
+  /** Importa produtos de planilha: cria ou atualiza (pelo código ou nome) e acerta o saldo. */
+  importProducts(rows: ProductRow[]): Promise<ImportResult>;
 
   /* orçamentos */
   getQuote(id: string): Promise<Quote | null>;

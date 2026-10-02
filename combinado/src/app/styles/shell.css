@@ -15,7 +15,14 @@
 .brand { display: flex; align-items: center; gap: 10px; flex: none; margin-right: 6px; }
 .brand-name { font-weight: 800; font-size: 19px; letter-spacing: -0.035em; }
 .brand svg { width: 38px; height: 38px; border-radius: 12px; box-shadow: 0 6px 14px rgba(11, 13, 18, 0.22); }
-.topbar .pills { flex: 1 1 auto; min-width: 0; padding: 14px 8px; margin: -14px -8px; pointer-events: none; }
+.topbar .pills-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; }
+.topbar .pills { flex: 1 1 auto; min-width: 0; padding: 14px 8px; margin: -14px -8px; pointer-events: none; scroll-behavior: smooth; }
+.pills-wrap.at-right .pills { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+.pills-wrap.at-left .pills { -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%); mask-image: linear-gradient(90deg, transparent, #000 15%); }
+.pills-wrap.at-left.at-right .pills { -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.pills-arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pill); }
+.pills-arrow svg { width: 17px; height: 17px; }
+.pills-arrow.left { left: -4px; } .pills-arrow.right { right: -4px; }
 .topbar .pills > * { pointer-events: auto; }
 .topbar .pill.active { box-shadow: 0 4px 10px rgba(11, 13, 18, 0.18); }
 .topbar-tools { display: flex; align-items: center; gap: 10px; flex: none; }
@@ -95,14 +102,14 @@
   .rail { display: none; }
   .board { margin: 12px; }
   .topbar { flex-wrap: wrap; }
-  .topbar .pills { order: 3; flex-basis: 100%; }
+  .topbar .pills-wrap { order: 3; flex-basis: 100%; }
   .topbar-tools { margin-left: auto; }
 }
 @media (max-width: 860px) {
   body { background-attachment: scroll; }
   .board { margin: 0; border-radius: 0; border: 0; min-height: 100vh; padding-bottom: 84px; backdrop-filter: none; -webkit-backdrop-filter: none; background: transparent; box-shadow: none; }
   .topbar { padding: 12px 16px 8px; border-radius: 0; }
-  .topbar .pills { display: none; }
+  .topbar .pills-wrap { display: none; }
   .brand-name { font-size: 17px; }
   .brand svg { width: 34px; height: 34px; }
   .topbar-tools { gap: 8px; }

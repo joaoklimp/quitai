@@ -300,6 +300,18 @@ export const EXECUTORS: Record<string, (c: AgentCtx, a: Record<string, unknown>)
     return ok(`Mensagem enviada para ${contact.name}.`, { tool: 'mensagem_para_cliente', label: `Mensagem enviada para ${contact.name}`, detail: text.slice(0, 80), status: 'ok' });
   },
   async criar_orcamento(c, a) { return createQuote(c, a, true); },
+  async baixar_conta(c, a) {
+    const blocked = canWrite(c); if (blocked) return blocked;
+    const { data: e } = await db.from('finance_entries').select('*').eq('company_id', c.company.id).eq('id', s(a.conta_id)).maybeSingle();
+    if (!e) return err('Conta não encontrada.');
+    if (e.paid_at) return ok(`Essa conta já estava ${e.kind === 'pagar' ? 'paga' : 'recebida'}.`);
+    const method = METHODS.includes(a.metodo as PayMethod) ? a.metodo : 'pix';
+    const { error } = await db.from('finance_entries').update({ paid_at: new Date().toISOString(), method }).eq('id', e.id);
+    if (error) return err(error.message);
+    const verb = e.kind === 'pagar' ? 'paga' : 'recebida';
+    await log(c, 'baixar_conta', `Marcou como ${verb}: ${e.description} (${brl(Number(e.amount))})`, 'finance', e.id);
+    return ok(`${e.description} marcada como ${verb}${e.recurrence === 'mensal' ? '. A do próximo mês já ficou lançada' : ''}.`, { tool: 'baixar_conta', label: `Conta ${verb}`, detail: `${e.description} · ${brl(Number(e.amount))}`, status: 'ok', link: '#/financeiro' });
+  },
 };
 
 /* ---------- definições ---------- */
@@ -703,6 +715,115 @@ export const OWNER_TOOLS: T[] = [
       const text = s(i.mensagem, 2000);
       if (!text) return err('Escreva a mensagem.');
       return askConfirmation(c, 'mensagem_para_cliente', i, `Enviar para ${contact.name}: "${text.slice(0, 120)}${text.length > 120 ? '…' : ''}"`);
+    },
+  },
+  {
+    name: 'lancar_conta',
+    description: 'Lança uma conta a pagar (aluguel, fornecedor, salário, imposto) ou um valor a receber (contrato, boleto de cliente) no financeiro.',
+    input_schema: obj({
+      tipo: { type: 'string', enum: ['pagar', 'receber'] }, descricao: str('O que é a conta.'), valor: { type: 'number', description: 'Valor em reais.' },
+      vencimento: str('Data de vencimento AAAA-MM-DD. Sem data, use hoje.'), categoria: str('Ex.: Fornecedores, Aluguel, Pessoal, Impostos, Contas da casa, Serviços, Contratos.'),
+      fornecedor: str('Fornecedor ou quem paga (opcional).'), cliente_id: str('Cliente cadastrado, para valores a receber (opcional).'),
+      mensal: { type: 'boolean', description: 'true se repete todo mês.' }, ja_pago: { type: 'boolean', description: 'true se já foi paga ou recebida.' },
+    }, ['tipo', 'descricao', 'valor']),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const blocked = canWrite(c); if (blocked) return blocked;
+      const amount = Math.round(money(i.valor) * 100) / 100;
+      if (!(amount > 0)) return err('Informe um valor maior que zero.');
+      const kind = i.tipo === 'receber' ? 'receber' : 'pagar';
+      const due = DATE.test(s(i.vencimento)) ? s(i.vencimento) : localDate(new Date().toISOString(), c.tz);
+      const { data, error } = await db.from('finance_entries').insert({
+        company_id: c.company.id, kind, description: s(i.descricao, 200) || 'Conta', category: s(i.categoria, 60) || (kind === 'pagar' ? 'Outros' : 'Serviços'),
+        amount, due_date: due, counterpart: s(i.fornecedor, 120) || null, contact_id: s(i.cliente_id) || null, recurrence: i.mensal === true ? 'mensal' : 'nenhuma',
+        ...(i.ja_pago === true ? { paid_at: new Date().toISOString(), method: 'pix' } : {}), created_via: 'ia_dono',
+      }).select('id, description').single();
+      if (error) return err(error.message);
+      await log(c, 'lancar_conta', `Lançou conta a ${kind}: ${data.description} (${brl(amount)}, vence ${fmtDate(due + 'T12:00:00Z', c.tz)})`, 'finance', data.id);
+      return ok(`Conta a ${kind} lançada: ${data.description}, ${brl(amount)}, vencimento ${fmtDate(due + 'T12:00:00Z', c.tz)}${i.mensal === true ? ', todo mês' : ''}. Id ${data.id}.`,
+        { tool: 'lancar_conta', label: `Conta a ${kind} lançada`, detail: `${data.description} · ${brl(amount)} · ${fmtDate(due + 'T12:00:00Z', c.tz).slice(0, 5)}`, status: 'ok', link: '#/financeiro' });
+    },
+  },
+  {
+    name: 'consultar_contas',
+    description: 'Lista contas a pagar e a receber em aberto (com ids), as vencidas e o resultado do mês. Use para perguntas como "o que vence essa semana?" ou "quanto tenho a receber?".',
+    input_schema: obj({ filtro: { type: 'string', enum: ['abertas', 'vencidas', 'proximos_7_dias'], description: 'Padrão: abertas.' }, tipo: { type: 'string', enum: ['pagar', 'receber', 'todas'] } }),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const today = localDate(new Date().toISOString(), c.tz);
+      let q = db.from('finance_entries').select('id, kind, description, amount, due_date, counterpart').eq('company_id', c.company.id).is('paid_at', null).order('due_date').limit(40);
+      if (i.tipo === 'pagar' || i.tipo === 'receber') q = q.eq('kind', i.tipo);
+      if (i.filtro === 'vencidas') q = q.lt('due_date', today);
+      if (i.filtro === 'proximos_7_dias') q = q.lte('due_date', addDays(today, 7));
+      const { data } = await q;
+      const rows = data ?? [];
+      const monthStart = `${today.slice(0, 7)}-01`;
+      const { data: paid } = await db.from('finance_entries').select('kind, amount').eq('company_id', c.company.id).gte('paid_at', at(c, monthStart, '00:00').toISOString());
+      const { data: sales } = await db.from('sales').select('amount').eq('company_id', c.company.id).gte('paid_at', at(c, monthStart, '00:00').toISOString());
+      const inM = (paid ?? []).filter((p) => p.kind === 'receber').reduce((t, p) => t + Number(p.amount), 0) + (sales ?? []).reduce((t, p) => t + Number(p.amount), 0);
+      const outM = (paid ?? []).filter((p) => p.kind === 'pagar').reduce((t, p) => t + Number(p.amount), 0);
+      const list = rows.map((r) => `[${r.id}] ${r.kind === 'pagar' ? 'A PAGAR' : 'A RECEBER'} · ${r.description}${r.counterpart ? ` (${r.counterpart})` : ''} · ${brl(Number(r.amount))} · vence ${fmtDate(r.due_date + 'T12:00:00Z', c.tz)}${r.due_date < today ? ' · VENCIDA' : ''}`).join('\n');
+      return ok(`${list || 'Nenhuma conta nesse filtro.'}\nResultado do mês até agora: entrou ${brl(inM)} (vendas e recebimentos), saiu ${brl(outM)}.`);
+    },
+  },
+  {
+    name: 'baixar_conta',
+    description: 'Marca uma conta como paga ou recebida (pede confirmação antes). Use o id de consultar_contas.',
+    input_schema: obj({ conta_id: str('Id da conta.'), metodo: { type: 'string', enum: METHODS } }, ['conta_id']),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const { data: e } = await db.from('finance_entries').select('kind, description, amount, paid_at').eq('company_id', c.company.id).eq('id', s(i.conta_id)).maybeSingle();
+      if (!e) return err('Conta não encontrada.');
+      if (e.paid_at) return ok('Essa conta já está baixada.');
+      return askConfirmation(c, 'baixar_conta', i, `Marcar como ${e.kind === 'pagar' ? 'paga' : 'recebida'}: ${e.description} (${brl(Number(e.amount))})`);
+    },
+  },
+  {
+    name: 'consultar_estoque',
+    description: 'Busca produtos do estoque com saldo, mínimo e id. Sem busca, lista os que estão abaixo do mínimo.',
+    input_schema: obj({ busca: str('Nome ou código do produto (opcional).') }),
+    run: async (i, c) => {
+      const term = s(i.busca, 80);
+      let q = db.from('products').select('id, name, sku, unit, stock, min_stock').eq('company_id', c.company.id).eq('active', true).order('name').limit(30);
+      if (term) q = q.or(`name.ilike.%${term.replace(/[%,()]/g, ' ')}%,sku.ilike.%${term.replace(/[%,()]/g, ' ')}%`);
+      const { data } = await q;
+      let rows = data ?? [];
+      if (!term) rows = rows.filter((p) => Number(p.min_stock) > 0 && Number(p.stock) <= Number(p.min_stock));
+      if (!rows.length) return ok(term ? `Nenhum produto encontrado para "${term}".` : 'Nenhum produto abaixo do mínimo.');
+      return ok(rows.map((p) => `[${p.id}] ${p.name}${p.sku ? ` (${p.sku})` : ''} · saldo ${Number(p.stock)} ${p.unit} · mínimo ${Number(p.min_stock)}${Number(p.min_stock) > 0 && Number(p.stock) <= Number(p.min_stock) ? ' · REPOR' : ''}`).join('\n'));
+    },
+  },
+  {
+    name: 'movimentar_estoque',
+    description: 'Registra entrada (compra, reposição) ou saída (uso, venda, perda) de um produto. Use o id de consultar_estoque.',
+    input_schema: obj({ produto_id: str('Id do produto.'), tipo: { type: 'string', enum: ['entrada', 'saida'] }, quantidade: { type: 'number' }, observacao: str('Motivo (opcional).') }, ['produto_id', 'tipo', 'quantidade']),
+    run: async (i, c) => {
+      const blocked = canWrite(c); if (blocked) return blocked;
+      const qty = Number(i.quantidade);
+      if (!(qty > 0)) return err('Informe uma quantidade maior que zero.');
+      const { data: p } = await db.from('products').select('id, name, unit').eq('company_id', c.company.id).eq('id', s(i.produto_id)).maybeSingle();
+      if (!p) return err('Produto não encontrado.');
+      const kind = i.tipo === 'entrada' ? 'entrada' : 'saida';
+      const { data: m, error } = await db.from('stock_movements').insert({ company_id: c.company.id, product_id: p.id, kind, qty, note: s(i.observacao, 300) || null, created_by: c.member?.userId ?? null, created_via: 'ia_dono' }).select('balance_after').single();
+      if (error) return err(error.message);
+      const bal = Number(m.balance_after);
+      await log(c, 'movimentar_estoque', `${kind === 'entrada' ? 'Entrada' : 'Saída'} de ${qty} ${p.unit} de ${p.name} (saldo: ${bal})`, 'product', p.id);
+      return ok(`${kind === 'entrada' ? 'Entrada' : 'Saída'} registrada: ${qty} ${p.unit} de ${p.name}. Saldo agora: ${bal} ${p.unit}.`, { tool: 'movimentar_estoque', label: `${kind === 'entrada' ? 'Entrada' : 'Saída'} de estoque`, detail: `${qty} ${p.unit} · ${p.name} · saldo ${bal}`, status: 'ok', link: '#/estoque' });
+    },
+  },
+  {
+    name: 'cadastrar_produto',
+    description: 'Cadastra um produto no estoque, com saldo inicial e estoque mínimo para alerta.',
+    input_schema: obj({ nome: str('Nome do produto.'), unidade: str('un, kg, litro, caixa...'), saldo: { type: 'number' }, minimo: { type: 'number' }, custo: { type: 'number' }, preco: { type: 'number' }, codigo: str('Código (opcional).') }, ['nome']),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const blocked = canWrite(c); if (blocked) return blocked;
+      const name = s(i.nome, 120);
+      if (!name) return err('Informe o nome.');
+      const { data, error } = await db.from('products').insert({ company_id: c.company.id, name, unit: s(i.unidade, 12) || 'un', stock: Math.max(0, Number(i.saldo) || 0), min_stock: Math.max(0, Number(i.minimo) || 0), cost: Number(i.custo) > 0 ? Number(i.custo) : null, price: Number(i.preco) > 0 ? Number(i.preco) : null, sku: s(i.codigo, 60) || null }).select('id, stock, unit').single();
+      if (error) return err(/duplicate|unique/i.test(error.message) ? 'Já existe um produto com esse código.' : error.message);
+      await log(c, 'cadastrar_produto', `Cadastrou o produto ${name}`, 'product', data.id);
+      return ok(`Produto ${name} cadastrado com saldo ${Number(data.stock)} ${data.unit}. Id ${data.id}.`, { tool: 'cadastrar_produto', label: `Produto ${name} cadastrado`, detail: `saldo ${Number(data.stock)} ${data.unit}`, status: 'ok', link: '#/estoque' });
     },
   },
   {

@@ -85,8 +85,59 @@ describe('simulador (IA atendendo o cliente)', () => {
       expect(table('appointments').length).toBe(before + 1);
     }
   });
+  it('pergunta no meio do agendamento não vira o nome do cliente (caso do print)', async () => {
+    await runSimulator('Oi, tudo bem?', { reset: true, name: 'Cliente Print' });
+    const today = localDate(new Date(), 'America/Sao_Paulo');
+    let d = addDays(today, 3); while (weekdayOf(d) !== 5) d = addDays(d, 1); // próxima sexta
+    const [, m, dd] = d.split('-');
+    const a = await runSimulator(`Tem horário dia ${dd}/${m} às 14h?`, {});
+    expect(a.reply).toMatch(/nome completo/);
+    const before = table('appointments').length;
+    const b = await runSimulator('Quais as formas de pagamento?', {});
+    expect(b.reply).toMatch(/Pix/);
+    expect(b.reply).toMatch(/nome completo/); // lembra o que falta para reservar
+    expect(table('appointments').length).toBe(before);
+    expect(table('contacts').find((c) => c.name.startsWith('Quais'))).toBeUndefined();
+    const c = await runSimulator('Paula Mendes, SQN 210 Bloco B', {});
+    expect(c.reply).toMatch(/Paula/);
+    expect(table('appointments').length).toBe(before + 1);
+  });
+  it('responde pelas perguntas frequentes cadastradas pelo dono', async () => {
+    const r = await runSimulator('Os produtos fazem mal para o meu cachorro? É pet', { reset: true, name: 'Dono de pet' });
+    expect(r.reply).toMatch(/biodegradáveis/);
+    const g = await runSimulator('Vocês dão garantia?', {});
+    expect(g.reply).toMatch(/7 dias/);
+  });
   it('passa para humano quando o cliente reclama', async () => {
     const r = await runSimulator('O técnico não apareceu, que absurdo', {});
     expect(r.handoff).toBe(true);
+  });
+});
+
+describe('financeiro e estoque por comando', () => {
+  it('lança conta mensal, consulta e dá baixa com confirmação', async () => {
+    const r = await runOwnerCommand('Lança o aluguel da sala de R$ 1.900 todo dia 10');
+    expect(r.actions[0]).toMatchObject({ tool: 'lancar_conta', status: 'ok' });
+    const e = table('finance_entries').find((x) => x.amount === 1900)!;
+    expect(e).toMatchObject({ kind: 'pagar', recurrence: 'mensal', category: 'Aluguel' });
+    expect(e.due_date.slice(8)).toBe('10');
+    const q = await runOwnerCommand('O que tenho a pagar?');
+    expect(q.reply).toMatch(/a pagar/);
+    const b = await runOwnerCommand('Paguei o aluguel da sala');
+    expect(b.actions[0]).toMatchObject({ tool: 'baixar_conta', status: 'aguardando' });
+    await runOwnerCommand('sim');
+    expect(table('finance_entries').find((x) => x.id === e.id)!.paid_at).toBeTruthy();
+    expect(table('finance_entries').filter((x) => x.description === e.description).length).toBe(2); // a do próximo mês
+  });
+  it('dá baixa no estoque, recusa saída maior que o saldo e lista o que repor', async () => {
+    const p = table('products').find((x) => x.name.startsWith('Removedor'))!;
+    const start = p.stock;
+    const r = await runOwnerCommand('Dá baixa de 1 removedor de manchas');
+    expect(r.actions[0]).toMatchObject({ tool: 'movimentar_estoque', status: 'ok' });
+    expect(table('products').find((x) => x.id === p.id)!.stock).toBe(start - 1);
+    const big = await runOwnerCommand('Usei 500 removedores de mancha');
+    expect(big.reply).toMatch(/Estoque insuficiente/);
+    const low = await runOwnerCommand('O que preciso repor?');
+    expect(low.reply).toMatch(/Removedor de manchas/);
   });
 });

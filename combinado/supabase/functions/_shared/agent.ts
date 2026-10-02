@@ -65,7 +65,7 @@ export async function customerTurn(b: Base, conv: Conversation, contact: Contact
   try {
     const run = await runAgent({
       system: customerSystem(b), dynamic: await customerDynamic(b, contact, await firstContact(conv.id)),
-      history, tools: CUSTOMER_TOOLS, ctx, effort: 'low', model: CUSTOMER_MODEL, maxTokens: 6000, maxSteps: 7,
+      history, tools: CUSTOMER_TOOLS, ctx, effort: 'low', model: CUSTOMER_MODEL, webSearch: b.ai.web_search === true, maxTokens: 6000, maxSteps: 7,
     });
     const handoff = run.receipts.some((r) => r.tool === 'chamar_atendente');
     if (run.text) return { reply: run.text, actions: run.receipts, handoff, usage: run.usage };
@@ -79,7 +79,7 @@ export async function customerTurn(b: Base, conv: Conversation, contact: Contact
   }
 }
 
-const ATENDENTE_SEM = ['atualizar_servico', 'criar_servico', 'pausar_ia'];
+const ATENDENTE_SEM = ['atualizar_servico', 'criar_servico', 'pausar_ia', 'lancar_conta', 'consultar_contas', 'baixar_conta', 'cadastrar_produto'];
 
 /** Executa um pedido da equipe (pelo WhatsApp ou pelo assistente do painel). */
 export async function ownerTurn(b: Base, conv: Conversation, member: Member, channel: 'whatsapp' | 'painel'): Promise<TurnResult> {

@@ -57,6 +57,8 @@ export async function runAgent<C>(o: {
   ctx: C;
   effort: Effort;
   model?: string;
+  /** pesquisa na internet feita pela própria API (opcional, só para dúvidas gerais) */
+  webSearch?: boolean;
   maxTokens?: number;
   maxSteps?: number;
 }): Promise<AgentRun> {
@@ -64,7 +66,8 @@ export async function runAgent<C>(o: {
   const messages: Msg[] = [...o.history];
   const system: Anthropic.Beta.BetaTextBlockParam[] = [{ type: 'text', text: o.system, cache_control: { type: 'ephemeral' } }];
   if (o.dynamic) system.push({ type: 'text', text: o.dynamic });
-  const tools = o.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
+  const tools: Anthropic.Beta.BetaToolUnion[] = o.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
+  if (o.webSearch) tools.push({ type: 'web_search_20260209', name: 'web_search', max_uses: 2 });
   const receipts: ActionReceipt[] = [];
   const usage = { input: 0, output: 0 };
   let toolCalls = 0;

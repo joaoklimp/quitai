@@ -1,7 +1,8 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminOverview, CheckoutInput, DataSource, OnboardInput, SignUpInput } from '../source';
-import type { AgentReply, AiSettings, Company, DailyStat, Filter, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
+import type { AgentReply, AiSettings, Company, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
+import type { ProductRow } from '../sheet';
 
 export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || '';
 export const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() || '';
@@ -233,6 +234,11 @@ export class SupabaseSource implements DataSource {
     const { error } = await this.sb.from(table).delete().eq('id', id);
     if (error) throw friendly(error);
   }
+  async importProducts(rows: ProductRow[]) {
+    const { data, error } = await this.sb.rpc('import_products', { p_rows: rows });
+    if (error) throw friendly(error);
+    return data as ImportResult;
+  }
 
   /* ---------- orçamentos ---------- */
   async getQuote(id: string) {
@@ -336,7 +342,7 @@ export class SupabaseSource implements DataSource {
     const cid = this.companyId;
     if (!cid) return () => {};
     const ch = this.sb.channel(`empresa-${cid}`);
-    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks'] as TableName[]) {
+    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements'] as TableName[]) {
       ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t, filter: `company_id=eq.${cid}` } as never, () => cb(t));
     }
     ch.subscribe();
