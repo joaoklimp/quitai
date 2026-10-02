@@ -262,3 +262,23 @@ export function useDebounced<T>(value: T, ms = 250): T {
   useEffect(() => { const t = setTimeout(() => setV(value), ms); return () => clearTimeout(t); }, [value, ms]);
   return v;
 }
+
+/** Faz um elemento ocupar a altura que sobra na janela (caixa de entrada, agenda). */
+export function useFillHeight<T extends HTMLElement>(bottomGap = 24) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      const mobile = window.innerWidth <= 860;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const h = window.innerHeight - top - (mobile ? 96 : bottomGap);
+      el.style.setProperty('--fill-h', `${Math.max(mobile ? 460 : 520, h)}px`);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    const ro = new ResizeObserver(fit); ro.observe(document.body);
+    return () => { window.removeEventListener('resize', fit); ro.disconnect(); };
+  }, [bottomGap]);
+  return ref;
+}

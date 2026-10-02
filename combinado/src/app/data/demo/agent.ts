@@ -4,8 +4,10 @@ import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, Pay
 import { audit, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
 import { isFree, slotsForDate } from '../availability';
+import { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime } from '../../../shared/parse';
+export { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime };
 import {
-  addDays, brl, firstName, fmtDate, fmtLong, fold, formatPhone, fromLocal, localDate, localTime, normalizePhone, parseMoney, weekdayOf, WEEKDAYS,
+  addDays, brl, firstName, fmtDate, fmtLong, fold, formatPhone, fromLocal, localDate, localTime, normalizePhone, weekdayOf, WEEKDAYS,
 } from '../../../shared/format';
 
 const TZ = 'America/Sao_Paulo';
@@ -16,65 +18,7 @@ const pause = (ms: number) => (instant ? Promise.resolve() : new Promise((r) => 
 const AI_NAME = () => `${demoDb().ai.assistant_name} (IA)`;
 const qn = (n: number) => String(n).padStart(4, '0');
 
-/* ================= extração de dados do texto ================= */
-const WD_WORDS: [RegExp, number][] = [[/\bdomingo\b/, 0], [/\bsegunda\b/, 1], [/\bterca\b/, 2], [/\bquarta\b/, 3], [/\bquinta\b/, 4], [/\bsexta\b/, 5], [/\bsabado\b/, 6]];
-
-export function parseDate(f: string, today: string): string | null {
-  if (/\bdepois de amanha\b/.test(f)) return addDays(today, 2);
-  if (/\bamanha\b/.test(f)) return addDays(today, 1);
-  if (/\bhoje\b/.test(f)) return today;
-  const dm = f.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-  if (dm) {
-    const y = dm[3] ? (dm[3].length === 2 ? 2000 + +dm[3] : +dm[3]) : +today.slice(0, 4);
-    let d = `${y}-${String(+dm[2]).padStart(2, '0')}-${String(+dm[1]).padStart(2, '0')}`;
-    if (!dm[3] && d < today) d = `${y + 1}${d.slice(4)}`;
-    return d;
-  }
-  const dia = f.match(/\bdia (\d{1,2})\b/);
-  if (dia) {
-    let d = `${today.slice(0, 8)}${String(+dia[1]).padStart(2, '0')}`;
-    if (d < today) { const [y, m] = today.split('-').map(Number); const nm = new Date(Date.UTC(y, m, +dia[1])); d = nm.toISOString().slice(0, 10); }
-    return d;
-  }
-  for (const [re, wd] of WD_WORDS) {
-    if (re.test(f)) {
-      let d = addDays(today, 1);
-      while (weekdayOf(d) !== wd) d = addDays(d, 1);
-      if (/\b(proxima|que vem)\b/.test(f) && wd !== weekdayOf(today) && (weekdayOf(addDays(today, 1)) <= wd)) { /* "próxima sexta" = a desta semana se ainda não passou */ }
-      return d;
-    }
-  }
-  return null;
-}
-export function parseTime(f: string): string | null {
-  if (/\bmeio[- ]dia\b/.test(f)) return '12:00';
-  const m = f.match(/\b(?:as|a partir das|pelas|por volta das|para as|pras)\s+(\d{1,2})(?:(?::|h)(\d{2}))?\s*(?:h|hs|horas)?\b/) || f.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:h|hs|horas)\b/) || f.match(/\b(\d{1,2}):(\d{2})\b/);
-  if (!m) return null;
-  let h = +m[1]; const mi = m[2] ? +m[2] : 0;
-  if (h > 23 || mi > 59) return null;
-  if (/\b(da tarde|a tarde)\b/.test(f) && h < 12) h += 12;
-  if (/\b(da noite)\b/.test(f) && h < 12) h += 12;
-  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
-}
-export function parseMoneyIn(raw: string): number | null {
-  const m = raw.match(/r\$\s*([\d.]+(?:,\d{1,2})?)/i) || raw.match(/([\d.]+(?:,\d{1,2})?)\s*(?:reais|real|conto)/i) || fold(raw).match(/\b(?:orcamento|venda|valor|cobra|cobrar|por|de)\s+(?:de\s+)?(\d{2,6}(?:[.,]\d{1,2})?)\b(?!\s*(?:h\b|horas|m2|m²|lugares|x\b|%|\/|:))/);
-  if (!m) return null;
-  const v = parseMoney(m[1]);
-  return v > 0 ? v : null;
-}
-export function parsePhone(raw: string): string | null {
-  const m = raw.match(/(?:\+?55[\s-]*)?\(?(\d{2})\)?[\s-]*(9?\d{4})[\s.-]?(\d{4})\b/);
-  return m ? normalizePhone(m[1] + m[2] + m[3]) : null;
-}
-export function parseMethod(f: string): PayMethod | null {
-  if (/\bpix\b/.test(f)) return 'pix';
-  if (/\bdinheiro|especie\b/.test(f)) return 'dinheiro';
-  if (/\bdebito\b/.test(f)) return 'cartao_debito';
-  if (/\bcartao|credito\b/.test(f)) return 'cartao_credito';
-  if (/\bboleto\b/.test(f)) return 'boleto';
-  if (/\btransferencia|ted\b/.test(f)) return 'transferencia';
-  return null;
-}
+/* extração de dados do texto: src/shared/parse.ts */
 const METHOD_LABEL: Record<PayMethod, string> = { pix: 'Pix', dinheiro: 'dinheiro', cartao_credito: 'cartão de crédito', cartao_debito: 'cartão de débito', boleto: 'boleto', transferencia: 'transferência', outro: 'outro' };
 const titleCase = (s: string) => s.split(/\s+/).map((w) => (/^(da|de|do|das|dos|e)$/i.test(w) ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join(' ');
 
@@ -619,11 +563,12 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
     const pct = Number(f.match(/(\d{1,2})\s*%/)?.[1] ?? 0);
     if (pct > ai.max_discount_pct) { handoff = true; reply = `Entendo! Esse desconto passa do que eu posso autorizar por aqui, então já pedi para o responsável avaliar. Ele te responde em instantes${emo ? ' 🙏' : '.'}`; }
     else reply = `Consigo sim te ajudar: no Pix tem 5% de desconto${service ? `, então ${service.name.toLowerCase()} sai por ${brl(service.price * 0.95)}` : ''}. Quer que eu reserve um horário?`;
-  } else if (sim.askedData && !sim.booked && sim.date && sim.time) {
+  } else if (sim.askedData && !sim.booked && sim.date && sim.time && (/^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f) || text.includes(',') || text.trim().split(/\s+/).length >= 3)) {
     // cliente mandou nome e endereço
+    const isYes = /^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f);
     const nameGuess = text.split(/[,\n]/)[0].trim();
-    if (nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) { contact.name = titleCase(nameGuess); }
-    const addr = text.includes(',') ? text.split(',').slice(1).join(',').trim() : null;
+    if (!isYes && nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) { contact.name = titleCase(nameGuess); }
+    const addr = !isYes && text.includes(',') ? text.split(',').slice(1).join(',').trim() : null;
     if (addr) contact.address = addr;
     contact.updated_at = new Date().toISOString(); emit('contacts');
     const start = fromLocal(sim.date, sim.time, TZ).toISOString();
@@ -642,14 +587,26 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
       notify({ kind: 'agendamento', title: 'Novo horário reservado pela IA', body: `${contact.name} · ${fmtDate(sim.date)} às ${sim.time}`, link: '#/agenda' });
       reply = `Combinado, ${firstName(contact.name)}! ${emo ? '✅ ' : ''}Reservei ${fmtLong(sim.date)} às ${sim.time}${service ? ` para ${service.name.toLowerCase()}` : ''}${service && service.price_type !== 'sob_consulta' ? ` (${service.price_type === 'a_partir_de' ? 'a partir de ' : ''}${brl(service.price)})` : ''}. ${ap.status === 'pendente' ? 'A equipe confirma em instantes.' : 'Está tudo certo na agenda.'} Qualquer coisa, é só me chamar por aqui!`;
     }
-  } else if ((date || time) && (sim.service || /\b(horario|agend|marc|pode ser|quero|tem)\b/.test(f))) {
+  } else if (!date && !time && sim.date && !sim.time && !sim.booked && !/\?/.test(text) && (text.includes(',') || text.trim().split(/\s+/).length >= 3) && !/\b(quanto|valor|preco|horario|atende|pagamento)\b/.test(f)) {
+    // mandou nome e endereço antes de escolher o horário: guarda e pede a escolha
+    const nameGuess = text.split(/[,\n]/)[0].trim();
+    if (nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) contact.name = titleCase(nameGuess);
+    if (text.includes(',')) contact.address = text.split(',').slice(1).join(',').trim();
+    contact.updated_at = new Date().toISOString(); emit('contacts');
+    sim.askedData = true;
+    const slots = slotsForDate(sim.date, company, table('appointments'), service?.duration_min ?? company.slot_minutes).slice(0, 4).map((s) => s.time);
+    reply = slots.length ? `Anotado, ${firstName(contact.name)}! ${emo ? '📝 ' : ''}Agora só falta escolher o horário: ${slots.join(', ')}. Qual prefere?` : `Anotado, ${firstName(contact.name)}! Esse dia lotou. Quer ver outro dia?`;
+  } else if ((date || time) && (sim.service || /\b(horario|agend|marc|pode ser|quero|tem)\b/.test(f) || sim.date)) {
     const day = sim.date ?? today;
     const dur = service?.duration_min ?? company.slot_minutes;
     const slots = slotsForDate(day, company, table('appointments'), dur);
     if (!(company.business_hours[String(weekdayOf(day))] ?? []).length) reply = `Não atendemos ${WEEKDAYS[weekdayOf(day)]}. ${emo ? '😕 ' : ''}Que tal outro dia?`;
     else if (sim.time) {
       const startIso = fromLocal(day, sim.time, TZ).toISOString();
-      if (slots.some((s) => s.startsAt === startIso)) { reply = `Temos esse horário disponível! Posso reservar ${fmtLong(day)} às ${sim.time} para você? Só preciso do seu nome completo e do endereço.`; sim.askedData = true; }
+      if (slots.some((s) => s.startsAt === startIso)) {
+        if (sim.askedData && contact.address) reply = `Perfeito! Posso confirmar ${fmtLong(day)} às ${sim.time} no endereço ${contact.address}? Responda "sim" para eu reservar.`;
+        else { reply = `Temos esse horário disponível! Posso reservar ${fmtLong(day)} às ${sim.time} para você? Só preciso do seu nome completo e do endereço.`; sim.askedData = true; }
+      }
       else reply = slots.length ? `Esse horário não está livre. ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} ainda tenho ${slots.slice(0, 4).map((s) => s.time).join(', ')}. Algum desses serve?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} está lotado. Quer ver outro dia?`;
     } else reply = slots.length ? `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} tenho ${slots.slice(0, 5).map((s) => s.time).join(', ')}. Qual fica melhor?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} não tenho horários livres. Quer tentar outro dia?`;
   } else if (/\b(quanto|valor|preco|custa|cobra|orcamento)\b/.test(f) || svcFound) {

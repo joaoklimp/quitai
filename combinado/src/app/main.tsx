@@ -10,6 +10,7 @@ import './styles/ui.css';
 import './styles/shell.css';
 import './styles/charts.css';
 import './styles/pages.css';
+import './styles/chat.css';
 import { ToastProvider, ConfirmProvider } from './ui';
 import { App } from './App';
 

@@ -1,0 +1,37 @@
+body { background-image: url("/img/ceu.webp"); background-size: cover; background-attachment: fixed; }
+.pq { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 18px; }
+.pq-card { width: min(560px, 100%); background: var(--glass-strong); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border-radius: 32px; box-shadow: var(--shadow-3); padding: 30px; border: 1px solid var(--board-border); animation: rise .3s ease; }
+.pq-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding-bottom: 18px; border-bottom: 1px dashed var(--line-2); }
+.pq-company { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.pq-sub { color: var(--ink-3); font-size: 13px; }
+.pq-num { text-align: right; font-size: 12px; color: var(--ink-3); }
+.pq-num b { font-size: 16px; color: var(--ink); }
+.pq-title { font-size: 30px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; margin: 22px 0 6px; }
+.pq-title .accent { color: var(--blue-ink); }
+.pq-desc { color: var(--ink-2); margin-bottom: 14px; }
+.pq-items { display: grid; gap: 10px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 10px; }
+.pq-item { display: flex; justify-content: space-between; gap: 14px; font-size: 14.5px; }
+.pq-item small { color: var(--ink-3); }
+.pq-line { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--ink-3); margin-top: 8px; }
+.pq-total { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 4px; font-weight: 700; }
+.pq-total b { font-size: 34px; letter-spacing: -0.035em; }
+.pq-valid { font-size: 13px; color: var(--ink-3); }
+.pq-notes { margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); font-size: 13.5px; color: var(--ink-2); white-space: pre-wrap; }
+.pq-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+.pq-actions .btn.lg { flex: 1 1 200px; }
+.pq-refuse { margin-top: 20px; display: grid; gap: 8px; }
+.pq-result { display: flex; gap: 14px; align-items: flex-start; margin-top: 22px; padding: 16px; border-radius: 20px; background: var(--surface-2); }
+.pq-result svg { width: 26px; height: 26px; flex: none; }
+.pq-result.aprovado { background: var(--green-soft); } .pq-result.aprovado svg { color: var(--green-ink); }
+.pq-result.recusado, .pq-result.expirado { background: var(--surface-3); }
+.pq-result b { display: block; font-size: 15.5px; }
+.pq-result span { display: block; font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+.pq-wa { margin-top: 12px; }
+.pq-err { color: var(--red-ink); font-size: 13px; margin-top: 10px; font-weight: 600; }
+.pq-empty { text-align: center; padding: 20px 0; display: grid; gap: 10px; justify-items: center; }
+.pq-empty svg { width: 34px; height: 34px; color: var(--ink-3); }
+.pq-empty h1 { font-size: 22px; }
+.pq-empty p { color: var(--ink-3); }
+.pq-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 650; color: #fff; text-shadow: 0 1px 6px rgba(20, 50, 110, 0.35); }
+.pq-brand svg { border-radius: 7px; }
+@media (max-width: 520px) { .pq-card { padding: 22px; border-radius: 26px; } .pq-title { font-size: 25px; } }

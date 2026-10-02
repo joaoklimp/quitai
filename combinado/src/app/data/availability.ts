@@ -32,7 +32,7 @@ export function slotsForDate(date: string, cfg: AgendaCfg, appts: Appointment[],
   const earliest = now.getTime() + (cfg.min_notice_minutes || 0) * 60000;
   const out: Slot[] = [];
   for (const [open, close] of intervals) {
-    for (let m = toMin(open); m + Math.min(dur, step) <= toMin(close); m += step) {
+    for (let m = toMin(open); m + dur <= toMin(close); m += step) {
       const start = fromLocal(date, toHHMM(m), tz).getTime();
       if (start < earliest) continue;
       const end = start + dur * 60000;
