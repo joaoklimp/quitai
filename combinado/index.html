@@ -77,23 +77,68 @@
 <main id="conteudo">
 
 <!-- ===================== topo ===================== -->
-<section class="hero">
-  <div class="hero-sky" aria-hidden="true"></div>
-  <div class="wrap hero-copy">
-    <a class="hero-badge" href="#modulos"><span class="live" aria-hidden="true"></span>Gestão empresarial com IA que executa<i data-icon="arrow-right"></i></a>
-    <h1 class="hero-title">Administre sua empresa<br> <em class="accent">conversando.<svg class="swoosh" viewBox="0 0 320 28" preserveAspectRatio="none" aria-hidden="true"><path d="M6 19C64 9 151 5 314 13" pathLength="1"/></svg></em></h1>
-    <p class="hero-sub">Responder qualquer IA responde. A ORBYTA trabalha: marca o horário na sua agenda, monta o orçamento, cobra no Pix, encaixa quem estava esperando quando alguém desmarca e cuida do caixa. Você pede por mensagem (até por áudio) e toda semana vê o que ela fez por você.</p>
-    <div class="cta-row">
-      <a class="btn solid lg" href="/app/?real#/cadastro">Começar teste grátis<i data-icon="arrow-up-right"></i></a>
-      <a class="btn lg btn-demo" href="/app/?demo"><span class="play" aria-hidden="true"><i data-icon="play"></i></span>Ver demonstração</a>
+<section class="hx" id="inicio" aria-label="ORBYTA: a IA que trabalha pela sua empresa">
+  <div class="hx-stage">
+    <canvas class="hx-stars" aria-hidden="true"></canvas>
+    <div class="hx-word" aria-hidden="true">ORBYTA</div>
+    <div class="hx-portal" aria-hidden="true">
+      <span class="hx-ring"></span>
+      <span class="hx-ring hx-ring-2"></span>
+      <span class="hx-moon"></span>
+      <span class="hx-core"></span>
     </div>
-    <ul class="trust">
-      <li><i data-icon="check"></i>7 dias grátis</li>
-      <li><i data-icon="check"></i>Sem cartão de crédito</li>
-      <li><i data-icon="check"></i>API oficial do WhatsApp</li>
-    </ul>
-  </div>
+    <div class="hx-light" aria-hidden="true"></div>
 
+    <div class="wrap-wide hx-grid">
+      <div class="hx-copy">
+        <a class="hx-badge" href="#diferenca"><span class="live" aria-hidden="true"></span>A IA que trabalha, não só responde<i data-icon="arrow-right"></i></a>
+        <h1 class="hx-title">Administre sua empresa <em class="accent">conversando.</em></h1>
+        <p class="hx-sub">A ORBYTA atende no WhatsApp, marca na sua agenda, cobra no Pix e encaixa quem estava esperando. Você só confirma o que importa.</p>
+        <div class="hx-cta">
+          <a class="btn lg hx-primary" href="/app/?real#/cadastro">Começar teste grátis<i data-icon="arrow-up-right"></i></a>
+          <a class="btn lg hx-ghost" href="/app/?demo"><span class="play" aria-hidden="true"><i data-icon="play"></i></span>Ver demonstração</a>
+        </div>
+        <div class="hx-try">
+          <span class="hx-try-label">Veja ela trabalhando agora:</span>
+          <div class="hx-tabs" role="tablist" aria-label="Escolha uma situação">
+            <button type="button" role="tab" aria-selected="true" data-scene="0"><i data-icon="mic"></i>Cliente manda áudio</button>
+            <button type="button" role="tab" aria-selected="false" data-scene="1"><i data-icon="qr-code"></i>Cobrar no Pix</button>
+            <button type="button" role="tab" aria-selected="false" data-scene="2"><i data-icon="calendar-x"></i>Alguém desmarcou</button>
+          </div>
+        </div>
+        <ul class="hx-trust">
+          <li><i data-icon="check"></i>7 dias grátis, sem cartão</li>
+          <li><i data-icon="check"></i>WhatsApp oficial</li>
+          <li><i data-icon="check"></i>Pede sua confirmação</li>
+        </ul>
+      </div>
+
+      <div class="hx-device">
+        <div class="hx-phone" aria-live="polite" aria-label="Conversa de exemplo">
+          <div class="hx-phone-top"><span>9:41</span><span class="hx-island"></span><span class="hx-sys"><i data-icon="wifi"></i><i data-icon="battery-full"></i></span></div>
+          <div class="hx-chat-head"><span class="hx-av" data-av>BL</span><div><b data-title>Brilho Lar Higienização</b><small data-subtitle>online</small></div><i data-icon="phone"></i></div>
+          <div class="hx-chat" data-chat></div>
+          <div class="hx-input"><span>Mensagem</span><span class="hx-mic"><i data-icon="mic"></i></span></div>
+        </div>
+        <div class="hx-sat hx-sat-0" data-sat="0"></div>
+        <div class="hx-sat hx-sat-1" data-sat="1"></div>
+        <div class="hx-sat hx-sat-2" data-sat="2"></div>
+        <a class="hx-try-cta" data-try-link href="/app/?demo#/simulador">Testar isso na demonstração<i data-icon="arrow-right"></i></a>
+      </div>
+    </div>
+
+    <template id="hx-icons"><span data-n="check"><i data-icon="check"></i></span><span data-n="calendar-check"><i data-icon="calendar-check"></i></span><span data-n="calendar-search"><i data-icon="calendar-search"></i></span><span data-n="audio-lines"><i data-icon="audio-lines"></i></span><span data-n="qr-code"><i data-icon="qr-code"></i></span><span data-n="banknote"><i data-icon="banknote"></i></span><span data-n="list-ordered"><i data-icon="list-ordered"></i></span><span data-n="user-x"><i data-icon="user-x"></i></span><span data-n="play"><i data-icon="play"></i></span><span data-n="sparkles"><i data-icon="sparkles"></i></span></template>
+    <a class="hx-scroll" href="#painel" aria-label="Rolar para ver o painel"><span></span>Role para abrir o painel</a>
+  </div>
+</section>
+
+<!-- ===================== painel ===================== -->
+<section class="pv-sec" id="painel">
+  <div class="wrap sec-head center reveal">
+    <span class="kicker"><i data-icon="layout-dashboard"></i>Do outro lado do portal</span>
+    <h2>Tudo o que ela faz<br><em class="accent">aparece no seu painel.</em></h2>
+    <p class="lead">Agenda, clientes, orçamentos, cobranças e o relatório do que a IA fez por você, atualizados sozinhos.</p>
+  </div>
   <div class="wrap-wide preview-wrap">
     <figure class="preview" role="img" aria-label="Prévia do painel da ORBYTA: indicadores do período, meta de vendas do mês, gráfico de conversas e vendas, sugestões da IA e qualidade dos leads.">
       <div class="pv-scale">

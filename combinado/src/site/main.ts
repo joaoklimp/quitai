@@ -9,6 +9,8 @@ import '../app/styles/ui.css';
 import '../app/styles/charts.css';
 import '../app/styles/chat.css';
 import './site.css';
+import './hero.css';
+import { initHero } from './hero';
 import { PLANS, PAID_PLANS, TRIAL_DAYS, monthlyEquivalent, type Cycle, type PaidPlanId } from '../shared/plans';
 import { brl0, fmtLong, MONTHS, MONTHS_SHORT, num, todayLocal } from '../shared/format';
 
@@ -41,6 +43,9 @@ menuBtn.addEventListener('click', () => setMenu(Boolean(menu.hidden)));
 menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('a')) setMenu(false); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { setMenu(false); menuBtn.focus(); } });
 matchMedia('(min-width: 961px)').addEventListener('change', (e) => { if (e.matches) setMenu(false); });
+
+/* ---------- hero: portal, partículas e a IA trabalhando ---------- */
+initHero(head, reduced);
 
 /* ---------- prévia do painel ---------- */
 const today = todayLocal('America/Sao_Paulo');
