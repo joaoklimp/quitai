@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useMeCtx, useAssistant } from '../context';
 import { useList, useStats, usePeriod } from '../data/hooks';
-import { bucketize, change, chatRevenue, rangeFor, sum, avgResponse, aiShare, PERIOD_LABEL, PERIOD_SHORT, type Period } from '../data/metrics';
+import { bucketize, change, chatRevenue, dayElapsed, rangeFor, sum, sumPrev, avgResponse, aiShare, PERIOD_LABEL, PERIOD_SHORT, type Period } from '../data/metrics';
 import { PairBars, RadialGauge, GoalBar, Funnel, HBars, Sparkline } from '../charts';
 import { Badge, Button, Delta, Empty, IconButton, Menu, PageHeader, Avatar, cx, useToast } from '../ui';
 import { addDays, brl, brl0, brlShort, firstName, fmtAgo, fmtDuration, fmtLong, fmtTime, localDate, MONTHS, num, todayLocal, fromLocal } from '../../shared/format';
@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [table, setTable] = useState(false);
 
   const cur = useMemo(() => sum((rows ?? []).filter((r) => r.day >= range.from)), [rows, range]);
-  const prev = useMemo(() => sum((rows ?? []).filter((r) => r.day < range.from)), [rows, range]);
+  const prev = useMemo(() => sumPrev(rows ?? [], range, dayElapsed(tz)), [rows, range, tz]);
   const buckets = useMemo(() => bucketize((rows ?? []).filter((r) => r.day >= range.from), range), [rows, range]);
   const monthStart = `${today.slice(0, 7)}-01`;
   const { data: monthRows } = useStats(monthStart, today);

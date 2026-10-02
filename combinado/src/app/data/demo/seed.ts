@@ -349,7 +349,8 @@ export function buildDemo(now = new Date()): DemoDB {
     const progress = (HISTORY_DAYS - back) / HISTORY_DAYS; // 0 → 1
     const wf = [0.22, 1.0, 1.05, 1.0, 1.1, 1.15, 0.72][wd];
     const season = 1 + 0.12 * Math.sin((progress * 2 * Math.PI) - 0.6);
-    const growth = 0.5 + 0.6 * progress + (back < AI_START ? 0.25 : 0);
+    // crescimento ao longo do ano, salto quando a IA entrou e um embalo nas últimas 4 semanas
+    const growth = 0.5 + 0.6 * progress + (back < AI_START ? 0.25 : 0) + (back < 28 ? 0.1 * (28 - back) / 28 : 0);
     const isToday = back === 0;
     const dayFraction = isToday ? Math.min(1, Math.max(0.05, (localParts(now, TZ).h * 60 + localParts(now, TZ).mi - 7 * 60) / (12 * 60))) : 1;
     const conv = Math.max(0, Math.round(15 * wf * season * growth * between(0.8, 1.2) * dayFraction));
@@ -410,8 +411,8 @@ export function buildDemo(now = new Date()): DemoDB {
       const total = subtotal - discount;
       const via = aiOn ? weighted<Quote['created_via']>([['ia_cliente', 62], ['ia_dono', 12], ['painel', 26]]) : 'painel';
       let status: Quote['status'];
-      if (back <= 1) status = weighted([['enviado', 70], ['rascunho', 10], ['aprovado', 20]]);
-      else if (back <= 7) status = weighted([['enviado', 38], ['aprovado', 44], ['recusado', 12], ['rascunho', 6]]);
+      if (back <= 1) status = weighted([['enviado', 62], ['rascunho', 8], ['aprovado', 30]]);
+      else if (back <= 7) status = weighted([['enviado', 30], ['aprovado', 52], ['recusado', 12], ['rascunho', 6]]);
       else status = weighted([['aprovado', 56], ['recusado', 18], ['expirado', 26]]);
       const respondedAt = status === 'aprovado' || status === 'recusado' ? new Date(Math.min(Date.parse(createdAt) + int(1, 72) * 3600000, now.getTime() - 30000)).toISOString() : null;
       quoteSeq++;

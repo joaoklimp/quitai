@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, Table2 } from 'lucide-react';
 import { useList, usePeakHours, usePeriod, useStats } from '../data/hooks';
-import { aiShare, avgResponse, bucketize, change, conversion, rangeFor, sum, PERIOD_LABEL, type Period } from '../data/metrics';
+import { aiShare, avgResponse, bucketize, change, conversion, dayElapsed, rangeFor, sum, sumPrev, PERIOD_LABEL, type Period } from '../data/metrics';
 import { useMeCtx } from '../context';
 import { Donut, Funnel, Heatmap, HBars, LineChart, PairBars, Sparkline } from '../charts';
 import { Button, Delta, IconButton, Menu, PageHeader, cx } from '../ui';
@@ -19,7 +19,7 @@ export default function Analytics() {
   const range = useMemo(() => rangeFor(period, today), [period, today]);
   const { data: rows = [], isFetching } = useStats(range.prevFrom, range.to);
   const curRows = rows.filter((r) => r.day >= range.from);
-  const cur = sum(curRows), prev = sum(rows.filter((r) => r.day < range.from));
+  const cur = sum(curRows), prev = sumPrev(rows, range, dayElapsed(tz));
   const buckets = bucketize(curRows, range);
   const { data: peak } = usePeakHours(range.from, range.to);
   const [tables, setTables] = useState<Record<string, boolean>>({});

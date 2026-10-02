@@ -1,6 +1,6 @@
 // Contas do painel a partir dos agregados diários (iguais no modo demo e no Supabase).
 import type { DailyStat } from './types';
-import { addDays, daysBetween, MONTHS_SHORT, weekdayOf } from '../../shared/format';
+import { addDays, daysBetween, localParts, MONTHS_SHORT, weekdayOf } from '../../shared/format';
 
 export type Period = '7d' | '30d' | '90d' | '12m';
 export const PERIOD_LABEL: Record<Period, string> = { '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', '90d': 'Últimos 90 dias', '12m': 'Últimos 12 meses' };
@@ -28,11 +28,32 @@ export function rangeFor(period: Period, today: string): Range {
     const fromM = new Date(Date.UTC(y, m - 1 - 11, 1)).toISOString().slice(0, 10);
     const prevFromM = new Date(Date.UTC(y, m - 1 - 23, 1)).toISOString().slice(0, 10);
     void from;
-    return { from: fromM, to: today, prevFrom: prevFromM, prevTo: addDays(fromM, -1), bucket: 'month', days: daysBetween(fromM, today) + 1 };
+    // o período anterior termina na mesma data do ano passado (o mês atual ainda não acabou)
+    const [ty, tm, td] = today.split('-').map(Number);
+    const sameDay = Math.min(td, new Date(Date.UTC(ty - 1, tm, 0)).getUTCDate());
+    const prevTo = `${ty - 1}-${String(tm).padStart(2, '0')}-${String(sameDay).padStart(2, '0')}`;
+    return { from: fromM, to: today, prevFrom: prevFromM, prevTo, bucket: 'month', days: daysBetween(fromM, today) + 1 };
   }
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
   const from = addDays(today, -(days - 1));
   return { from, to: today, prevFrom: addDays(from, -days), prevTo: addDays(from, -1), bucket: period === '90d' ? 'week' : 'day', days };
+}
+
+/**
+ * Quanto do expediente de hoje já passou (das 7h às 20h, no fuso da empresa), de 0 a 1.
+ * Hoje ainda não acabou: comparar com dias inteiros do período anterior mostraria queda todo começo de dia.
+ */
+export function dayElapsed(tz: string, now: Date = new Date()): number {
+  const { h, mi } = localParts(now, tz);
+  return Math.min(1, Math.max(0, (h * 60 + mi - 7 * 60) / (13 * 60)));
+}
+
+/** Período anterior até o mesmo ponto: o dia equivalente a hoje (prevTo) conta só a parte do expediente já passada. */
+export function sumPrev(rows: DailyStat[], range: Range, elapsed: number): DailyStat {
+  const out = sum(rows.filter((r) => r.day >= range.prevFrom && r.day < range.prevTo));
+  const last = rows.find((r) => r.day === range.prevTo);
+  if (last) for (const k of KEYS) out[k] += Number(last[k] ?? 0) * elapsed;
+  return out;
 }
 
 export interface Bucket { key: string; label: string; long: string; start: string; end: string; stat: DailyStat }
