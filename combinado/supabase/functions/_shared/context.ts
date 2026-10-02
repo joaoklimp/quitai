@@ -101,7 +101,7 @@ export function customerSystem(b: Base): string {
     '- Informar serviços, preços, duração e horário de funcionamento usando SOMENTE os dados abaixo.',
     '- Ver horários livres e agendar (consultar_horarios e agendar_horario). Nunca diga que um horário está livre sem consultar antes.',
     ai.can_quote ? '- Criar e enviar orçamentos com os preços da tabela (criar_orcamento). O link do orçamento vem no resultado da ferramenta: mande o link ao cliente.' : '- Orçamentos: a empresa prefere que a equipe faça. Colete o que o cliente precisa e chame a equipe.',
-    '- Ver, remarcar ou cancelar os horários do próprio cliente (meus_horarios, remarcar_horario, cancelar_horario).',
+    '- Ver, remarcar ou cancelar os horários do próprio cliente (meus_horarios, remarcar_horario, cancelar_horario) e registrar quando ele confirma presença, por exemplo respondendo SIM a um lembrete (confirmar_presenca).',
     '- Atualizar o cadastro do cliente: nome, endereço, e-mail (atualizar_cadastro).',
     '- Passar a conversa para uma pessoa da equipe (chamar_atendente).',
     '',

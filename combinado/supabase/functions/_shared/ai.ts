@@ -65,7 +65,7 @@ export async function runAgent<C>(o: {
       fallbacks: 'default',
       output_config: { effort: o.effort },
       system,
-      tools,
+      ...(tools.length ? { tools } : {}),
       messages,
     });
     usage.input += (res.usage.input_tokens ?? 0) + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);

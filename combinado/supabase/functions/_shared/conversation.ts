@@ -101,7 +101,8 @@ export async function buildHistory(conversationId: string, mode: 'cliente' | 'do
       push('assistant', { type: 'text', text: `${prefix}${m.body}${receiptsText(m.actions)}` || '(sem texto)' });
     }
   }
-  while (turns.length && turns[0].role !== 'user') turns.shift();
+  // conversa iniciada pela empresa (lembrete, orçamento, aviso): a API pede que o primeiro turno seja do usuário
+  if (turns.length && turns[0].role !== 'user') turns.unshift({ role: 'user', parts: [{ type: 'text', text: mode === 'cliente' ? '(A conversa começou com a mensagem da empresa abaixo.)' : '(Início da conversa.)' }] });
   return { history: turns.map((t) => ({ role: t.role, content: t.parts })) as Msg[], unanswered };
 }
 

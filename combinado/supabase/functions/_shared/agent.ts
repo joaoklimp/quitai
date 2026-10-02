@@ -129,7 +129,7 @@ export async function resolvePending(b: Base, pendingId: string, approve: boolea
 
 async function finish(b: Base, p: { id: string; conversation_id: string }, reply: string, receipt: ActionReceipt, status: ActionReceipt['status']) {
   // atualiza o recibo da mensagem que pediu a confirmação (os botões somem no painel)
-  const { data: asked } = await db.from('messages').select('id, actions').eq('conversation_id', p.conversation_id).contains('actions', [{ pending_id: p.id }]).limit(1);
+  const { data: asked } = await db.from('messages').select('id, actions').eq('conversation_id', p.conversation_id).contains('actions', JSON.stringify([{ pending_id: p.id }])).limit(1); // jsonb: o filtro vai como texto JSON
   for (const m of asked ?? []) {
     const actions = (m.actions as ActionReceipt[]).map((a) => (a.pending_id === p.id ? { ...a, status } : a));
     await db.from('messages').update({ actions }).eq('id', m.id);

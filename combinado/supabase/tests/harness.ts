@@ -46,6 +46,9 @@ export interface TestDb {
   /** Executa como um papel do Supabase dentro de uma transação (confirmada no fim, desfeita em caso de erro). */
   as<T>(who: Who, fn: (q: Q) => Promise<T>): Promise<T>;
   createUser(email: string, name: string): Promise<string>;
+  /** SQL como superusuário (preparação dos testes). */
+  sql(sql: string, params?: unknown[]): Promise<Record<string, unknown>[]>;
+  port: number;
   stop(): Promise<void>;
 }
 
@@ -101,6 +104,8 @@ export async function startDb(): Promise<TestDb> {
 
   return {
     as,
+    port,
+    async sql(text, params) { return (await client.query(text, prep(params))).rows; },
     async createUser(email, name) {
       const r = await client.query('insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id', [email, { name }]);
       return r.rows[0].id as string;

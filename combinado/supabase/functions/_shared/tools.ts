@@ -349,6 +349,21 @@ export const CUSTOMER_TOOLS: T[] = [
     },
   },
   {
+    name: 'confirmar_presenca',
+    description: 'Registra que o cliente confirmou que vai comparecer a um horário (por exemplo, respondendo SIM ao lembrete).',
+    input_schema: obj({ agendamento_id: str('Id do horário confirmado.') }, ['agendamento_id']),
+    run: async (i, c) => {
+      const appt = await appointmentFor(c, i.agendamento_id);
+      if (!appt) return err('Horário não encontrado entre os do cliente.');
+      if (appt.status === 'cancelado') return err('Esse horário foi cancelado.');
+      const note = `Cliente confirmou presença em ${fmtDate(new Date(), c.tz)} às ${localTime(new Date(), c.tz)}.`;
+      await db.from('appointments').update({ status: appt.status === 'pendente' && c.ai.booking_mode !== 'confirmar' ? 'confirmado' : appt.status, notes: [appt.notes, note].filter(Boolean).join('\n') }).eq('id', appt.id);
+      const label = `${when(c, appt.starts_at)} · ${appt.title}`;
+      await log(c, 'confirmar_presenca', `${c.contact?.name ?? 'O cliente'} confirmou presença em ${label}`, 'appointment', appt.id);
+      return ok(`Presença confirmada: ${label}.`, { tool: 'confirmar_presenca', label: 'Cliente confirmou presença', detail: label, status: 'ok', link: '#/agenda' });
+    },
+  },
+  {
     name: 'criar_orcamento',
     description: 'Cria um orçamento para o cliente desta conversa com serviços da tabela (preço da tabela) e devolve o link para ele aprovar. Mande o link na resposta.',
     input_schema: obj({

@@ -254,7 +254,7 @@ create table public.tasks (
   done_at timestamptz,
   contact_id uuid references public.contacts (id) on delete set null,
   reminded_at timestamptz,
-  created_by uuid references auth.users (id) on delete set null,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null, -- quem recebe o lembrete
   created_via text not null default 'painel' check (created_via in ('painel', 'ia_cliente', 'ia_dono', 'automacao', 'site', 'whatsapp')),
   created_at timestamptz not null default now()
 );
