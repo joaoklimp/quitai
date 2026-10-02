@@ -141,3 +141,41 @@ describe('financeiro e estoque por comando', () => {
     expect(low.reply).toMatch(/Removedor de manchas/);
   });
 });
+
+describe('cobrança e nota fiscal (demonstração)', () => {
+  it('cobra o cliente com confirmação, o pagamento vira venda e a nota é emitida', async () => {
+    const { api } = await import('../../api');
+    const { setInstantDemo } = await import('../demoSource');
+    setInstantDemo(true);
+    const juliana = findContacts('Juliana Ribeiro')[0];
+    const r = await runOwnerCommand('Cobra R$ 250 da Juliana Ribeiro para sexta');
+    expect(r.actions[0]).toMatchObject({ tool: 'cobrar_cliente', status: 'aguardando' });
+    const before = table('charges').length;
+    const ok = await runOwnerCommand('sim');
+    expect(ok.actions[0]).toMatchObject({ tool: 'cobrar_cliente', status: 'ok' });
+    expect(table('charges').length).toBe(before + 1);
+    const ch = table('charges')[0];
+    expect(ch).toMatchObject({ contact_id: juliana.id, amount: 250, status: 'pendente', created_via: 'ia_dono' });
+    expect(table('finance_entries').find((x) => x.id === ch.finance_entry_id)).toMatchObject({ kind: 'receber', amount: 250 });
+
+    const sales = table('sales').length;
+    await api.integrations('demo_pay', { id: ch.id });
+    expect(table('charges')[0].status).toBe('paga');
+    expect(table('sales').length).toBe(sales + 1);
+    expect(table('finance_entries').find((x) => x.id === ch.finance_entry_id)!.paid_at).toBeTruthy();
+
+    const n = await runOwnerCommand('Emite a nota da Juliana Ribeiro');
+    expect(n.actions[0]).toMatchObject({ tool: 'emitir_nota', status: 'aguardando' });
+    await runOwnerCommand('sim');
+    await new Promise((res) => setTimeout(res, 5));
+    const note = table('fiscal_notes')[0];
+    expect(note).toMatchObject({ charge_id: ch.id, amount: 250, status: 'autorizada' });
+    expect(note.number).toBeTruthy();
+  });
+  it('pede o CPF quando o cliente não tem', async () => {
+    const c = table('contacts').find((x) => !x.document && x.name.split(' ').length >= 2 && findContacts(x.name).length === 1)!;
+    const r = await runOwnerCommand(`Cobra R$ 90 do ${c.name}`);
+    expect(r.reply).toMatch(/CPF ou CNPJ/);
+    expect(r.actions).toHaveLength(0);
+  });
+});

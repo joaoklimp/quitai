@@ -88,3 +88,24 @@ describe('base de conhecimento da IA', () => {
     expect(await db.as(user(atendente), (q) => q.exec(`update ai_settings set faq = '[]'::jsonb`))).toBe(0);
   });
 });
+
+describe('cobrança e nota fiscal', () => {
+  it('chaves das integrações ficam fora do painel; cobranças e notas só para dono e gerente, e só leitura', async () => {
+    await db.as('service', (q) => q.exec(`insert into integration_credentials (company_id, provider, api_key) values ($1, 'asaas', 'chave-secreta')`, [cid]));
+    await db.as('service', (q) => q.exec(`insert into company_integrations (company_id, provider, account_name) values ($1, 'asaas', 'Loja da Lia')`, [cid]));
+    await db.as('service', (q) => q.exec(`insert into charges (company_id, description, amount, due_date) values ($1, 'Limpeza', 180, current_date)`, [cid]));
+    await expect(db.as(user(dona), (q) => q.rows(`select * from integration_credentials`))).rejects.toThrow(/permission denied/);
+    expect(await db.as(user(dona), (q) => q.rows(`select provider, account_name from company_integrations`))).toEqual([{ provider: 'asaas', account_name: 'Loja da Lia' }]);
+    expect(await db.as(user(dona), (q) => q.rows(`select id from charges`))).toHaveLength(1);
+    expect(await db.as(user(atendente), (q) => q.rows(`select id from charges`))).toHaveLength(0);
+    expect(await db.as(user(outro), (q) => q.rows(`select id from charges`))).toHaveLength(0);
+    await expect(db.as(user(dona), (q) => q.exec(`update charges set status = 'paga'`))).rejects.toThrow(/permission denied/);
+    await expect(db.as(user(dona), (q) => q.exec(`insert into fiscal_notes (company_id, amount, description) values ($1, 10, 'x')`, [cid]))).rejects.toThrow(/permission denied/);
+    const tok = await db.as('service', (q) => q.one<{ webhook_token: string }>(`select webhook_token from integration_credentials where company_id = $1`, [cid]));
+    expect(tok.webhook_token).toMatch(/^[0-9a-f]{48}$/);
+  });
+  it('CPF ou CNPJ do cliente só com números', async () => {
+    await expect(db.as(user(dona), (q) => q.exec(`insert into contacts (company_id, name, document) values ($1, 'X', '123.456')`, [cid]))).rejects.toThrow(/check/);
+    await db.as(user(dona), (q) => q.exec(`insert into contacts (company_id, name, document) values ($1, 'Cliente PJ', '11222333000181')`, [cid]));
+  });
+});

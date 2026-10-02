@@ -1,5 +1,5 @@
 // Dados de exemplo dos módulos de gestão (financeiro, estoque e base de conhecimento) da empresa da demonstração.
-import type { Contact, FaqItem, FinanceEntry, Product, StockMovement } from '../types';
+import type { Charge, CompanyIntegration, Contact, FaqItem, FinanceEntry, FiscalNote, Product, StockMovement } from '../types';
 import { addDays, fromLocal } from '../../../shared/format';
 import { DEMO_COMPANY_ID, DEMO_USER_ID, demoId } from './seed';
 
@@ -14,7 +14,7 @@ export const DEMO_FAQ: FaqItem[] = [
   { q: 'Vocês emitem nota fiscal?', a: 'Sim, emitimos nota fiscal de serviço. É só pedir no momento do pagamento.' },
 ];
 
-export function buildGestao(now: Date, today: string, contacts: Contact[]): { finance_entries: FinanceEntry[]; products: Product[]; stock_movements: StockMovement[] } {
+export function buildGestao(now: Date, today: string, contacts: Contact[]): { finance_entries: FinanceEntry[]; products: Product[]; stock_movements: StockMovement[]; charges: Charge[]; fiscal_notes: FiscalNote[]; company_integrations: CompanyIntegration[] } {
   const at = (date: string, hhmm = '10:00') => fromLocal(date, hhmm, TZ).toISOString();
   const created = at(addDays(today, -40));
   const monthDay = (d: number) => { const [y, m] = today.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; };
@@ -68,5 +68,30 @@ export function buildGestao(now: Date, today: string, contacts: Contact[]): { fi
     products.push(p);
   }
   stock_movements.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  return { finance_entries, products, stock_movements };
+
+  // integrações conectadas em modo de testes, com algumas cobranças e notas de exemplo
+  const ago = (d: number, h = '10:00') => at(addDays(today, -d), h);
+  const company_integrations: CompanyIntegration[] = [
+    { company_id: DEMO_COMPANY_ID, provider: 'asaas', status: 'conectado', environment: 'testes', config: { webhook: 'automatico' }, account_name: 'Brilho Lar Higienização', last_error: null, connected_at: ago(20), updated_at: ago(20) },
+    { company_id: DEMO_COMPANY_ID, provider: 'focusnfe', status: 'conectado', environment: 'testes', config: { cnpj: '11222333000181', inscricao_municipal: '0745123', codigo_municipio: '5300108', item_lista_servico: '0702', aliquota: 2, optante_simples_nacional: true }, account_name: 'Brilho Lar Higienização', last_error: null, connected_at: ago(20), updated_at: ago(20) },
+  ];
+  const named = (n: string) => contacts.find((c) => c.name.startsWith(n)) ?? contacts[0];
+  const ch = (c: Contact, description: string, amount: number, due: string, status: Charge['status'], created: number, paid?: number): Charge => {
+    const id = demoId('f4');
+    return { id, company_id: DEMO_COMPANY_ID, contact_id: c.id, quote_id: null, description, amount, due_date: due, method: 'pix_boleto', status, provider_id: `pay_demo${id.slice(-6)}`, invoice_url: `https://sandbox.asaas.com/i/demo${id.slice(-6)}`, pix_code: `00020126580014br.gov.bcb.pix0136demo-${id.slice(-6)}5204000053039865406${amount.toFixed(2)}5802BR`, paid_at: paid != null ? ago(paid, '15:20') : null, sent_at: ago(created, '10:05'), sale_id: null, finance_entry_id: null, created_via: created % 2 ? 'ia_dono' : 'painel', created_at: ago(created), updated_at: ago(paid ?? created) };
+  };
+  // CPFs fictícios (válidos no formato) para os clientes que já foram cobrados
+  named('Juliana').document = '52998224725'; named('Bruno').document = '11144477735'; named('Patrícia').document = '39053344705';
+  const charges: Charge[] = [
+    ch(named('Juliana'), 'Limpeza de sofá 3 lugares', 180, addDays(today, 2), 'pendente', 0),
+    ch(named('Bruno'), 'Limpeza de 8 cadeiras', 280, addDays(today, -3), 'paga', 5, 3),
+    ch(named('Patrícia'), 'Higienização de colchão casal', 220, addDays(today, -2), 'vencida', 7),
+  ];
+  const note = (c: Contact, amount: number, description: string, status: FiscalNote['status'], d: number, n: string | null): FiscalNote => ({
+    id: demoId('f5'), company_id: DEMO_COMPANY_ID, ref: `demo${demoId('f6').slice(-8)}`, contact_id: c.id, sale_id: null, charge_id: null, amount, description,
+    taker: { name: c.name, document: c.document ?? undefined, email: c.email ?? undefined }, status, number: n, verification_code: n ? 'A1B2C3D4' : null,
+    pdf_url: n ? 'https://homologacao.focusnfe.com.br/notas_fiscais_servico/exemplo.pdf' : null, xml_url: null, error: null, issued_at: n ? ago(d, '16:00') : null, created_via: 'painel', created_at: ago(d), updated_at: ago(d),
+  });
+  const fiscal_notes: FiscalNote[] = [note(named('Bruno'), 280, 'Limpeza de 8 cadeiras', 'autorizada', 3, '2026000123'), note(named('Juliana'), 180, 'Limpeza de sofá 3 lugares', 'autorizada', 9, '2026000117')];
+  return { finance_entries, products, stock_movements, charges, fiscal_notes, company_integrations };
 }

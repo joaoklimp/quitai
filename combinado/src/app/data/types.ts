@@ -110,6 +110,7 @@ export interface Contact {
   created_via: Channel;
   created_at: ISO;
   updated_at: ISO;
+  document?: string | null; // CPF ou CNPJ, só números
 }
 
 export type PriceType = 'fixo' | 'a_partir_de' | 'sob_consulta';
@@ -401,6 +402,7 @@ export interface FinanceEntry {
   method: PayMethod | null;
   contact_id: UUID | null;
   counterpart: string | null; // fornecedor ou pagador sem cadastro
+  sale_id?: UUID | null; // recebimento que virou venda (não conta duas vezes no caixa)
   recurrence: 'nenhuma' | 'mensal';
   notes: string | null;
   created_via: Channel;
@@ -438,10 +440,70 @@ export interface StockMovement {
 }
 export interface ImportResult { created: number; updated: number; skipped: number }
 
+/* ---------- cobrança dos clientes e nota fiscal ---------- */
+export type IntegrationProvider = 'asaas' | 'focusnfe';
+export interface CompanyIntegration {
+  company_id: UUID;
+  provider: IntegrationProvider;
+  status: 'conectado' | 'erro' | 'desconectado';
+  environment: 'producao' | 'testes';
+  config: Record<string, unknown>;
+  account_name: string | null;
+  last_error: string | null;
+  connected_at: ISO | null;
+  updated_at: ISO;
+}
+export type ChargeMethod = 'pix' | 'boleto' | 'pix_boleto';
+export type ChargeStatus = 'pendente' | 'paga' | 'vencida' | 'cancelada' | 'estornada';
+export interface Charge {
+  id: UUID;
+  company_id: UUID;
+  contact_id: UUID | null;
+  quote_id: UUID | null;
+  description: string;
+  amount: number;
+  due_date: DateStr;
+  method: ChargeMethod;
+  status: ChargeStatus;
+  provider_id: string | null;
+  invoice_url: string | null;
+  pix_code: string | null;
+  paid_at: ISO | null;
+  sent_at: ISO | null;
+  sale_id: UUID | null;
+  finance_entry_id: UUID | null;
+  created_via: Channel;
+  created_at: ISO;
+  updated_at: ISO;
+}
+export type FiscalStatus = 'processando' | 'autorizada' | 'erro' | 'cancelada';
+export interface FiscalNote {
+  id: UUID;
+  company_id: UUID;
+  ref: string;
+  contact_id: UUID | null;
+  sale_id: UUID | null;
+  charge_id: UUID | null;
+  amount: number;
+  description: string;
+  taker: { name?: string; document?: string; email?: string; address?: string };
+  status: FiscalStatus;
+  number: string | null;
+  verification_code: string | null;
+  pdf_url: string | null;
+  xml_url: string | null;
+  error: string | null;
+  issued_at: ISO | null;
+  created_via: Channel;
+  created_at: ISO;
+  updated_at: ISO;
+}
+
 export type TableName =
   | 'contacts' | 'services' | 'quotes' | 'quote_items' | 'appointments' | 'sales' | 'tasks'
   | 'conversations' | 'messages' | 'pending_actions' | 'audit_log' | 'automations' | 'automation_runs'
-  | 'notifications' | 'members' | 'invoices' | 'usage_monthly' | 'finance_entries' | 'products' | 'stock_movements';
+  | 'notifications' | 'members' | 'invoices' | 'usage_monthly' | 'finance_entries' | 'products' | 'stock_movements'
+  | 'charges' | 'fiscal_notes' | 'company_integrations';
 
 export interface RowMap {
   contacts: Contact; services: Service; quotes: Quote; quote_items: QuoteItem; appointments: Appointment;
@@ -449,6 +511,7 @@ export interface RowMap {
   audit_log: AuditEntry; automations: Automation; automation_runs: AutomationRun; notifications: Notification;
   members: Member; invoices: Invoice; usage_monthly: UsageMonth;
   finance_entries: FinanceEntry; products: Product; stock_movements: StockMovement;
+  charges: Charge; fiscal_notes: FiscalNote; company_integrations: CompanyIntegration;
 }
 
 export type Filter =

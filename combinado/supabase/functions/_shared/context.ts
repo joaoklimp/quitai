@@ -137,12 +137,14 @@ export async function customerDynamic(b: Base, contact: Contact, firstContact: b
     db.from('appointments').select('id, title, starts_at, status, address').eq('contact_id', contact.id).gte('starts_at', now.toISOString()).neq('status', 'cancelado').order('starts_at').limit(5),
     db.from('quotes').select('number, total, status, sent_at, public_token').eq('contact_id', contact.id).in('status', ['enviado', 'rascunho']).order('created_at', { ascending: false }).limit(3),
   ]);
+  const { data: charges } = await db.from('charges').select('description, amount, due_date, status, invoice_url').eq('contact_id', contact.id).in('status', ['pendente', 'vencida']).order('created_at', { ascending: false }).limit(3);
   const lines = [
     `Agora: ${WEEKDAYS[new Date(localDate(now, b.tz) + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(now, b.tz)}, ${localTime(now, b.tz)} (fuso ${b.tz}).`,
     `Cliente: ${contact.name}${contact.phone ? ` · telefone ${formatPhone(contact.phone)}` : ''}${contact.address ? ` · endereço: ${contact.address}` : ''}${contact.email ? ` · e-mail: ${contact.email}` : ''}${Number(contact.total_spent) > 0 ? ` · já comprou ${brl(contact.total_spent)} com a empresa` : ''}.`,
     contact.notes ? `Anotações da equipe sobre o cliente: ${contact.notes}` : '',
     (appts ?? []).length ? `Próximos horários do cliente: ${(appts as Appointment[]).map((a) => `[${a.id}] ${fmtDate(a.starts_at, b.tz)} às ${localTime(a.starts_at, b.tz)} — ${a.title} (${a.status})`).join('; ')}.` : 'O cliente não tem horários marcados.',
     (quotes ?? []).length ? `Orçamentos em aberto: ${(quotes as Quote[]).map((q) => `nº ${quoteNo(q.number)} de ${brl(q.total)} (${q.status}) — ${quoteLink(b, q)}`).join('; ')}.` : '',
+    (charges ?? []).length ? `Cobranças em aberto do cliente (se ele perguntar como pagar, mande o link): ${(charges ?? []).map((x) => `${x.description} — ${brl(Number(x.amount))}, vence ${fmtDate(x.due_date + 'T12:00:00Z', b.tz)}${x.status === 'vencida' ? ' (vencida)' : ''} — ${x.invoice_url}`).join('; ')}.` : '',
     firstContact ? 'Este é o primeiro contato deste cliente com a empresa.' : '',
   ];
   return lines.filter(Boolean).join('\n');
@@ -161,7 +163,8 @@ export function ownerSystem(b: Base): string {
     '- Datas relativas ("amanhã", "sexta", "dia 15") usam a data de hoje informada abaixo. Valores são em reais.',
     '- Financeiro: "lança o aluguel de R$ 2.800 todo dia 5" vira lancar_conta (mensal). Para dar baixa, encontre a conta com consultar_contas.',
     '- Estoque: para entrada ou saída, encontre o produto com consultar_estoque e use movimentar_estoque. Se o saldo não der para a saída, avise.',
-    `- Ações sensíveis ficam aguardando confirmação: registrar venda, dar baixa em conta, cancelar horário, mudar preço ou desativar serviço, dar desconto acima de ${Number(b.ai.max_discount_pct)}% e mandar mensagem para cliente. A ferramenta registra o pedido e você pede para a pessoa confirmar. Nunca diga que foi feito antes da confirmação.`,
+    '- Cobrança: "cobra a Juliana R$ 180 no Pix" vira cobrar_cliente (precisa do CPF ou CNPJ). Nota fiscal: "emite a nota da Juliana" vira emitir_nota com o valor e o serviço.',
+    `- Ações sensíveis ficam aguardando confirmação: registrar venda, dar baixa em conta, cobrar cliente, emitir nota fiscal, cancelar horário, mudar preço ou desativar serviço, dar desconto acima de ${Number(b.ai.max_discount_pct)}% e mandar mensagem para cliente. A ferramenta registra o pedido e você pede para a pessoa confirmar. Nunca diga que foi feito antes da confirmação.`,
     '- Se faltar algo essencial (por exemplo, o valor de um item que não está na tabela), pergunte antes de agir.',
     '- Não invente números: para totais e resumos, use a ferramenta resumo.',
     '- Responda curto e direto, confirmando o que foi feito. O sistema já mostra a lista de ações realizadas abaixo da sua resposta: não repita tudo em detalhe.',

@@ -1,6 +1,6 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
-import type { DataSource, AdminOverview } from '../source';
-import type { AiSettings, Company, DailyStat, FinanceEntry, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
+import type { DataSource, AdminOverview, IntegrationAction } from '../source';
+import type { AiSettings, Charge, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
 import type { ProductRow } from '../sheet';
 import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
@@ -156,6 +156,69 @@ export class DemoSource implements DataSource {
     if (name === 'tasks' && op === 'insert') {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'criar_tarefa', summary: `Criou a tarefa "${row.title}"`, target_type: 'task', target_id: row.id as string, status: 'ok' });
     }
+  }
+
+  /** Demonstração: imita o Asaas e a Focus NFe (nada sai daqui). */
+  async integrations<T = Record<string, unknown>>(action: IntegrationAction, b: Record<string, unknown> = {}): Promise<T> {
+    await wait(600);
+    const now = new Date().toISOString();
+    const you = { actor_type: 'usuario' as const, actor_name: 'Você', channel: 'painel' as const, status: 'ok' as const };
+    const integ = (provider: CompanyIntegration['provider']) => table('company_integrations').find((x) => x.provider === provider);
+    const upsertInteg = (row: CompanyIntegration) => { const d = demoDb(); d.company_integrations = [...d.company_integrations.filter((x) => x.provider !== row.provider), row]; emit('company_integrations'); return row; };
+    const charge = () => { const c = table('charges').find((x) => x.id === b.id); if (!c) throw new Error('Cobrança não encontrada.'); return c; };
+    const note = () => { const n = table('fiscal_notes').find((x) => x.id === b.id); if (!n) throw new Error('Nota não encontrada.'); return n; };
+    switch (action) {
+      case 'connect_asaas': {
+        if (String(b.api_key ?? '').length < 20) throw new Error('Cole a chave da API do Asaas (Integrações → Chaves de API, no Asaas).');
+        const row = upsertInteg({ company_id: DEMO_COMPANY_ID, provider: 'asaas', status: 'conectado', environment: b.environment === 'producao' ? 'producao' : 'testes', config: { webhook: 'automatico' }, account_name: demoDb().company.name, last_error: null, connected_at: now, updated_at: now });
+        audit({ ...you, action: 'conectar_asaas', summary: 'Conectou o Asaas da empresa', target_type: null, target_id: null });
+        return { integration: row, webhook: null } as T;
+      }
+      case 'connect_focus': {
+        const c = (b.config ?? {}) as Record<string, unknown>;
+        if (String(c.cnpj ?? '').replace(/\D/g, '').length !== 14) throw new Error('CNPJ da empresa inválido.');
+        if (String(c.codigo_municipio ?? '').replace(/\D/g, '').length !== 7) throw new Error('O código do município é o código IBGE de 7 números (ex.: Brasília 5300108).');
+        const row = upsertInteg({ company_id: DEMO_COMPANY_ID, provider: 'focusnfe', status: 'conectado', environment: b.environment === 'producao' ? 'producao' : 'testes', config: c, account_name: demoDb().company.name, last_error: null, connected_at: now, updated_at: now });
+        audit({ ...you, action: 'conectar_focusnfe', summary: 'Conectou a emissão de nota fiscal', target_type: null, target_id: null });
+        return { integration: row } as T;
+      }
+      case 'disconnect': { const i = integ(b.provider === 'focusnfe' ? 'focusnfe' : 'asaas'); if (i) { i.status = 'desconectado'; emit('company_integrations'); } return { ok: true } as T; }
+      case 'webhook_info': return { url: 'https://SEU-PROJETO.supabase.co/functions/v1/cobranca-webhook?empresa=demo', token: 'token-de-demonstracao', events: ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_REFUNDED'] } as T;
+      case 'charge_create': return demoCreateCharge(b, 'painel') as T;
+      case 'charge_send': { const c = charge(); c.sent_at = now; emit('charges'); return { sent: true } as T; }
+      case 'charge_cancel': {
+        const c = charge();
+        if (c.status === 'paga') throw new Error('Essa cobrança já foi paga: para devolver o dinheiro, faça o estorno no Asaas.');
+        c.status = 'cancelada'; c.updated_at = now;
+        const d = demoDb(); d.finance_entries = d.finance_entries.filter((x) => x.id !== c.finance_entry_id || x.paid_at);
+        emit('charges'); emit('finance_entries');
+        return { ok: true } as T;
+      }
+      case 'charge_sync': return { charge: charge() } as T;
+      case 'demo_pay': {
+        const c = charge();
+        if (c.status === 'paga') return { charge: c } as T;
+        const sale = { id: newId(), company_id: DEMO_COMPANY_ID, contact_id: c.contact_id, quote_id: c.quote_id, appointment_id: null, description: c.description, amount: c.amount, method: 'pix' as const, origin: 'equipe' as const, paid_at: now, created_via: 'automacao' as const, created_at: now };
+        table('sales').unshift(sale);
+        const ct = contactById(c.contact_id); if (ct) ct.total_spent += c.amount;
+        Object.assign(c, { status: 'paga', paid_at: now, sale_id: sale.id, updated_at: now });
+        const fe = table('finance_entries').find((x) => x.id === c.finance_entry_id); if (fe) Object.assign(fe, { paid_at: now, method: 'pix', sale_id: sale.id });
+        notify({ kind: 'venda', title: `Pagamento recebido: ${brl(c.amount)}`, body: `${ct?.name ?? 'Cliente'} · ${c.description}`, link: '#/cobrancas' });
+        audit({ actor_type: 'sistema', actor_name: 'Asaas', channel: 'automacao', status: 'ok', action: 'cobranca_paga', summary: `${ct?.name ?? 'Cliente'} pagou a cobrança de ${brl(c.amount)} (${c.description})`, target_type: 'charge', target_id: c.id });
+        emit('charges'); emit('sales'); emit('finance_entries'); emit('contacts');
+        return { charge: c } as T;
+      }
+      case 'note_emit': return { note: demoEmitNote(b, 'painel') } as T;
+      case 'note_sync': return { note: note() } as T;
+      case 'note_cancel': {
+        const n = note();
+        if (n.status !== 'autorizada') throw new Error('Só dá para cancelar nota autorizada.');
+        if (String(b.reason ?? '').trim().length < 15) throw new Error('Escreva o motivo do cancelamento (pelo menos 15 caracteres).');
+        n.status = 'cancelada'; emit('fiscal_notes');
+        return { note: n } as T;
+      }
+    }
+    throw new Error('Ação desconhecida.');
   }
 
   async importProducts(rows: ProductRow[]): Promise<ImportResult> {
@@ -357,4 +420,57 @@ function addMonth(d: string): string {
   const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
   const dt = new Date(Date.UTC(y, mo, Math.min(day, last)));
   return dt.toISOString().slice(0, 10);
+}
+
+/** Testes: a demonstração autoriza a nota na hora. */
+let instantDemo = false;
+export function setInstantDemo(v = true) { instantDemo = v; }
+
+/* ---------- cobrança e nota da demonstração (usados pelo painel e pelo assistente) ---------- */
+type Via = 'painel' | 'ia_dono';
+const actorOf = (via: Via) => (via === 'painel' ? { actor_type: 'usuario' as const, actor_name: 'Você', channel: 'painel' as const } : { actor_type: 'ia' as const, actor_name: `${demoDb().ai.assistant_name} (IA)`, channel: 'ia_dono' as const });
+
+export function demoCreateCharge(b: Record<string, unknown>, via: Via): { charge: Charge; sent: boolean; reason?: string } {
+  if (table('company_integrations').find((x) => x.provider === 'asaas')?.status !== 'conectado') throw new Error('Conecte o Asaas da empresa em Integrações para cobrar clientes.');
+  const contact = contactById(String(b.contact_id ?? ''));
+  if (!contact) throw new Error('Escolha o cliente.');
+  const doc = String(b.document || contact.document || '').replace(/\D/g, '');
+  if (!/^(\d{11}|\d{14})$/.test(doc)) throw new Error(`Para cobrar, preciso do CPF ou CNPJ de ${contact.name}.`);
+  contact.document = doc;
+  const amount = Math.round(Number(b.amount) * 100) / 100;
+  if (!(amount >= 5)) throw new Error('O valor mínimo de uma cobrança é R$ 5,00.');
+  const now = new Date().toISOString();
+  const id = newId();
+  const fe: FinanceEntry = { id: newId(), company_id: DEMO_COMPANY_ID, kind: 'receber', description: `Cobrança: ${b.description || 'Serviço'}`, category: 'Cobranças', amount, due_date: String(b.due_date), paid_at: null, method: null, contact_id: contact.id, counterpart: contact.name, recurrence: 'nenhuma', notes: null, created_via: via, created_at: now, updated_at: now };
+  table('finance_entries').unshift(fe);
+  const sent = !!b.send && !!contact.phone;
+  const ch: Charge = { id, company_id: DEMO_COMPANY_ID, contact_id: contact.id, quote_id: (b.quote_id as string) || null, description: String(b.description || 'Serviço'), amount, due_date: String(b.due_date), method: (b.method as ChargeMethod) || 'pix_boleto', status: 'pendente', provider_id: `pay_demo${id.slice(-6)}`, invoice_url: `https://sandbox.asaas.com/i/demo${id.slice(-6)}`, pix_code: `00020126580014br.gov.bcb.pix0136demo-${id.slice(-6)}5802BR`, paid_at: null, sent_at: sent ? now : null, sale_id: null, finance_entry_id: fe.id, created_via: via, created_at: now, updated_at: now };
+  table('charges').unshift(ch);
+  audit({ ...actorOf(via), status: 'ok', action: 'criar_cobranca', summary: `Gerou cobrança de ${brl(amount)} para ${contact.name} (${ch.description})`, target_type: 'charge', target_id: id });
+  emit('charges'); emit('finance_entries'); emit('contacts');
+  return { charge: ch, sent, reason: b.send && !sent ? 'O cliente não tem WhatsApp cadastrado.' : undefined };
+}
+
+export function demoEmitNote(b: Record<string, unknown>, via: Via): FiscalNote {
+  if (table('company_integrations').find((x) => x.provider === 'focusnfe')?.status !== 'conectado') throw new Error('Conecte a Focus NFe em Integrações para emitir notas.');
+  const contact = contactById(String(b.contact_id ?? ''));
+  const t = (b.taker ?? {}) as Record<string, string>;
+  const name = t.name || contact?.name;
+  if (!name) throw new Error('Informe o nome do cliente (tomador).');
+  const amount = Number(b.amount);
+  if (!(amount > 0)) throw new Error('Informe o valor da nota.');
+  const now = new Date().toISOString();
+  const doc = (t.document || contact?.document || '').replace(/\D/g, '');
+  if (contact && doc && !contact.document) contact.document = doc;
+  const n: FiscalNote = { id: newId(), company_id: DEMO_COMPANY_ID, ref: `demo${Date.now()}`, contact_id: contact?.id ?? null, sale_id: (b.sale_id as string) || null, charge_id: (b.charge_id as string) || null, amount, description: String(b.description || 'Prestação de serviço'), taker: { name, document: doc || undefined, email: t.email || contact?.email || undefined }, status: 'processando', number: null, verification_code: null, pdf_url: null, xml_url: null, error: null, issued_at: null, created_via: via, created_at: now, updated_at: now };
+  table('fiscal_notes').unshift(n); emit('fiscal_notes');
+  audit({ ...actorOf(via), status: 'ok', action: 'emitir_nota', summary: `Enviou para emissão a nota de ${brl(amount)} para ${name}`, target_type: 'fiscal_note', target_id: n.id });
+  // a "prefeitura" da demonstração autoriza em alguns segundos
+  setTimeout(() => {
+    const seq = 2026000124 + table('fiscal_notes').filter((x) => x.number).length;
+    Object.assign(n, { status: 'autorizada', number: String(seq), verification_code: 'DEMO1234', pdf_url: 'https://homologacao.focusnfe.com.br/notas_fiscais_servico/exemplo.pdf', issued_at: new Date().toISOString() });
+    notify({ kind: 'financeiro', title: `Nota fiscal nº ${seq} autorizada`, body: `${name} · ${brl(amount)}`, link: '#/cobrancas?aba=notas' });
+    emit('fiscal_notes');
+  }, instantDemo ? 0 : 3500);
+  return n;
 }

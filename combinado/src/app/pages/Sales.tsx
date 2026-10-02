@@ -1,7 +1,7 @@
 // Vendas: o que entrou, por forma de pagamento e por origem (IA, equipe, balcão).
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Bot, Download, Plus, Wallet, Trash2 } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Bot, Download, Plus, ReceiptText, Wallet, Trash2 } from 'lucide-react';
 import { api } from '../data/api';
 import { useInvalidate, useList } from '../data/hooks';
 import type { PayMethod, Sale, SaleOrigin } from '../data/types';
@@ -87,7 +87,7 @@ export default function Sales() {
                   <td>{METHOD_LABEL[s.method]}</td>
                   <td>{s.origin === 'ia' ? <Badge tone="ai" size="sm" icon={<Bot />}>IA</Badge> : <Badge size="sm">{ORIGIN_LABEL[s.origin]}</Badge>}{s.created_via === 'ia_dono' && <span className="muted tiny"> · pelo WhatsApp</span>}</td>
                   <td className="num"><b>{brl(s.amount)}</b></td>
-                  <td><button className="icon-btn xs" aria-label="Excluir venda" onClick={async () => { if (await confirm({ title: 'Excluir esta venda?', text: `${brl(s.amount)} · ${s.description}`, confirm: 'Excluir', danger: true })) { await api.remove('sales', s.id); inv('sales'); toast('Venda excluída'); } }}><Trash2 /></button></td>
+                  <td className="nowrap"><Link className="icon-btn xs" aria-label="Emitir nota fiscal" title="Emitir nota fiscal" to={`/cobrancas?aba=notas&nova=nota&venda=${s.id}`}><ReceiptText /></Link><button className="icon-btn xs" aria-label="Excluir venda" onClick={async () => { if (await confirm({ title: 'Excluir esta venda?', text: `${brl(s.amount)} · ${s.description}`, confirm: 'Excluir', danger: true })) { await api.remove('sales', s.id); inv('sales'); toast('Venda excluída'); } }}><Trash2 /></button></td>
                 </tr>
               ))}</tbody>
             </table>

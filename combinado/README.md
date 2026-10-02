@@ -37,10 +37,10 @@ Para publicar de verdade, siga o **[DEPLOY.md](DEPLOY.md)**, um passo a passo do
 | Parte | O que faz |
 |---|---|
 | **Site** (`/`) | Página de vendas: recursos, simulação de conversa, planos e perguntas frequentes. |
-| **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, catálogo, tarefas, financeiro, estoque, integrações, módulos, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
+| **Painel** (`/app/`) | Cadastro, login, criação da empresa (com serviços prontos por ramo), visão geral com gráficos, conversas, clientes, orçamentos, agenda, vendas, cobranças e notas fiscais, catálogo, tarefas, financeiro, estoque, integrações, módulos, análises, automações, histórico, configurações, assinatura, ajuda e área de administração da plataforma. |
 | **Financeiro** | Contas a pagar e a receber, contas mensais (ao pagar, a do mês seguinte já fica lançada), vencidas em destaque, resultado do mês e caixa previsto das próximas 6 semanas. Só dono e gerente acessam. |
 | **Estoque** | Produtos com saldo, mínimo e custo; entradas, saídas e ajustes com histórico; alerta quando um produto fica abaixo do mínimo; importação de planilha do Excel (.xlsx) ou CSV e exportação. |
-| **Integrações** | WhatsApp oficial e planilhas funcionando. Nota fiscal, cobrança dos clientes, ERP (Bling, Tiny, Omie), Google Agenda e API estão listados como “em breve”, sem prometer o que ainda não existe. |
+| **Integrações** | WhatsApp oficial, planilhas, cobrança dos clientes com Pix e boleto (conta Asaas da própria empresa, baixa automática pelo webhook) e nota fiscal de serviço NFS-e (Focus NFe da empresa) funcionando, pelo painel ou por comando no WhatsApp. ERP (Bling, Tiny, Omie), NF-e de produto, Google Agenda e API estão listados como “em breve”. |
 | **Orçamento público** (`/orcamento/#…`) | Link enviado ao cliente para ver e aprovar o orçamento. A aprovação vai direto para o painel. |
 | **Termos e Privacidade** (`/termos/`, `/privacidade/`) | Textos-base de acordo com a LGPD, com os campos da empresa a preencher. |
 | **IA de atendimento** | Responde clientes com o catálogo, as regras e as **perguntas frequentes** que o dono cadastra (com pesquisa na internet opcional, só para dúvidas gerais), consulta horários livres, agenda, monta orçamentos, envia links e passa a conversa para a equipe (reclamação, pedido de humano ou assunto que não sabe). |
@@ -108,7 +108,7 @@ combinado/
 │   └── shared/                marca, planos, formatos, modelos de mensagem do WhatsApp
 ├── supabase/
 │   ├── migrations/            esquema, RLS, funções SQL, gatilhos, tempo real, arquivos e agendamentos
-│   ├── functions/             Edge Functions (agent, whatsapp-webhook, whatsapp, billing, asaas-webhook, team, cron)
+│   ├── functions/             Edge Functions (agent, whatsapp-webhook, whatsapp, billing, asaas-webhook, team, cron, integrations, cobranca-webhook)
 │   │   └── _shared/           IA, ferramentas, WhatsApp, Asaas, conversas e cópias sincronizadas de src/shared
 │   ├── templates/             e-mails de cadastro, convite e nova senha (em português)
 │   └── tests/                 testes do banco com Postgres de verdade
@@ -129,7 +129,7 @@ Algumas regras (planos, formatos, modelos de mensagem, disponibilidade de horár
 | `npm run preview` | Serve o `dist/` em <http://localhost:4173> |
 | `npm run typecheck` | Só confere os tipos do painel e do site |
 | `npm test` | Testes rápidos (IA de demonstração, leitura de planilhas, comparação de períodos do painel, cópias sincronizadas) |
-| `npm run test:db` | Testes do banco num Postgres 17 de verdade: RLS entre empresas, papéis, gatilhos, numeração, funções, financeiro e estoque |
+| `npm run test:db` | Testes do banco num Postgres 17 de verdade: RLS entre empresas, papéis, gatilhos, numeração, funções, financeiro, estoque, cobranças e notas |
 | `npm run test:functions` | Testes das Edge Functions (Deno, Claude simulado) |
 | `npm run check:functions` | Confere os tipos das Edge Functions |
 | `npm run sync:functions` | Copia `src/shared` para as Edge Functions |

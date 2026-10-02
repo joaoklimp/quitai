@@ -348,3 +348,81 @@ Deno.test({ name: 'automações: lembrete de horário sai uma vez, com o modelo 
   assertEquals([fp[0], fp.length], ['Juliana', 4]);
   assertStringIncludes(fp[3], 'https://combinado.test/orcamento/#');
 }});
+
+/* ---------- cobrança (Asaas da empresa) e nota fiscal (Focus NFe), com as APIs simuladas ---------- */
+Deno.test({ name: 'cobrança: IA cobra com confirmação, o Asaas avisa o pagamento e vira venda; nota fiscal autorizada', ...opts, fn: async () => {
+  const { handleChargeWebhook } = await import('../cobranca-webhook/index.ts');
+  const { syncNote } = await import('../_shared/fiscal.ts');
+  const calls: { url: string; method: string; body: Record<string, any> }[] = [];
+  let focusStatus = 'processando_autorizacao';
+  const prev = globalThis.fetch;
+  globalThis.fetch = ((input: Request | URL | string, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (url.startsWith('https://api-sandbox.asaas.com/v3/')) {
+      calls.push({ url, method: init?.method ?? 'GET', body });
+      if (url.includes('/customers?cpfCnpj=')) return Promise.resolve(Response.json({ data: [] }));
+      if (url.endsWith('/customers')) return Promise.resolve(Response.json({ id: 'cus_1' }));
+      if (url.endsWith('/payments')) return Promise.resolve(Response.json({ id: 'pay_1', invoiceUrl: 'https://sandbox.asaas.com/i/pay_1' }));
+      if (url.endsWith('/pixQrCode')) return Promise.resolve(Response.json({ payload: '00020126pixcopiaecola' }));
+    }
+    if (url.startsWith('https://homologacao.focusnfe.com.br/v2/nfse')) {
+      calls.push({ url, method: init?.method ?? 'GET', body });
+      if ((init?.method ?? 'GET') === 'POST') return Promise.resolve(Response.json({ status: 'processando_autorizacao' }, { status: 202 }));
+      return Promise.resolve(Response.json(focusStatus === 'autorizado' ? { status: 'autorizado', numero: '123', codigo_verificacao: 'ABC', url: 'https://nfse.exemplo/123' } : { status: focusStatus }));
+    }
+    return prev(input, init);
+  }) as typeof fetch;
+  try {
+    for (const r0 of [await db.from('integration_credentials').insert([{ company_id: CID, provider: 'asaas', api_key: 'chave-asaas-teste' }, { company_id: CID, provider: 'focusnfe', api_key: 'token-focus' }])]) assertEquals(r0.error, null);
+    const ins = await db.from('company_integrations').insert([
+      { company_id: CID, provider: 'asaas', environment: 'testes', config: {} },
+      { company_id: CID, provider: 'focusnfe', environment: 'testes', config: { cnpj: '11222333000181', inscricao_municipal: '123', codigo_municipio: '5300108', item_lista_servico: '0702', aliquota: 2 } },
+    ]);
+    assertEquals(ins.error, null);
+    const b = await loadBase(CID);
+    const conv = await findOrCreateConversation({ companyId: CID, kind: 'dono', channel: 'painel', memberUserId: UID });
+    const ctx = { ...b, mode: 'dono', channel: 'painel', conversationId: conv.id, member };
+    const { contact } = await findOrCreateContact(CID, '5561977776666', 'Carlos Pagador');
+
+    let r = await run(OWNER_TOOLS, 'cobrar_cliente', { cliente_id: contact.id, valor: 180, descricao: 'Limpeza de sofá' }, ctx);
+    assert(r.error); has(r.content, 'CPF ou CNPJ');
+    r = await run(OWNER_TOOLS, 'cobrar_cliente', { cliente_id: contact.id, valor: 180, descricao: 'Limpeza de sofá', cpf_cnpj: '529.982.247-25', enviar: false }, ctx);
+    assertEquals(r.receipt?.status, 'aguardando', r.content);
+    const res = await resolvePending(b, r.receipt!.pending_id!, true, member, 'painel');
+    assertEquals(res.actions[0].status, 'ok');
+    const { data: ch } = await db.from('charges').select('*').eq('company_id', CID).eq('description', 'Limpeza de sofá').single();
+    assertEquals([ch!.provider_id, ch!.invoice_url, ch!.pix_code, ch!.status, Number(ch!.amount)], ['pay_1', 'https://sandbox.asaas.com/i/pay_1', '00020126pixcopiaecola', 'pendente', 180]);
+    const pay = calls.find((x) => x.url.endsWith('/payments'))!;
+    assertEquals([pay.body.customer, pay.body.billingType, pay.body.value, pay.body.externalReference], ['cus_1', 'UNDEFINED', 180, ch!.id]);
+    const { data: doc } = await db.from('contacts').select('document').eq('id', contact.id).single();
+    assertEquals(doc!.document, '52998224725');
+
+    // aviso do Asaas: token errado é recusado; o certo vira venda (uma vez só)
+    const { data: cred } = await db.from('integration_credentials').select('webhook_token').eq('company_id', CID).eq('provider', 'asaas').single();
+    const hook = (token: string, id = 'evt_1') => handleChargeWebhook(new Request(`http://local/cobranca-webhook?empresa=${CID}`, { method: 'POST', headers: { 'asaas-access-token': token }, body: JSON.stringify({ id, event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', billingType: 'PIX', externalReference: ch!.id, clientPaymentDate: '2030-01-05' } }) }));
+    assertEquals((await hook('errado')).status, 401);
+    assertEquals((await hook(cred!.webhook_token)).status, 200);
+    assertEquals((await hook(cred!.webhook_token)).status, 200);
+    const { data: paid } = await db.from('charges').select('status, sale_id, finance_entry_id').eq('id', ch!.id).single();
+    assertEquals(paid!.status, 'paga');
+    const { data: sales } = await db.from('sales').select('amount, method').eq('company_id', CID).eq('description', 'Limpeza de sofá');
+    assertEquals(sales!.map((s) => [Number(s.amount), s.method]), [[180, 'pix']]);
+    const { data: fe } = await db.from('finance_entries').select('paid_at, sale_id').eq('id', paid!.finance_entry_id).single();
+    assert(fe!.paid_at && fe!.sale_id === paid!.sale_id);
+
+    // nota fiscal: vai para a prefeitura, fica processando e depois é autorizada
+    r = await run(OWNER_TOOLS, 'emitir_nota', { cliente_id: contact.id, valor: 180, descricao: 'Limpeza de sofá 3 lugares', venda_id: paid!.sale_id }, ctx);
+    const nres = await resolvePending(b, r.receipt!.pending_id!, true, member, 'painel');
+    assertEquals(nres.actions[0].status, 'ok');
+    const sent = calls.find((x) => x.method === 'POST' && x.url.includes('/v2/nfse?ref='))!;
+    assertEquals([sent.body.tomador.cpf, sent.body.servico.valor_servicos, sent.body.prestador.codigo_municipio], ['52998224725', 180, '5300108']);
+    const { data: note } = await db.from('fiscal_notes').select('*').eq('company_id', CID).single();
+    assertEquals(note!.status, 'processando');
+    focusStatus = 'autorizado';
+    const done = await syncNote(note!);
+    assertEquals([done!.status, done!.number, done!.pdf_url], ['autorizada', '123', 'https://nfse.exemplo/123']);
+  } finally {
+    globalThis.fetch = prev;
+  }
+}});

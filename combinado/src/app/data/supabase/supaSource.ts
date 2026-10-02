@@ -1,6 +1,6 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
-import type { AdminOverview, CheckoutInput, DataSource, OnboardInput, SignUpInput } from '../source';
+import type { AdminOverview, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import type { AgentReply, AiSettings, Company, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
 import type { ProductRow } from '../sheet';
 
@@ -234,6 +234,9 @@ export class SupabaseSource implements DataSource {
     const { error } = await this.sb.from(table).delete().eq('id', id);
     if (error) throw friendly(error);
   }
+  async integrations<T = Record<string, unknown>>(action: IntegrationAction, payload: Record<string, unknown> = {}) {
+    return this.fn<T>('integrations', { action, ...payload });
+  }
   async importProducts(rows: ProductRow[]) {
     const { data, error } = await this.sb.rpc('import_products', { p_rows: rows });
     if (error) throw friendly(error);
@@ -342,7 +345,7 @@ export class SupabaseSource implements DataSource {
     const cid = this.companyId;
     if (!cid) return () => {};
     const ch = this.sb.channel(`empresa-${cid}`);
-    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements'] as TableName[]) {
+    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes'] as TableName[]) {
       ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t, filter: `company_id=eq.${cid}` } as never, () => cb(t));
     }
     ch.subscribe();

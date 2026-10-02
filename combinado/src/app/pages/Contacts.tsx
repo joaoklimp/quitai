@@ -8,6 +8,7 @@ import type { Contact, ContactSource, Stage, Temperature } from '../data/types';
 import { Avatar, Badge, Button, Drawer, Empty, Field, Input, Loader, Modal, PageHeader, PhoneInput, Segmented, Select, Textarea, cx, useConfirm, useDebounced, useToast } from '../ui';
 import { ContactSide, STAGE_LABEL, TEMP_LABEL, TEMP_TONE } from './Inbox';
 import { brl, brl0, fmtAgo, formatPhone, normalizePhone } from '../../shared/format';
+import { fmtDoc } from './Charges';
 
 const STAGES: Stage[] = ['novo', 'conversando', 'orcamento', 'fechado', 'perdido'];
 const STAGE_COLOR: Record<Stage, string> = { novo: 'var(--violet)', conversando: 'var(--c1)', orcamento: 'var(--c2)', fechado: 'var(--c3)', perdido: 'var(--ink-4)' };
@@ -185,8 +186,9 @@ export function ContactForm({ open, contact, onClose }: { open: boolean; contact
   const set = (k: keyof Contact, v: unknown) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     if (!f.name || f.name.trim().length < 2) { toast('Informe o nome do cliente', 'err'); return; }
+    if (f.document && !/^(\d{11}|\d{14})$/.test(f.document.replace(/\D/g, ''))) { toast('CPF ou CNPJ inválido', 'err'); return; }
     setBusy(true);
-    const row: Partial<Contact> = { name: f.name.trim(), phone: f.phone ? normalizePhone(f.phone) : null, email: f.email?.trim() || null, address: f.address?.trim() || null, notes: f.notes?.trim() || null, source: f.source, opt_in: !!f.opt_in, stage: f.stage, temperature: f.temperature, birthday: f.birthday || null, tags: tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) };
+    const row: Partial<Contact> = { name: f.name.trim(), phone: f.phone ? normalizePhone(f.phone) : null, email: f.email?.trim() || null, address: f.address?.trim() || null, notes: f.notes?.trim() || null, source: f.source, opt_in: !!f.opt_in, stage: f.stage, temperature: f.temperature, birthday: f.birthday || null, document: f.document ? f.document.replace(/\D/g, '') : null, tags: tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) };
     try {
       if (contact) await api.update('contacts', contact.id, row);
       else await api.insert('contacts', { ...row, score: 50, total_spent: 0, created_via: 'painel', last_interaction_at: new Date().toISOString() });
@@ -199,6 +201,7 @@ export function ContactForm({ open, contact, onClose }: { open: boolean; contact
         <Field label="Nome" className="full"><Input value={f.name ?? ''} onChange={(e) => set('name', e.target.value)} autoFocus /></Field>
         <Field label="WhatsApp"><PhoneInput value={f.phone ?? ''} onChange={(v) => set('phone', v)} /></Field>
         <Field label="E-mail"><Input type="email" value={f.email ?? ''} onChange={(e) => set('email', e.target.value)} /></Field>
+        <Field label="CPF ou CNPJ" hint="Opcional. Usado para cobrar com Pix ou boleto e emitir nota."><Input value={fmtDoc(f.document)} inputMode="numeric" onChange={(e) => set('document', e.target.value.replace(/\D/g, '').slice(0, 14))} /></Field>
         <Field label="Endereço" className="full"><Input value={f.address ?? ''} onChange={(e) => set('address', e.target.value)} placeholder="Rua, número, bairro" /></Field>
         <Field label="Etapa"><Select value={f.stage} onChange={(e) => set('stage', e.target.value)}>{STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
         <Field label="Temperatura"><Select value={f.temperature} onChange={(e) => set('temperature', e.target.value)}>{(['quente', 'morno', 'frio'] as Temperature[]).map((t) => <option key={t} value={t}>{TEMP_LABEL[t]}</option>)}</Select></Field>

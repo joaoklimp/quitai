@@ -2,6 +2,8 @@
 // Roda as automações ligadas em cada empresa: lembrete de horário, acompanhamento de orçamento, resumo do dia,
 // pós-atendimento, reativação de clientes e lembretes de tarefas. Cada envio é registrado uma vez só.
 import { db, notify } from '../_shared/db.ts';
+import { syncNote } from '../_shared/fiscal.ts';
+import type { FiscalNote } from '../_shared/types.ts';
 import { loadBase, quoteLink, quoteNo, type Base } from '../_shared/context.ts';
 import { deliverToContact } from '../_shared/conversation.ts';
 import { lastOwnerWhatsApp } from '../_shared/tools.ts';
@@ -35,6 +37,11 @@ export async function runCron(req: Request): Promise<Response> {
         if (n) { report[a.kind] = (report[a.kind] ?? 0) + n; await db.from('automations').update({ last_run_at: new Date().toISOString() }).eq('id', a.id); }
       }
     } catch (e) { console.error('automações', companyId, e); }
+  }
+  // notas fiscais ainda em processamento na prefeitura: confere o resultado (as mais recentes primeiro)
+  const { data: pending } = await db.from('fiscal_notes').select('*').eq('status', 'processando').gt('created_at', new Date(Date.now() - 7 * 86400000).toISOString()).order('created_at', { ascending: false }).limit(40);
+  for (const n of (pending ?? []) as FiscalNote[]) {
+    try { if ((await syncNote(n))?.status !== 'processando') report.notas_fiscais = (report.notas_fiscais ?? 0) + 1; } catch (e) { console.error('nota fiscal', n.id, (e as Error).message); }
   }
   return Response.json({ ok: true, sent: report });
 }

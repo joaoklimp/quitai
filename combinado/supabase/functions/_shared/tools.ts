@@ -9,6 +9,8 @@ import { isFree, slotsForDate } from './availability.ts';
 import { addDays, brl, firstName, fmtDate, fold, formatPhone, localDate, localTime, normalizePhone, parseMoney, WEEKDAYS_SHORT } from './format.ts';
 import { loadAccount, sendTemplate, sendText, withinWindow } from './whatsapp.ts';
 import { TEMPLATES } from './templates.ts';
+import { createCharge, ProviderError, type Actor } from './payments.ts';
+import { emitNote } from './fiscal.ts';
 import type { ActionReceipt, Appointment, Contact, PayMethod, Role, Service } from './types.ts';
 
 export interface AgentCtx extends Base {
@@ -42,6 +44,7 @@ async function log(c: AgentCtx, action: string, summary: string, target_type?: s
 async function alert(c: AgentCtx, kind: string, title: string, body: string, link: string) {
   if (!sim(c)) await notify(c.company.id, kind, title, body, link);
 }
+const iaActor = (c: AgentCtx): Actor => ({ type: 'ia', name: `IA, a pedido de ${c.member?.name ?? 'equipe'}`, userId: c.member?.userId ?? null, channel: 'ia_dono', via: 'ia_dono' });
 function canWrite(c: AgentCtx): ToolResult | null {
   return c.writable ? null : err('A assinatura da empresa está inativa: só é possível consultar. Avise a pessoa para reativar em Configurações → Assinatura.');
 }
@@ -300,6 +303,24 @@ export const EXECUTORS: Record<string, (c: AgentCtx, a: Record<string, unknown>)
     return ok(`Mensagem enviada para ${contact.name}.`, { tool: 'mensagem_para_cliente', label: `Mensagem enviada para ${contact.name}`, detail: text.slice(0, 80), status: 'ok' });
   },
   async criar_orcamento(c, a) { return createQuote(c, a, true); },
+  async cobrar_cliente(c, a) {
+    const blocked = canWrite(c); if (blocked) return blocked;
+    try {
+      const r = await createCharge(c, { contactId: s(a.cliente_id), amount: money(a.valor), description: s(a.descricao, 300) || 'Serviço', dueDate: DATE.test(s(a.vencimento)) ? s(a.vencimento) : addDays(localDate(new Date().toISOString(), c.tz), 3), method: (['pix', 'boleto'].includes(String(a.forma)) ? a.forma : 'pix_boleto') as 'pix', document: s(a.cpf_cnpj, 20) || null, send: a.enviar !== false && !sim(c) }, iaActor(c));
+      const ch = r.charge;
+      return ok(`Cobrança de ${brl(ch.amount)} criada. Link: ${ch.invoice_url}.${r.sent ? ' Enviada ao cliente pelo WhatsApp.' : r.reason ? ` Não enviei pelo WhatsApp: ${r.reason}` : ''}`,
+        { tool: 'cobrar_cliente', label: `Cobrança de ${brl(ch.amount)} criada`, detail: `${ch.description}${r.sent ? ' · enviada no WhatsApp' : ''}`, status: 'ok', link: '#/cobrancas' });
+    } catch (e) { return err(e instanceof ProviderError ? e.friendly : (e as Error).message); }
+  },
+  async emitir_nota(c, a) {
+    const blocked = canWrite(c); if (blocked) return blocked;
+    const contact = a.cliente_id ? await contactById(c, a.cliente_id) : null;
+    if (!contact) return err('Cliente não encontrado.');
+    try {
+      const n = await emitNote(c, { contactId: contact.id, saleId: s(a.venda_id) || null, amount: money(a.valor), description: s(a.descricao, 2000) || 'Prestação de serviço', taker: { name: contact.name, document: s(a.cpf_cnpj, 20) || contact.document || null, email: contact.email } }, iaActor(c));
+      return ok(`Nota de ${brl(n.amount)} enviada para a prefeitura (situação: ${n.status}). Avisamos no painel quando for autorizada.`, { tool: 'emitir_nota', label: n.status === 'autorizada' ? `Nota nº ${n.number} autorizada` : 'Nota fiscal em emissão', detail: `${contact.name} · ${brl(n.amount)}`, status: n.status === 'erro' ? 'erro' : 'ok', link: '#/cobrancas?aba=notas' });
+    } catch (e) { return err(e instanceof ProviderError ? e.friendly : (e as Error).message); }
+  },
   async baixar_conta(c, a) {
     const blocked = canWrite(c); if (blocked) return blocked;
     const { data: e } = await db.from('finance_entries').select('*').eq('company_id', c.company.id).eq('id', s(a.conta_id)).maybeSingle();
@@ -758,9 +779,9 @@ export const OWNER_TOOLS: T[] = [
       const { data } = await q;
       const rows = data ?? [];
       const monthStart = `${today.slice(0, 7)}-01`;
-      const { data: paid } = await db.from('finance_entries').select('kind, amount').eq('company_id', c.company.id).gte('paid_at', at(c, monthStart, '00:00').toISOString());
+      const { data: paid } = await db.from('finance_entries').select('kind, amount, sale_id').eq('company_id', c.company.id).gte('paid_at', at(c, monthStart, '00:00').toISOString());
       const { data: sales } = await db.from('sales').select('amount').eq('company_id', c.company.id).gte('paid_at', at(c, monthStart, '00:00').toISOString());
-      const inM = (paid ?? []).filter((p) => p.kind === 'receber').reduce((t, p) => t + Number(p.amount), 0) + (sales ?? []).reduce((t, p) => t + Number(p.amount), 0);
+      const inM = (paid ?? []).filter((p) => p.kind === 'receber' && !p.sale_id).reduce((t, p) => t + Number(p.amount), 0) + (sales ?? []).reduce((t, p) => t + Number(p.amount), 0);
       const outM = (paid ?? []).filter((p) => p.kind === 'pagar').reduce((t, p) => t + Number(p.amount), 0);
       const list = rows.map((r) => `[${r.id}] ${r.kind === 'pagar' ? 'A PAGAR' : 'A RECEBER'} · ${r.description}${r.counterpart ? ` (${r.counterpart})` : ''} · ${brl(Number(r.amount))} · vence ${fmtDate(r.due_date + 'T12:00:00Z', c.tz)}${r.due_date < today ? ' · VENCIDA' : ''}`).join('\n');
       return ok(`${list || 'Nenhuma conta nesse filtro.'}\nResultado do mês até agora: entrou ${brl(inM)} (vendas e recebimentos), saiu ${brl(outM)}.`);
@@ -824,6 +845,52 @@ export const OWNER_TOOLS: T[] = [
       if (error) return err(/duplicate|unique/i.test(error.message) ? 'Já existe um produto com esse código.' : error.message);
       await log(c, 'cadastrar_produto', `Cadastrou o produto ${name}`, 'product', data.id);
       return ok(`Produto ${name} cadastrado com saldo ${Number(data.stock)} ${data.unit}. Id ${data.id}.`, { tool: 'cadastrar_produto', label: `Produto ${name} cadastrado`, detail: `saldo ${Number(data.stock)} ${data.unit}`, status: 'ok', link: '#/estoque' });
+    },
+  },
+  {
+    name: 'cobrar_cliente',
+    description: 'Gera uma cobrança (Pix, boleto ou os dois) no Asaas da empresa para um cliente e manda o link pelo WhatsApp (pede confirmação antes). Precisa do CPF ou CNPJ do cliente: se não estiver no cadastro, pergunte.',
+    input_schema: obj({ cliente_id: str('Id do cliente.'), valor: { type: 'number', description: 'Valor em reais (mínimo R$ 5).' }, descricao: str('A que se refere.'), vencimento: str('AAAA-MM-DD. Sem data, 3 dias a partir de hoje.'), forma: { type: 'string', enum: ['pix', 'boleto', 'pix_boleto'] }, cpf_cnpj: str('CPF ou CNPJ, se não estiver no cadastro.'), enviar: { type: 'boolean', description: 'Mandar o link no WhatsApp (padrão: sim).' } }, ['cliente_id', 'valor', 'descricao']),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const contact = await contactById(c, i.cliente_id);
+      if (!contact) return err('Cliente não encontrado.');
+      const amount = money(i.valor);
+      if (!(amount >= 5)) return err('O valor mínimo de uma cobrança é R$ 5,00.');
+      const doc = s(i.cpf_cnpj, 20).replace(/\D/g, '') || contact.document || '';
+      if (!/^(\d{11}|\d{14})$/.test(doc)) return err(`Preciso do CPF ou CNPJ de ${contact.name} para gerar a cobrança. Pergunte e chame de novo com cpf_cnpj.`);
+      const { data: integ } = await db.from('company_integrations').select('status').eq('company_id', c.company.id).eq('provider', 'asaas').maybeSingle();
+      if (integ?.status !== 'conectado') return err('O Asaas da empresa não está conectado. Conecte em Integrações para cobrar clientes.');
+      return askConfirmation(c, 'cobrar_cliente', { ...i, cpf_cnpj: doc }, `Cobrar ${brl(amount)} de ${contact.name} (${s(i.descricao, 80)})${i.enviar === false ? '' : ' e enviar o link no WhatsApp'}`);
+    },
+  },
+  {
+    name: 'emitir_nota',
+    description: 'Emite a nota fiscal de serviço (NFS-e) para um cliente (pede confirmação antes). Use o valor e a descrição do serviço; com venda_id, liga a nota à venda.',
+    input_schema: obj({ cliente_id: str('Id do cliente (tomador).'), valor: { type: 'number' }, descricao: str('Descrição do serviço na nota.'), venda_id: str('Venda relacionada (opcional).'), cpf_cnpj: str('CPF ou CNPJ do cliente (opcional, mas recomendado).') }, ['cliente_id', 'valor', 'descricao']),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      const contact = await contactById(c, i.cliente_id);
+      if (!contact) return err('Cliente não encontrado.');
+      const { data: integ } = await db.from('company_integrations').select('status').eq('company_id', c.company.id).eq('provider', 'focusnfe').maybeSingle();
+      if (integ?.status !== 'conectado') return err('A emissão de nota fiscal não está conectada. Conecte a Focus NFe em Integrações.');
+      return askConfirmation(c, 'emitir_nota', i, `Emitir nota fiscal de ${brl(money(i.valor))} para ${contact.name}: ${s(i.descricao, 80)}`);
+    },
+  },
+  {
+    name: 'consultar_cobrancas',
+    description: 'Lista as cobranças da empresa (em aberto, vencidas ou pagas) com valor, cliente e link.',
+    input_schema: obj({ situacao: { type: 'string', enum: ['pendente', 'vencida', 'paga', 'todas'] } }),
+    run: async (i, c) => {
+      const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
+      let q = db.from('charges').select('id, description, amount, due_date, status, invoice_url, contact_id').eq('company_id', c.company.id).order('created_at', { ascending: false }).limit(20);
+      if (['pendente', 'vencida', 'paga'].includes(String(i.situacao))) q = q.eq('status', i.situacao);
+      const { data } = await q;
+      if (!(data ?? []).length) return ok('Nenhuma cobrança nesse filtro.');
+      const ids = [...new Set((data ?? []).map((x) => x.contact_id).filter(Boolean))];
+      const { data: cs } = await db.from('contacts').select('id, name').in('id', ids);
+      const names = new Map((cs ?? []).map((x) => [x.id, x.name]));
+      return ok((data ?? []).map((x) => `[${x.id}] ${names.get(x.contact_id) ?? 'Cliente'} · ${brl(Number(x.amount))} · ${x.description} · vence ${fmtDate(x.due_date + 'T12:00:00Z', c.tz)} · ${x.status}${x.status !== 'paga' && x.invoice_url ? ` · ${x.invoice_url}` : ''}`).join('\n'));
     },
   },
   {

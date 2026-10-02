@@ -3,7 +3,7 @@
 import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, FinanceEntry, PayMethod, PendingAction, Product, Quote, Sale, Service } from '../types';
 import { audit, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
-import { applyMovement } from './demoSource';
+import { applyMovement, demoCreateCharge, demoEmitNote } from './demoSource';
 import { isFree, slotsForDate } from '../availability';
 import { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime } from '../../../shared/parse';
 export { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime };
@@ -211,6 +211,18 @@ function executePending(p: PendingAction): ActionReceipt {
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'baixar_conta', summary: `Marcou como ${verb}: ${e.description} (${brl(e.amount)}) — confirmado pelo dono`, target_type: 'finance', target_id: e.id, status: 'ok' });
     return { tool: p.tool, label: `Conta ${verb}`, status: 'ok', detail: `${e.description} · ${brl(e.amount)}`, link: '#/financeiro' };
   }
+  if (p.tool === 'cobrar_cliente') {
+    try {
+      const r = demoCreateCharge({ ...p.args, send: true }, 'ia_dono');
+      return { tool: p.tool, label: `Cobrança de ${brl(r.charge.amount)} ${r.sent ? 'enviada' : 'criada'}`, status: 'ok', detail: `${a.contact_name} · vence ${fmtDate(r.charge.due_date).slice(0, 5)}${r.sent ? ' · link no WhatsApp' : ''}`, link: '#/cobrancas' };
+    } catch (e) { return { tool: p.tool, label: 'Não deu para cobrar', status: 'erro', detail: (e as Error).message }; }
+  }
+  if (p.tool === 'emitir_nota') {
+    try {
+      const n = demoEmitNote(p.args, 'ia_dono');
+      return { tool: p.tool, label: 'Nota enviada para a prefeitura', status: 'ok', detail: `${n.taker.name} · ${brl(n.amount)} · aviso quando autorizar`, link: '#/cobrancas?aba=notas' };
+    } catch (e) { return { tool: p.tool, label: 'Não deu para emitir a nota', status: 'erro', detail: (e as Error).message }; }
+  }
   return { tool: p.tool, label: 'Ação desconhecida', status: 'erro' };
 }
 
@@ -231,6 +243,36 @@ const qtyIn = (f: string) => { const m = f.match(/(\d+(?:[.,]\d+)?)\s*(?:un|unid
 
 function handleGestao(ctx: Ctx, clause: string, f: string): boolean {
   const today = ctx.today;
+  // cobrar cliente com Pix/boleto (sensível)
+  if (/\bcobr(a|ar|e|ança|anca)\b/.test(f) && parseMoneyIn(clause) && !/\?\s*$/.test(clause) && !/\b(quanto|qual)\b/.test(f)) {
+    const amount = parseMoneyIn(clause)!;
+    const c = resolveContact(ctx, clause);
+    if (!c || c === 'ambiguous') { ctx.lines.push('De quem é a cobrança? Ex.: "cobra R$ 250 da Juliana para sexta".'); return true; }
+    const docIn = clause.match(/\b(\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/)?.[1]?.replace(/\D/g, '');
+    const doc = docIn || c.document;
+    if (!doc) { ctx.lines.push(`Para gerar Pix e boleto, o Asaas pede o CPF ou CNPJ de ${c.name}. Me manda junto: "cobra ${brl(amount)} da ${firstName(c.name)}, CPF 000.000.000-00".`); return true; }
+    const due = parseDate(f, today) ?? addDays(today, 3);
+    const svc = matchService(f);
+    const description = svc?.name ?? 'Serviço';
+    ctx.pending = createPending(ctx.conv, 'cobrar_cliente', { contact_id: c.id, contact_name: c.name, document: doc, amount, due_date: due, description, method: 'pix_boleto' }, `Cobrar ${brl(amount)} de ${c.name} (Pix ou boleto, vence ${fmtDate(due)})`);
+    ctx.actions.push({ tool: 'cobrar_cliente', label: 'Cobrança aguardando confirmação', status: 'aguardando', detail: `${c.name} · ${brl(amount)} · ${fmtDate(due).slice(0, 5)}`, pending_id: ctx.pending.id });
+    ctx.lines.push(`Vou gerar uma cobrança de ${brl(amount)} para ${c.name} (${description}), com Pix e boleto e vencimento em ${fmtDate(due)}, e mandar o link no WhatsApp de ${firstName(c.name)}. Confirma? Responda SIM ou NÃO.`);
+    return true;
+  }
+  // emitir nota fiscal de serviço (sensível)
+  if (/\b(emit|ger|tir|fa[zc]|solt)\w*\b.*\bnota\b|\bnota fiscal\b.*\b(para|pra|da|do)\b/.test(f)) {
+    const c = resolveContact(ctx, clause);
+    if (!c || c === 'ambiguous') { ctx.lines.push('A nota é para qual cliente? Ex.: "emite a nota da Juliana".'); return true; }
+    const paid = table('charges').find((x) => x.contact_id === c.id && x.status === 'paga' && !table('fiscal_notes').some((n) => n.charge_id === x.id));
+    const sale = table('sales').filter((x) => x.contact_id === c.id).sort((x, y) => (x.paid_at < y.paid_at ? 1 : -1))[0];
+    const amount = parseMoneyIn(clause) ?? paid?.amount ?? sale?.amount;
+    if (!amount) { ctx.lines.push(`Não achei venda de ${c.name}. Qual o valor da nota? Ex.: "emite a nota da ${firstName(c.name)} de R$ 180".`); return true; }
+    const description = matchService(f)?.name ?? paid?.description ?? sale?.description ?? 'Prestação de serviço';
+    ctx.pending = createPending(ctx.conv, 'emitir_nota', { contact_id: c.id, amount, description, charge_id: paid?.id ?? null, sale_id: paid ? paid.sale_id : sale?.id ?? null }, `Emitir NFS-e de ${brl(amount)} para ${c.name} (${description})`);
+    ctx.actions.push({ tool: 'emitir_nota', label: 'Nota fiscal aguardando confirmação', status: 'aguardando', detail: `${c.name} · ${brl(amount)}`, pending_id: ctx.pending.id });
+    ctx.lines.push(`Vou emitir a nota fiscal de serviço de ${brl(amount)} para ${c.name}${c.document ? '' : ' (sem CPF cadastrado)'}, descrição "${description}". Nota fiscal pede confirmação: responda SIM ou NÃO.`);
+    return true;
+  }
   // dar baixa numa conta (sensível)
   if (/\b(paguei|recebi|pago|quitei|baixa)\b.*\b(conta|aluguel|boleto|salario|fornecedor|luz|energia|internet|contrato)\b|\bmarca\b.*\b(paga|recebida)\b/.test(f)) {
     const open = table('finance_entries').filter((e) => !e.paid_at);
@@ -316,7 +358,7 @@ function resolveContact(ctx: Ctx, clause: string): Contact | null | 'ambiguous' 
   return found[0];
 }
 
-const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\nAções sensíveis (vendas, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
+const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\n• "Cobra R$ 250 da Juliana para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (vendas, cobranças, notas fiscais, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
 
 function handleClause(ctx: Ctx, clause: string) {
   const f = fold(clause);

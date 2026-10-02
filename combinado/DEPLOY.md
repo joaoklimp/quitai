@@ -35,7 +35,7 @@ Nos exemplos abaixo, troque:
    npx supabase db push
    ```
 
-   O `db push` cria as tabelas (inclusive financeiro e estoque), as regras de acesso por empresa (RLS), as funções e gatilhos, o tempo real do painel, a pasta privada de arquivos do WhatsApp (`whatsapp-media`) e os dois agendamentos (`orbyta-automacoes` a cada 5 minutos e `orbyta-manutencao` a cada 10).
+   O `db push` cria as tabelas (inclusive financeiro, estoque, cobranças e notas fiscais), as regras de acesso por empresa (RLS), as funções e gatilhos, o tempo real do painel, a pasta privada de arquivos do WhatsApp (`whatsapp-media`) e os dois agendamentos (`orbyta-automacoes` a cada 5 minutos e `orbyta-manutencao` a cada 10).
 
 3. Gere um segredo longo para o agendador (guarde, ele é usado de novo na etapa 2):
 
@@ -103,7 +103,7 @@ Nos exemplos abaixo, troque:
 npx supabase functions deploy
 ```
 
-Isso publica as sete funções: `agent`, `whatsapp-webhook`, `whatsapp`, `billing`, `asaas-webhook`, `team` e `cron`. Cada uma faz a própria conferência de acesso (as do painel validam o login do usuário; as que recebem chamadas de fora conferem a assinatura da Meta, o token do Asaas ou o segredo do agendador), por isso o `supabase/config.toml` desliga a verificação automática de token do Supabase. Assim elas funcionam com as chaves antigas e com as novas chaves de API do Supabase.
+Isso publica as nove funções: `agent`, `whatsapp-webhook`, `whatsapp`, `billing`, `asaas-webhook`, `team`, `cron`, `integrations` (conectar Asaas e Focus NFe da empresa, cobrar e emitir notas) e `cobranca-webhook` (aviso de pagamento das cobranças que as empresas fazem aos clientes delas). Cada uma faz a própria conferência de acesso (as do painel validam o login do usuário; as que recebem chamadas de fora conferem a assinatura da Meta, o token do Asaas ou o segredo do agendador), por isso o `supabase/config.toml` desliga a verificação automática de token do Supabase. Assim elas funcionam com as chaves antigas e com as novas chaves de API do Supabase.
 
 Sempre que mudar algo em `supabase/functions/`, rode esse comando de novo. Se mudou algo em `src/shared/`, rode antes `npm run sync:functions`.
 
@@ -203,6 +203,7 @@ Fora das 24 horas depois da última mensagem do cliente, o WhatsApp só deixa a 
 | `resumo_diario` | Utilidade | Resumo de hoje na {{1}}: {{2}}. Responda esta mensagem para ver os detalhes. |
 | `lembrete_tarefa` | Utilidade | Lembrete da ORBYTA: {{1}}. Responda esta mensagem se precisar de algo. |
 | `aviso_equipe` | Utilidade | Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes. |
+| `cobranca_cliente` | Utilidade | Olá, {{1}}! Segue a cobrança de {{2}} referente a {{3}}, com vencimento em {{4}}. Para pagar com Pix ou boleto, é só abrir o link: {{5}} |
 
 Os modelos são de cada conta do WhatsApp: no cadastro incorporado, cada cliente precisa tê-los na própria conta (eles aparecem no painel para copiar).
 
@@ -213,6 +214,8 @@ No painel, **Configurações → WhatsApp → Verificar meu número**. Mande o c
 ---
 
 ## 7. Pagamentos (Asaas)
+
+Esta seção é a **assinatura da ORBYTA** (as empresas pagando você). A cobrança que cada empresa faz aos clientes dela usa a conta Asaas da própria empresa e está na seção 7.1.
 
 Teste tudo primeiro no ambiente de testes (<https://sandbox.asaas.com>) com `ASAAS_ENV=sandbox`. Depois troque para a conta de produção.
 
@@ -228,6 +231,24 @@ Teste tudo primeiro no ambiente de testes (<https://sandbox.asaas.com>) com `ASA
 Como funciona: o cartão vai pelo Checkout do Asaas com cobrança recorrente. Pix e boleto viram uma assinatura com fatura mensal ou anual. O webhook mantém o plano em dia: libera quando paga, dá 7 dias de tolerância quando atrasa e bloqueia em caso de estorno ou contestação. Se um pagamento não liberar o plano, o botão **Já paguei** em **Configurações → Assinatura** confere direto no Asaas.
 
 Os preços dos planos ficam na tabela `plans` do banco e em `src/shared/plans.ts` (o servidor confere o valor pelo banco). Para mudar um preço, altere os dois e publique de novo.
+
+### 7.1 Cobrança dos clientes e nota fiscal (cada empresa conecta a sua)
+
+Nada para configurar no servidor: cada empresa conecta as próprias contas em **Integrações**, e as chaves ficam guardadas só no banco (tabela `integration_credentials`, que nem a equipe da empresa consegue ler).
+
+**Cobrança (Asaas da empresa)**
+
+1. A empresa cria a conta dela no Asaas (comece pelo sandbox) e gera a chave em **Integrações → Chaves de API**.
+2. No painel: **Integrações → Cobrança dos seus clientes → Conectar**, escolhe o ambiente e cola a chave.
+3. A ORBYTA confere a chave e cadastra sozinha o webhook `https://SEU_REF.supabase.co/functions/v1/cobranca-webhook?empresa=<id>` com um token próprio da empresa. Se o Asaas recusar, o painel mostra a URL e o token para cadastrar à mão.
+4. Cobranças: pelo painel (**Cobranças e notas**) ou pelo WhatsApp do dono (“cobra R$ 250 da Juliana para sexta”, com confirmação). O Asaas exige CPF ou CNPJ do cliente (campo no cadastro do cliente). A cobrança entra em Financeiro → a receber; quando é paga, vira venda e a conta é baixada. O link vai pelo WhatsApp (dentro das 24 horas como mensagem normal; fora, pelo modelo `cobranca_cliente`).
+
+**Nota fiscal de serviço (Focus NFe da empresa)**
+
+1. A empresa contrata a Focus NFe, cadastra o CNPJ e envia o certificado digital A1 no painel da Focus.
+2. No painel: **Integrações → Nota fiscal de serviço → Conectar**, com o token da Focus e os dados fiscais (CNPJ, inscrição municipal, código IBGE do município, item da lista de serviço, alíquota do ISS, Simples Nacional). Esses dados vêm do contador.
+3. Comece em **homologação**: as notas de teste não valem. Cada prefeitura tem exigências próprias; se recusar, o motivo aparece na lista de notas.
+4. A emissão é assíncrona: o agendador `orbyta-automacoes` consulta as notas em processamento e avisa a equipe quando a prefeitura autoriza ou recusa. Só NFS-e (serviço); NF-e de produto ainda não.
 
 ---
 

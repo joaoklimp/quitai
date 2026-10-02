@@ -48,7 +48,7 @@ export default function Finance() {
   const toPay = open.filter((e) => e.kind === 'pagar'), toReceive = open.filter((e) => e.kind === 'receber');
   const overdue = open.filter((e) => e.due_date < today);
   const paidThisMonth = all.filter((e) => e.paid_at && e.paid_at >= fromLocal(monthStart, '00:00', tz).toISOString());
-  const inMonth = sum(paidThisMonth.filter((e) => e.kind === 'receber')) + monthSales.reduce((s, x) => s + x.amount, 0);
+  const inMonth = sum(paidThisMonth.filter((e) => e.kind === 'receber' && !e.sale_id)) /* o que virou venda já conta nas vendas */ + monthSales.reduce((s, x) => s + x.amount, 0);
   const outMonth = sum(paidThisMonth.filter((e) => e.kind === 'pagar'));
 
   // fluxo previsto: próximas 6 semanas (vencidas entram na primeira)

@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Bell, CalendarDays, CheckCheck, ClipboardList, CreditCard, FileText, HelpCircle, History, LayoutGrid, LogOut, Menu as MenuIcon, MessageCircle,
   Monitor, Moon, Search, Settings, ShieldCheck, Smartphone, Sparkles, Sun, Tag, Users, Wallet, Workflow, CalendarCheck, CircleDollarSign, Bot, Info,
-  Landmark, Package, Plug, Orbit, ChevronLeft, ChevronRight,
+  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
@@ -30,6 +30,7 @@ export const PRIMARY: NavItem[] = [
 export const SECONDARY: NavItem[] = [
   { to: '/modulos', label: 'Módulos ORBYTA', icon: Orbit },
   { to: '/vendas', label: 'Vendas', icon: Wallet, roles: MANAGERS },
+  { to: '/cobrancas', label: 'Cobranças e notas', icon: ReceiptText, roles: MANAGERS },
   { to: '/catalogo', label: 'Serviços e preços', icon: Tag },
   { to: '/tarefas', label: 'Tarefas', icon: ClipboardList },
   { to: '/analises', label: 'Análises', icon: BarChart3 },

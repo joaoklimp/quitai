@@ -7,6 +7,7 @@ import type {
 import type { ProductRow } from './sheet';
 import type { Cycle, PaidPlanId } from '../../shared/plans';
 
+export type IntegrationAction = 'connect_asaas' | 'connect_focus' | 'disconnect' | 'webhook_info' | 'charge_create' | 'charge_send' | 'charge_cancel' | 'charge_sync' | 'note_emit' | 'note_sync' | 'note_cancel' | 'demo_pay';
 export interface SignUpInput { name: string; email: string; password: string }
 export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean }
 export interface CheckoutInput { plan: PaidPlanId; cycle: Cycle; method: 'cartao' | 'pix_boleto'; cpfCnpj?: string }
@@ -46,6 +47,8 @@ export interface DataSource {
   remove(table: TableName, id: string): Promise<void>;
   /** Importa produtos de planilha: cria ou atualiza (pelo código ou nome) e acerta o saldo. */
   importProducts(rows: ProductRow[]): Promise<ImportResult>;
+  /** Cobrança dos clientes (Asaas) e nota fiscal (Focus NFe): conectar, cobrar, emitir, consultar e cancelar. */
+  integrations<T = Record<string, unknown>>(action: IntegrationAction, payload?: Record<string, unknown>): Promise<T>;
 
   /* orçamentos */
   getQuote(id: string): Promise<Quote | null>;

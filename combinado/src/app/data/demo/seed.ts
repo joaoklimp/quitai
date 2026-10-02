@@ -6,7 +6,7 @@ import type {
   PayMethod, ContactSource, AutomationKind, ActionReceipt, PendingAction,
 } from '../types';
 import { addDays, fromLocal, localDate, localParts, normalizePhone, weekdayOf } from '../../../shared/format';
-import type { FinanceEntry, Product, StockMovement } from '../types';
+import type { Charge, CompanyIntegration, FinanceEntry, FiscalNote, Product, StockMovement } from '../types';
 import { buildGestao, DEMO_FAQ } from './gestao';
 
 export const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
@@ -39,6 +39,9 @@ export interface DemoDB {
   finance_entries: FinanceEntry[];
   products: Product[];
   stock_movements: StockMovement[];
+  charges: Charge[];
+  fiscal_notes: FiscalNote[];
+  company_integrations: CompanyIntegration[];
   /** campos de mensagens por dia (o resto do agregado vem das linhas) */
   msgStats: Record<string, Pick<DailyStat, 'msgs_in' | 'msgs_ai' | 'msgs_team' | 'conversations' | 'response_sum' | 'response_count' | 'handoffs'>>;
   /** agregados de vendas/orçamentos para dias anteriores à janela de linhas */
@@ -46,7 +49,7 @@ export interface DemoDB {
   seq: { quote: number; id: number };
 }
 
-export const DEMO_VERSION = 4;
+export const DEMO_VERSION = 6;
 const HISTORY_DAYS = 365;
 const RAW_DAYS = 75;
 const AI_START = 120; // a empresa começou a usar a IA há 120 dias

@@ -54,6 +54,12 @@ export const TEMPLATES = {
     params: ['tarefa'],
     use: 'Lembretes das tarefas pedidas à IA ("me lembra de...").',
   },
+  cobranca: {
+    name: 'cobranca_cliente', category: 'Utilidade',
+    body: 'Olá, {{1}}! Segue a cobrança de {{2}} referente a {{3}}, com vencimento em {{4}}. Para pagar com Pix ou boleto, é só abrir o link: {{5}}',
+    params: ['primeiro nome', 'valor', 'descrição', 'vencimento', 'link de pagamento'],
+    use: 'Enviar uma cobrança (Pix ou boleto) para quem não escreveu nas últimas 24 horas.',
+  },
   avisoEquipe: {
     name: 'aviso_equipe', category: 'Utilidade',
     body: 'Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes.',

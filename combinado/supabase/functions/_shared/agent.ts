@@ -79,7 +79,7 @@ export async function customerTurn(b: Base, conv: Conversation, contact: Contact
   }
 }
 
-const ATENDENTE_SEM = ['atualizar_servico', 'criar_servico', 'pausar_ia', 'lancar_conta', 'consultar_contas', 'baixar_conta', 'cadastrar_produto'];
+const ATENDENTE_SEM = ['atualizar_servico', 'criar_servico', 'pausar_ia', 'lancar_conta', 'consultar_contas', 'baixar_conta', 'cadastrar_produto', 'cobrar_cliente', 'emitir_nota', 'consultar_cobrancas'];
 
 /** Executa um pedido da equipe (pelo WhatsApp ou pelo assistente do painel). */
 export async function ownerTurn(b: Base, conv: Conversation, member: Member, channel: 'whatsapp' | 'painel'): Promise<TurnResult> {

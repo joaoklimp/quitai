@@ -29,6 +29,7 @@ const Finance = lazy(() => import('./pages/Finance'));
 const Stock = lazy(() => import('./pages/Stock'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const Modules = lazy(() => import('./pages/Modules'));
+const Charges = lazy(() => import('./pages/Charges'));
 const Auth = lazy(() => import('./pages/auth/Auth'));
 const Onboarding = lazy(() => import('./pages/auth/Onboarding'));
 const NewPassword = lazy(() => import('./pages/auth/NewPassword'));
@@ -93,6 +94,7 @@ export function App() {
               <Route path="/admin" element={me.isPlatformAdmin ? <Admin /> : <Navigate to="/" replace />} />
               <Route path="/ajuda" element={<Help />} />
               <Route path="/financeiro" element={<Finance />} />
+              <Route path="/cobrancas" element={<Charges />} />
               <Route path="/estoque" element={<Stock />} />
               <Route path="/integracoes" element={<Integrations />} />
               <Route path="/modulos" element={<Modules />} />
