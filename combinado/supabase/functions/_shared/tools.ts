@@ -135,6 +135,8 @@ async function book(c: AgentCtx, input: Record<string, unknown>): Promise<ToolRe
   }).select('*').single();
   if (error) return err(/horario_ocupado/.test(error.message) ? 'Esse horário acabou de ser ocupado. Consulte de novo e ofereça outro.' : `Não consegui agendar: ${error.message}`);
   const label = `${when(c, appt.starts_at)} · ${appt.title}`;
+  // quem estava na lista de espera e conseguiu o horário sai da lista (encaixe concluído)
+  if (contact && !sim(c)) await db.from('waitlist').update({ status: 'agendado', appointment_id: appt.id }).eq('company_id', c.company.id).eq('contact_id', contact.id).in('status', ['aguardando', 'oferecido']);
   await log(c, 'agendar', `Agendou ${contact?.name ?? appt.title} para ${fmtDate(appt.starts_at, c.tz).slice(0, 5)} às ${localTime(appt.starts_at, c.tz)} (${appt.title})${pending ? ', aguardando confirmação da equipe' : ''}`, 'appointment', appt.id);
   if (c.mode === 'cliente') await alert(c, 'agendamento', pending ? `Confirmar horário de ${firstName(contact?.name)}` : `${firstName(contact?.name)} marcou um horário`, label, '#/agenda');
   return ok(`Agendado (${pending ? 'pendente de confirmação da equipe' : 'confirmado'}): ${label}${appt.address ? ` · ${appt.address}` : ''}. Id ${appt.id}.`,
@@ -176,6 +178,28 @@ async function cancelAppointmentNow(c: AgentCtx, appt: Appointment, reason: stri
   await log(c, 'cancelar_agendamento', `Cancelou o horário de ${fmtDate(appt.starts_at, c.tz).slice(0, 5)} às ${localTime(appt.starts_at, c.tz)} (${appt.title})${reason ? ` — ${reason}` : ''}`, 'appointment', appt.id);
   if (c.mode === 'cliente') await alert(c, 'agendamento', `${firstName(c.contact?.name)} cancelou o horário`, `${label}${reason ? ` · ${reason}` : ''}`, '#/agenda');
   return ok(`Horário cancelado: ${label}.`, { tool: 'cancelar_horario', label: 'Horário cancelado', detail: label, status: 'ok', link: '#/agenda' });
+}
+
+/* ---------- lista de espera ---------- */
+const PERIODS = ['manha', 'tarde', 'noite', 'qualquer'];
+const PERIOD_TEXT: Record<string, string> = { manha: 'de manhã', tarde: 'à tarde', noite: 'à noite', qualquer: 'em qualquer horário' };
+
+async function joinWaitlist(c: AgentCtx, contact: Contact, input: Record<string, unknown>): Promise<ToolResult> {
+  const blocked = canWrite(c); if (blocked) return blocked;
+  const date = s(input.data);
+  if (date && !DATE.test(date)) return err('Use a data no formato AAAA-MM-DD (ou deixe vazio para qualquer dia).');
+  const svc = input.servico_id ? service(c, input.servico_id) : undefined;
+  if (input.servico_id && !svc) return err('Serviço não encontrado: use um id da lista.');
+  const period = PERIODS.includes(s(input.periodo)) ? s(input.periodo) : 'qualquer';
+  const row = { company_id: c.company.id, contact_id: contact.id, service_id: svc?.id ?? null, desired_date: date || null, period, notes: s(input.observacoes, 500) || null, created_via: via(c) };
+  if (sim(c)) return ok(`(Simulador) ${contact.name} entraria na lista de espera ${date ? `para ${fmtDate(date + 'T12:00:00Z', c.tz).slice(0, 5)}` : 'para o primeiro horário'} ${PERIOD_TEXT[period]}.`, { tool: 'entrar_lista_espera', label: 'Cliente na lista de espera', detail: `${contact.name}${date ? ` · ${fmtDate(date + 'T12:00:00Z', c.tz).slice(0, 5)}` : ''}`, status: 'ok', link: '#/agenda' });
+  const { data: open } = await db.from('waitlist').select('id').eq('company_id', c.company.id).eq('contact_id', contact.id).in('status', ['aguardando', 'oferecido']).maybeSingle();
+  const { error } = open ? await db.from('waitlist').update({ ...row, status: 'aguardando', offered_at: null, offered_starts_at: null }).eq('id', open.id) : await db.from('waitlist').insert(row);
+  if (error) return err(`Não consegui colocar na lista: ${error.message}`);
+  const detail = `${contact.name}${date ? ` · ${fmtDate(date + 'T12:00:00Z', c.tz).slice(0, 5)}` : ''} · ${PERIOD_TEXT[period]}${svc ? ` · ${svc.name}` : ''}`;
+  await log(c, 'lista_espera', `Colocou ${contact.name} na lista de espera (${detail})`, 'contact', contact.id);
+  if (c.mode === 'cliente') await alert(c, 'agendamento', `${firstName(contact.name)} entrou na lista de espera`, detail, '#/agenda');
+  return ok(`${contact.name} está na lista de espera. Se abrir um horário que sirva, a ORBYTA avisa pelo WhatsApp na hora.`, { tool: 'entrar_lista_espera', label: 'Cliente na lista de espera', detail, status: 'ok', link: '#/agenda' });
 }
 
 /* ---------- orçamentos ---------- */
@@ -423,6 +447,12 @@ export const CUSTOMER_TOOLS: T[] = [
     },
   },
   {
+    name: 'entrar_lista_espera',
+    description: 'Coloca o cliente desta conversa na lista de espera quando não há horário que sirva para ele. Se abrir um horário (por cancelamento), a empresa oferece para ele pelo WhatsApp.',
+    input_schema: obj({ data: str('Dia desejado AAAA-MM-DD (vazio = o primeiro horário que abrir).'), periodo: { type: 'string', enum: PERIODS, description: 'Período preferido.' }, servico_id: str('Id do serviço, se já escolheu.'), observacoes: str('Detalhes (ex.: "pode ir depois das 17h").') }),
+    run: (i, c) => joinWaitlist(c, c.contact!, i),
+  },
+  {
     name: 'chamar_atendente',
     description: 'Passa a conversa para uma pessoa da equipe e para de responder. Use quando o cliente pedir, reclamar, pedir desconto acima do limite, ou quando você não tiver certeza.',
     input_schema: obj({ motivo: str('Motivo curto, para a equipe entender sem ler tudo (ex.: "Pediu 20% de desconto").') }, ['motivo']),
@@ -578,6 +608,21 @@ export const OWNER_TOOLS: T[] = [
     },
   },
   consultarHorarios,
+  {
+    name: 'lista_espera',
+    description: 'Sem cliente_id: mostra quem está na lista de espera. Com cliente_id: coloca esse cliente na lista (avisamos quando abrir um horário).',
+    input_schema: obj({ cliente_id: str('Id do cliente para adicionar (opcional).'), data: str('Dia desejado AAAA-MM-DD (opcional).'), periodo: { type: 'string', enum: PERIODS }, servico_id: str('Id do serviço (opcional).'), observacoes: str('Observações.') }),
+    run: async (i, c) => {
+      if (i.cliente_id) {
+        const contact = await contactById(c, i.cliente_id);
+        if (!contact) return err('Cliente não encontrado. Use buscar_clientes para achar o id.');
+        return joinWaitlist(c, contact, i);
+      }
+      const { data } = await db.from('waitlist').select('*, contact:contacts(name), service:services(name)').eq('company_id', c.company.id).in('status', ['aguardando', 'oferecido']).order('created_at').limit(40);
+      const list = (data ?? []) as unknown as { status: string; desired_date: string | null; period: string; contact: { name: string } | null; service: { name: string } | null; offered_starts_at: string | null }[];
+      return ok(list.length ? list.map((w) => `• ${w.contact?.name ?? '—'} · ${w.desired_date ? fmtDate(w.desired_date + 'T12:00:00Z', c.tz).slice(0, 5) : 'qualquer dia'} ${PERIOD_TEXT[w.period] ?? ''}${w.service ? ` · ${w.service.name}` : ''}${w.status === 'oferecido' && w.offered_starts_at ? ` · encaixe oferecido para ${when(c, w.offered_starts_at)}` : ''}`).join('\n') : 'Ninguém na lista de espera.');
+    },
+  },
   {
     name: 'agendar_horario',
     description: 'Marca um horário. Confere conflitos; use encaixar: true só se a pessoa quiser marcar mesmo com a agenda ocupada.',

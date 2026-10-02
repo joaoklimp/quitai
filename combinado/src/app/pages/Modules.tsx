@@ -1,17 +1,32 @@
 // ORBYTA ONE: uma conta, um painel, vários módulos que compartilham os mesmos dados (com permissão e histórico).
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, Briefcase, History, Landmark, Lock, Package, Plug, type LucideIcon } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Bot, Briefcase, History, Landmark, Lock, Package, Plug, ReceiptText, type LucideIcon } from 'lucide-react';
+import { api } from '../data/api';
+import type { ModuleKey } from '../data/types';
 import { useList } from '../data/hooks';
-import { can, useMeCtx } from '../context';
+import { can, hasModule, useMeCtx } from '../context';
 import { BRAND, logoSvg } from '../../shared/brand';
 import { brl0, num, todayLocal } from '../../shared/format';
 import { isLow } from './Stock';
-import { PageHeader } from '../ui';
+import { Button, PageHeader, Switch, useToast } from '../ui';
 
-interface Mod { key: string; name: string; desc: string; icon: LucideIcon; to: string; links: [string, string][]; stat?: string; color: string; locked?: boolean }
+interface Mod { key: string; name: string; desc: string; icon: LucideIcon; to: string; links: [string, string][]; stat?: string; color: string; locked?: boolean; optional?: ModuleKey }
 
 export default function Modules() {
-  const { me } = useMeCtx();
+  const { me, refresh } = useMeCtx();
+  const toast = useToast();
+  const [busy, setBusy] = useState<ModuleKey | null>(null);
+  const owner = can(me, 'dono');
+  const toggle = async (k: ModuleKey, on: boolean) => {
+    setBusy(k);
+    try {
+      const next = on ? [...new Set([...(me.company.modules ?? []), k])] : (me.company.modules ?? []).filter((x) => x !== k);
+      await api.updateCompany({ modules: next });
+      refresh();
+      toast(on ? 'Módulo ativado: já aparece no menu' : 'Módulo desligado: some do menu, os dados continuam guardados');
+    } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(null); }
+  };
   const today = todayLocal(me.company.timezone);
   const manager = can(me, 'dono', 'gerente');
   const { data: convs = [] } = useList('conversations', { filters: [{ col: 'status', op: 'eq', value: 'aberta' }], limit: 500 });
@@ -23,12 +38,13 @@ export default function Modules() {
     { key: 'ai', name: `${BRAND.name} AI`, desc: 'Atende clientes no WhatsApp e executa os comandos da equipe.', icon: Bot, to: '/conversas', color: 'var(--c1)', links: [['Conversas', '/conversas'], ['Simulador', '/simulador'], ['Automações', '/automacoes']], stat: `${num(convs.length)} conversas abertas` },
     { key: 'gestao', name: `${BRAND.name} Gestão`, desc: 'Clientes, orçamentos, agenda e vendas no mesmo lugar.', icon: Briefcase, to: '/clientes', color: 'var(--violet-ink)', links: [['Clientes', '/clientes'], ['Orçamentos', '/orcamentos'], ['Agenda', '/agenda'], ...(manager ? [['Vendas', '/vendas'] as [string, string]] : [])], stat: `${num(quotes.length)} ${quotes.length === 1 ? 'orçamento aguardando' : 'orçamentos aguardando'} resposta` },
     { key: 'finance', name: `${BRAND.name} Finance`, desc: 'Contas a pagar e a receber, vencimentos e caixa previsto.', icon: Landmark, to: '/financeiro', color: 'var(--green-ink)', links: [['Contas', '/financeiro'], ['Exportar', '/financeiro']], stat: manager ? (overdue.length ? `${overdue.length} contas vencidas` : `${brl0(bills.reduce((s, b) => s + (b.kind === 'pagar' ? b.amount : 0), 0))} a pagar em aberto`) : undefined, locked: !manager },
-    { key: 'estoque', name: `${BRAND.name} Estoque`, desc: 'Entradas, saídas, alertas de reposição e importação do Excel.', icon: Package, to: '/estoque', color: 'var(--orange-ink)', links: [['Produtos', '/estoque']], stat: ((n) => (n ? `${n} ${n === 1 ? 'produto' : 'produtos'} para repor` : 'Nada para repor'))(products.filter(isLow).length) },
-    { key: 'conecta', name: `${BRAND.name} Conecta`, desc: 'WhatsApp, planilhas, cobrança com Pix e boleto e nota fiscal de serviço. ERP em breve.', icon: Plug, to: '/integracoes', color: 'var(--blue-ink)', links: [['Integrações', '/integracoes'], ['Cobranças e notas', '/cobrancas']] },
+    { key: 'estoque', name: `${BRAND.name} Estoque`, desc: 'Entradas, saídas, alertas de reposição e importação do Excel. Para quem vende ou usa produtos.', icon: Package, to: '/estoque', color: 'var(--orange-ink)', links: [['Produtos', '/estoque']], stat: hasModule(me, 'estoque') ? ((n) => (n ? `${n} ${n === 1 ? 'produto' : 'produtos'} para repor` : 'Nada para repor'))(products.filter(isLow).length) : undefined, optional: 'estoque' },
+    { key: 'cobranca', name: `${BRAND.name} Cobrança`, desc: 'Pix e boleto mandados no WhatsApp, baixa sozinha quando o cliente paga e nota fiscal de serviço.', icon: ReceiptText, to: '/cobrancas', color: 'var(--pink)', links: [['Cobranças', '/cobrancas'], ['Notas fiscais', '/cobrancas?aba=notas']], locked: !manager, optional: 'cobrancas' },
+    { key: 'conecta', name: `${BRAND.name} Conecta`, desc: 'WhatsApp oficial, planilhas, Asaas e Focus NFe. ERP em breve.', icon: Plug, to: '/integracoes', color: 'var(--blue-ink)', links: [['Integrações', '/integracoes']] },
   ];
   return (
     <>
-      <PageHeader title={`${BRAND.name} ONE`} subtitle="Uma conta. Um painel. Vários módulos conversando entre si." />
+      <PageHeader title={`${BRAND.name} ONE`} subtitle="Uma conta. Um painel. Ligue só o que a sua empresa usa: o menu fica com a cara do seu negócio." />
       <section className="one-hero card">
         <div className="one-orbit" aria-hidden="true">
           <span className="ring r1" /><span className="ring r2" /><span className="ring r3" />
@@ -42,17 +58,25 @@ export default function Modules() {
         </div>
       </section>
       <div className="mod-grid">
-        {mods.map((m) => (
-          <article key={m.key} className={`card mod ${m.locked ? 'locked' : ''}`}>
-            <div className="mod-head"><span className="mod-ic" style={{ color: m.color }}><m.icon /></span><div><b>{m.name}</b><p className="muted small">{m.desc}</p></div></div>
-            {m.stat && <div className="mod-stat">{m.stat}</div>}
-            <div className="mod-links">
-              {m.locked ? <span className="muted small"><Lock style={{ width: 13, verticalAlign: -2 }} /> Só para dono e gerentes</span>
-                : m.links.map(([l, to]) => <Link key={l} to={to} className="chip">{l}</Link>)}
-              {!m.locked && <Link to={m.to} className="mod-go" aria-label={`Abrir ${m.name}`}><ArrowRight /></Link>}
-            </div>
-          </article>
-        ))}
+        {mods.map((m) => {
+          const off = !!m.optional && !hasModule(me, m.optional);
+          return (
+            <article key={m.key} className={`card mod ${m.locked ? 'locked' : ''} ${off ? 'off' : ''}`}>
+              <div className="mod-head">
+                <span className="mod-ic" style={{ color: m.color }}><m.icon /></span>
+                <div className="grow"><b>{m.name}</b><p className="muted small">{m.desc}</p></div>
+                {m.optional && owner && <Switch checked={!off} onChange={(v) => void toggle(m.optional!, v)} label={off ? `Ativar ${m.name}` : `Desligar ${m.name}`} />}
+              </div>
+              {m.stat && !off && <div className="mod-stat">{m.stat}</div>}
+              <div className="mod-links">
+                {off ? (owner ? <Button size="sm" variant="solid" loading={busy === m.optional} onClick={() => void toggle(m.optional!, true)}>Ativar módulo</Button> : <span className="muted small">Desligado. Peça para o dono ativar.</span>)
+                  : m.locked ? <span className="muted small"><Lock style={{ width: 13, verticalAlign: -2 }} /> Só para dono e gerentes</span>
+                  : m.links.map(([l, to]) => <Link key={l} to={to} className="chip">{l}</Link>)}
+                {!m.locked && !off && <Link to={m.to} className="mod-go" aria-label={`Abrir ${m.name}`}><ArrowRight /></Link>}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </>
   );

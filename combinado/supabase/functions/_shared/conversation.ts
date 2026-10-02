@@ -53,7 +53,7 @@ function mediaText(m: MediaInfo, who: string): string {
   const cap = m.caption ? `: "${m.caption}"` : '';
   switch (m.type) {
     case 'image': return `[${who} mandou uma foto${cap}]`;
-    case 'audio': return `[${who} mandou um áudio, que você não consegue ouvir]`;
+    case 'audio': return m.transcript ? `[${who} mandou um áudio; o texto abaixo é a transcrição automática, pode ter pequenos erros]` : `[${who} mandou um áudio, que você não consegue ouvir]`;
     case 'video': return `[${who} mandou um vídeo${cap}]`;
     case 'document': return `[${who} mandou um documento${m.filename ? ` (${m.filename})` : ''}${cap}]`;
     case 'sticker': return `[${who} mandou uma figurinha]`;

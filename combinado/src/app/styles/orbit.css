@@ -82,7 +82,7 @@
 .one-orbit .sat { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 13px; display: grid; place-items: center;
   background: rgba(10,20,48,.9); border: 1px solid rgba(140,180,255,.3); box-shadow: 0 0 18px rgba(56,140,255,.25); animation: orbit 26s linear infinite; }
 .one-orbit .sat svg { width: 19px; height: 19px; }
-.one-orbit .s0 { --r: 100px; animation-delay: 0s; } .one-orbit .s1 { --r: 138px; animation-delay: -5.2s; } .one-orbit .s2 { --r: 100px; animation-delay: -10.4s; }
-.one-orbit .s3 { --r: 138px; animation-delay: -15.6s; } .one-orbit .s4 { --r: 100px; animation-delay: -20.8s; }
+.one-orbit .s0 { --r: 100px; animation-delay: 0s; } .one-orbit .s1 { --r: 138px; animation-delay: -4.33s; } .one-orbit .s2 { --r: 100px; animation-delay: -8.67s; }
+.one-orbit .s3 { --r: 138px; animation-delay: -13s; } .one-orbit .s4 { --r: 100px; animation-delay: -17.33s; } .one-orbit .s5 { --r: 138px; animation-delay: -21.67s; }
 @keyframes orbit { from { transform: rotate(0deg) translateX(var(--r)) rotate(0deg); } to { transform: rotate(360deg) translateX(var(--r)) rotate(-360deg); } }
 @media (prefers-reduced-motion: reduce) { .one-orbit .sat { animation-play-state: paused; } }

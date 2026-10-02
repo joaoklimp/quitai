@@ -110,6 +110,7 @@ export function customerSystem(b: Base): string {
     '- Responder dúvidas comuns (pagamento, prazos, garantia, cuidados) com as perguntas frequentes e as regras da empresa abaixo.',
     ...(ai.web_search ? ['- Pesquisar na internet (web_search) só para dúvidas gerais que não dependem da empresa, como cuidados com um tecido ou o que é um procedimento. Nunca use a internet para preço, prazo, horário, política ou qualquer informação da empresa: isso vem só dos dados abaixo.'] : []),
     '- Ver horários livres e agendar (consultar_horarios e agendar_horario). Nunca diga que um horário está livre sem consultar antes.',
+    '- Se nenhum horário livre servir para o cliente, ofereça a lista de espera (entrar_lista_espera): quando alguém cancelar, a empresa avisa ele na hora.',
     ai.can_quote ? '- Criar e enviar orçamentos com os preços da tabela (criar_orcamento). O link do orçamento vem no resultado da ferramenta: mande o link ao cliente.' : '- Orçamentos: a empresa prefere que a equipe faça. Colete o que o cliente precisa e chame a equipe.',
     '- Ver, remarcar ou cancelar os horários do próprio cliente (meus_horarios, remarcar_horario, cancelar_horario) e registrar quando ele confirma presença, por exemplo respondendo SIM a um lembrete (confirmar_presenca).',
     '- Atualizar o cadastro do cliente: nome, endereço, e-mail (atualizar_cadastro).',
@@ -137,6 +138,7 @@ export async function customerDynamic(b: Base, contact: Contact, firstContact: b
     db.from('appointments').select('id, title, starts_at, status, address').eq('contact_id', contact.id).gte('starts_at', now.toISOString()).neq('status', 'cancelado').order('starts_at').limit(5),
     db.from('quotes').select('number, total, status, sent_at, public_token').eq('contact_id', contact.id).in('status', ['enviado', 'rascunho']).order('created_at', { ascending: false }).limit(3),
   ]);
+  const { data: wait } = await db.from('waitlist').select('status, desired_date, period, offered_starts_at, service_id').eq('contact_id', contact.id).in('status', ['aguardando', 'oferecido']).maybeSingle();
   const { data: charges } = await db.from('charges').select('description, amount, due_date, status, invoice_url').eq('contact_id', contact.id).in('status', ['pendente', 'vencida']).order('created_at', { ascending: false }).limit(3);
   const lines = [
     `Agora: ${WEEKDAYS[new Date(localDate(now, b.tz) + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(now, b.tz)}, ${localTime(now, b.tz)} (fuso ${b.tz}).`,
@@ -145,6 +147,7 @@ export async function customerDynamic(b: Base, contact: Contact, firstContact: b
     (appts ?? []).length ? `Próximos horários do cliente: ${(appts as Appointment[]).map((a) => `[${a.id}] ${fmtDate(a.starts_at, b.tz)} às ${localTime(a.starts_at, b.tz)} — ${a.title} (${a.status})`).join('; ')}.` : 'O cliente não tem horários marcados.',
     (quotes ?? []).length ? `Orçamentos em aberto: ${(quotes as Quote[]).map((q) => `nº ${quoteNo(q.number)} de ${brl(q.total)} (${q.status}) — ${quoteLink(b, q)}`).join('; ')}.` : '',
     (charges ?? []).length ? `Cobranças em aberto do cliente (se ele perguntar como pagar, mande o link): ${(charges ?? []).map((x) => `${x.description} — ${brl(Number(x.amount))}, vence ${fmtDate(x.due_date + 'T12:00:00Z', b.tz)}${x.status === 'vencida' ? ' (vencida)' : ''} — ${x.invoice_url}`).join('; ')}.` : '',
+    wait?.status === 'oferecido' && wait.offered_starts_at ? `O cliente está na lista de espera e a empresa ofereceu a ele um encaixe em ${fmtDate(wait.offered_starts_at, b.tz)} às ${localTime(wait.offered_starts_at, b.tz)}${wait.service_id ? ` (serviço ${b.services.find((s) => s.id === wait.service_id)?.name ?? ''}, id ${wait.service_id})` : ''}. Se ele aceitar, confira o horário com consultar_horarios e marque com agendar_horario nesse horário.` : wait ? `O cliente está na lista de espera${wait.desired_date ? ` para ${fmtDate(wait.desired_date + 'T12:00:00Z', b.tz).slice(0, 5)}` : ''}.` : '',
     firstContact ? 'Este é o primeiro contato deste cliente com a empresa.' : '',
   ];
   return lines.filter(Boolean).join('\n');

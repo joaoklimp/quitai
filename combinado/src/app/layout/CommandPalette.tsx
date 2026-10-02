@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { CalendarPlus, FilePlus2, Search, Sparkles, UserPlus, User, FileText, CornerDownLeft } from 'lucide-react';
-import { PRIMARY, SECONDARY } from './Shell';
-import { useAssistant } from '../context';
+import { PRIMARY, SECONDARY, allowed } from './Shell';
+import { useAssistant, useMeCtx } from '../context';
 import { useList } from '../data/hooks';
 import { useDebounced } from '../ui';
 import { brl, fold, formatPhone } from '../../shared/format';
@@ -16,6 +16,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const [sel, setSel] = useState(0);
   const nav = useNavigate();
   const assistant = useAssistant();
+  const { me } = useMeCtx();
   const term = useDebounced(q, 150);
   const inputRef = useRef<HTMLInputElement>(null);
   const { data: contacts = [] } = useList('contacts', term.trim().length >= 2 ? { search: { cols: ['name', 'phone', 'email'], term }, limit: 6, order: [{ col: 'last_interaction_at', asc: false }] } : { limit: 0 }, { enabled: open && term.trim().length >= 2 });
@@ -33,7 +34,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'a-q', group: 'Ações', label: 'Novo orçamento', icon: FilePlus2, run: go('/orcamentos/novo') },
       { id: 'a-a', group: 'Ações', label: 'Novo agendamento', icon: CalendarPlus, run: go('/agenda?novo=1') },
     ];
-    const pages: Item[] = [...PRIMARY, ...SECONDARY].map((p) => ({ id: 'p' + p.to, group: 'Páginas', label: p.label, icon: p.icon, run: go(p.to) }));
+    const pages: Item[] = [...allowed(PRIMARY, me.role, me.company.modules), ...allowed(SECONDARY, me.role, me.company.modules)].map((p) => ({ id: 'p' + p.to, group: 'Páginas', label: p.label, icon: p.icon, run: go(p.to) }));
     const out: Item[] = [];
     out.push(...actions.filter((a) => !f || a.id === 'a-ai' || fold(a.label).includes(f)));
     out.push(...contacts.map((c) => ({ id: 'c' + c.id, group: 'Clientes', label: c.name, meta: formatPhone(c.phone), icon: User, run: go(`/clientes/${c.id}`) })));

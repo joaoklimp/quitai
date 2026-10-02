@@ -27,6 +27,8 @@ export interface Company {
   capacity_per_slot: number;
   min_notice_minutes: number;
   max_days_ahead: number;
+  /** módulos opcionais ligados (o essencial sempre aparece) */
+  modules: ModuleKey[];
   monthly_goal: number;
   plan: PlanId;
   billing_status: BillingStatus;
@@ -247,6 +249,8 @@ export interface MediaInfo {
   mime?: string | null;
   caption?: string | null;
   filename?: string | null;
+  /** áudio: o que foi falado (transcrição automática) */
+  transcript?: string | null;
 }
 export interface Message {
   id: UUID;
@@ -291,7 +295,7 @@ export interface AuditEntry {
   created_at: ISO;
 }
 
-export type AutomationKind = 'lembrete_agendamento' | 'followup_orcamento' | 'resumo_diario' | 'pos_atendimento' | 'reativacao' | 'lembrete_tarefa';
+export type AutomationKind = 'lembrete_agendamento' | 'followup_orcamento' | 'resumo_diario' | 'pos_atendimento' | 'reativacao' | 'lembrete_tarefa' | 'relatorio_semanal' | 'encaixe';
 export interface Automation {
   id: UUID;
   company_id: UUID;
@@ -503,7 +507,7 @@ export type TableName =
   | 'contacts' | 'services' | 'quotes' | 'quote_items' | 'appointments' | 'sales' | 'tasks'
   | 'conversations' | 'messages' | 'pending_actions' | 'audit_log' | 'automations' | 'automation_runs'
   | 'notifications' | 'members' | 'invoices' | 'usage_monthly' | 'finance_entries' | 'products' | 'stock_movements'
-  | 'charges' | 'fiscal_notes' | 'company_integrations';
+  | 'charges' | 'fiscal_notes' | 'company_integrations' | 'waitlist';
 
 export interface RowMap {
   contacts: Contact; services: Service; quotes: Quote; quote_items: QuoteItem; appointments: Appointment;
@@ -511,7 +515,7 @@ export interface RowMap {
   audit_log: AuditEntry; automations: Automation; automation_runs: AutomationRun; notifications: Notification;
   members: Member; invoices: Invoice; usage_monthly: UsageMonth;
   finance_entries: FinanceEntry; products: Product; stock_movements: StockMovement;
-  charges: Charge; fiscal_notes: FiscalNote; company_integrations: CompanyIntegration;
+  charges: Charge; fiscal_notes: FiscalNote; company_integrations: CompanyIntegration; waitlist: WaitlistEntry;
 }
 
 export type Filter =
@@ -525,4 +529,32 @@ export interface Query {
   order?: { col: string; asc?: boolean }[];
   limit?: number;
   search?: { cols: string[]; term: string };
+}
+
+export type ModuleKey = 'estoque' | 'cobrancas';
+export type WaitlistStatus = 'aguardando' | 'oferecido' | 'agendado' | 'cancelado';
+export interface WaitlistEntry {
+  id: UUID;
+  company_id: UUID;
+  contact_id: UUID;
+  service_id: UUID | null;
+  desired_date: DateStr | null;
+  period: 'manha' | 'tarde' | 'noite' | 'qualquer';
+  notes: string | null;
+  status: WaitlistStatus;
+  offered_at: ISO | null;
+  offered_starts_at: ISO | null;
+  appointment_id: UUID | null;
+  created_via: Channel;
+  created_at: ISO;
+  updated_at: ISO;
+}
+/** O que a ORBYTA fez pela empresa num período (função value_report no banco). */
+export interface ValueReport {
+  from: ISO; to: ISO;
+  ia_replies: number; ia_conversations: number; after_hours: number; owner_commands: number;
+  appointments: number; quotes: number; quotes_approved: number; quotes_approved_value: number;
+  sales_ia: number; sales_ia_value: number; charges_paid: number; charges_value: number;
+  reminders: number; followups: number; reviews_asked: number; reactivations: number; encaixes: number;
+  minutes_saved: number;
 }

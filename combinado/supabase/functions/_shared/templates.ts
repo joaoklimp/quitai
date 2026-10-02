@@ -60,6 +60,18 @@ export const TEMPLATES = {
     params: ['primeiro nome', 'valor', 'descrição', 'vencimento', 'link de pagamento'],
     use: 'Enviar uma cobrança (Pix ou boleto) para quem não escreveu nas últimas 24 horas.',
   },
+  encaixe: {
+    name: 'encaixe_disponivel', category: 'Utilidade',
+    body: 'Olá, {{1}}! Abriu um horário {{2}} às {{3}} para {{4}}. Quer ficar com ele? É só responder SIM por aqui.',
+    params: ['primeiro nome', 'dia (ex.: amanhã)', 'hora', 'serviço'],
+    use: 'Avisar quem está na lista de espera que um horário foi liberado.',
+  },
+  relatorio: {
+    name: 'relatorio_semanal', category: 'Utilidade',
+    body: 'Sua semana na {{1}} com a ORBYTA: {{2}}. Responda esta mensagem para ver o relatório completo.',
+    params: ['nome da empresa', 'números da semana'],
+    use: 'Relatório semanal do que a ORBYTA fez pela empresa (para o dono e gerentes).',
+  },
   avisoEquipe: {
     name: 'aviso_equipe', category: 'Utilidade',
     body: 'Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes.',

@@ -151,7 +151,7 @@ Deno.test({ name: 'dono: cadastro, orçamento, confirmações, venda, agenda, ta
 
 Deno.test({ name: 'agente completo: o cliente pede um horário e a IA consulta, agenda e responde', ...opts, fn: async () => {
   const b = await loadBase(CID, 'https://combinado.test');
-  const { contact } = await findOrCreateContact(CID, '5561955554444', 'Pedro Lima');
+  const { contact } = await findOrCreateContact(CID, '5561955559991', 'Pedro Lima');
   const conv = await findOrCreateConversation({ companyId: CID, kind: 'cliente', channel: 'whatsapp', contactId: contact.id });
   await insertMessage({ company_id: CID, conversation_id: conv.id, direction: 'in', sender: 'contato', sender_name: 'Pedro Lima', body: 'Quero limpar meu colchão, pode ser às 10h?', channel: 'whatsapp' });
   const colchao = b.services.find((s) => s.name.startsWith('Higienização de colchão'))!;
@@ -425,4 +425,89 @@ Deno.test({ name: 'cobrança: IA cobra com confirmação, o Asaas avisa o pagame
   } finally {
     globalThis.fetch = prev;
   }
+}});
+
+/* ---------- áudio, encaixe e relatório semanal ---------- */
+Deno.test({ name: 'WhatsApp: áudio do cliente é transcrito e a IA responde ao que foi falado', ...opts, fn: async () => {
+  const prev = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = ((input: Request | URL | string, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (url.startsWith('https://graph.facebook.com/') && url.includes('/midia-audio-')) return Promise.resolve(Response.json({ url: `https://lookaside.test/${url.split('/').pop()}`, mime_type: 'audio/ogg; codecs=opus' }));
+    if (url.startsWith('https://lookaside.test/')) return Promise.resolve(new Response(new Uint8Array([79, 103, 103, 83, 1, 2, 3])));
+    if (url === 'https://api.groq.com/openai/v1/audio/transcriptions') { asked.push(String((init?.body as FormData).get('model'))); return Promise.resolve(Response.json({ text: 'Oi, queria saber se vocês limpam colchão de casal' })); }
+    return prev(input, init);
+  }) as typeof fetch;
+  try {
+    Deno.env.set('TRANSCRIBE_API_KEY', 'chave-groq');
+    const calls = fakeClaude([{ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Limpamos sim! A higienização de colchão casal sai por R$ 160.' }] }]);
+    await post(wa('5561944443333', 'Lúcia Prado', { id: 'wamid.audio1', type: 'audio', audio: { id: 'midia-audio-1', mime_type: 'audio/ogg; codecs=opus' } }));
+    assertEquals(asked, ['whisper-large-v3-turbo']);
+    const { data: msg } = await db.from('messages').select('body, media').eq('wa_message_id', 'wamid.audio1').single();
+    assertEquals([msg!.body, msg!.media.type, msg!.media.transcript], ['Oi, queria saber se vocês limpam colchão de casal', 'audio', 'Oi, queria saber se vocês limpam colchão de casal']);
+    has(JSON.stringify(calls[0].messages), 'transcrição automática');
+    has(JSON.stringify(calls[0].messages), 'limpam colchão de casal');
+    has(graph.filter((c) => c.body.type === 'text').at(-1)!.body.text.body, 'colchão casal sai por R$ 160');
+
+    // sem a chave de transcrição: pede para escrever, sem gastar a IA
+    Deno.env.delete('TRANSCRIBE_API_KEY');
+    await post(wa('5561944443333', 'Lúcia Prado', { id: 'wamid.audio2', type: 'audio', audio: { id: 'midia-audio-2', mime_type: 'audio/ogg' } }));
+    has(graph.filter((c) => c.body.type === 'text').at(-1)!.body.text.body, 'Ainda não consigo ouvir áudios');
+  } finally {
+    globalThis.fetch = prev;
+    Deno.env.delete('TRANSCRIBE_API_KEY');
+  }
+}});
+
+Deno.test({ name: 'encaixe: horário cancelado é oferecido a quem está na lista de espera e vira agendamento', ...opts, fn: async () => {
+  const b = await loadBase(CID);
+  let day = addDays(localDate(new Date(), TZ), 6);
+  while ([0, 6].includes(new Date(day + 'T12:00:00Z').getUTCDay())) day = addDays(day, 1);
+  const svc = b.services[0];
+  const { contact: paula } = await findOrCreateContact(CID, '5561920200001', 'Paula Reis');
+  const { contact: marcos } = await findOrCreateContact(CID, '5561920200002', 'Marcos Lima');
+  // Paula pede pela IA para entrar na lista de espera
+  const conv = await findOrCreateConversation({ companyId: CID, kind: 'cliente', channel: 'whatsapp', contactId: paula.id });
+  const pctx = { ...b, mode: 'cliente', channel: 'whatsapp', conversationId: conv.id, contact: paula };
+  const w = await run(CUSTOMER_TOOLS, 'entrar_lista_espera', { data: day, periodo: 'tarde' }, pctx);
+  assertEquals(w.receipt?.label, 'Cliente na lista de espera');
+  // o horário das 15h do Marcos é cancelado
+  const start = new Date(`${day}T15:00:00-03:00`), end = new Date(start.getTime() + svc.duration_min * 60000);
+  const { data: ap } = await db.from('appointments').insert({ company_id: CID, contact_id: marcos.id, service_id: svc.id, title: svc.name, starts_at: start.toISOString(), ends_at: end.toISOString(), status: 'confirmado', created_via: 'painel' }).select('id').single();
+  await db.from('appointments').update({ status: 'cancelado' }).eq('id', ap!.id);
+
+  const res = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(res.sent.encaixe, 1);
+  const tpl = graph.filter((c) => c.body.type === 'template' && c.body.template.name === 'encaixe_disponivel').at(-1)!;
+  const params = tpl.body.template.components[0].parameters.map((p: { text: string }) => p.text);
+  assertEquals([tpl.body.to, params[0], params[2], params[3]], ['5561920200001', 'Paula', '15:00', svc.name]);
+  const { data: wl } = await db.from('waitlist').select('status, offered_starts_at').eq('contact_id', paula.id).single();
+  assertEquals([wl!.status, Date.parse(wl!.offered_starts_at)], ['oferecido', start.getTime()]);
+  // a IA sabe do encaixe oferecido
+  const { customerDynamic } = await import('../_shared/context.ts');
+  has(await customerDynamic(b, paula, false), 'ofereceu a ele um encaixe');
+  // não oferece de novo na mesma rodada
+  const again = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(again.sent.encaixe ?? 0, 0);
+  // Paula responde SIM e a IA agenda: sai da lista
+  const booked = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: svc.id, data: day, hora: '15:00' }, pctx);
+  assert(!booked.error, booked.content);
+  const { data: wl2 } = await db.from('waitlist').select('status, appointment_id').eq('contact_id', paula.id).single();
+  assertEquals(wl2!.status, 'agendado');
+  assert(wl2!.appointment_id);
+}});
+
+Deno.test({ name: 'relatório semanal: aviso no painel e mensagem para o dono com o que a ORBYTA fez', ...opts, fn: async () => {
+  const today = new Date(localDate(new Date(), TZ) + 'T12:00:00Z').getUTCDay();
+  await db.from('automations').update({ enabled: true, config: { dia: today, horario: '00:00' } }).eq('company_id', CID).eq('kind', 'relatorio_semanal');
+  await db.from('automation_runs').delete().eq('company_id', CID).eq('kind', 'relatorio_semanal');
+  const res = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(res.sent.relatorio_semanal, 2); // painel + WhatsApp da dona
+  const { data: n } = await db.from('notifications').select('title, body').eq('company_id', CID).eq('title', 'Sua semana com a ORBYTA').single();
+  assert(n!.body.length > 5);
+  const msg = graph.filter((c) => c.body.to === '5561988880000').at(-1)!;
+  if (msg.body.type === 'text') has(msg.body.text.body, 'Sua semana na');
+  else assertEquals(msg.body.template.name, 'relatorio_semanal');
+  const again = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(again.sent.relatorio_semanal ?? 0, 0);
 }});

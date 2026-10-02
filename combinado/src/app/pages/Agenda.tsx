@@ -1,7 +1,7 @@
 // Agenda: semana, dia ou lista. A IA marca pelo WhatsApp respeitando horário de funcionamento e capacidade.
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock3, List, MapPin, Phone, UserX, XCircle, Columns3, Square, Wallet } from 'lucide-react';
+import { Bot, CalendarClock, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock3, List, MapPin, Phone, UserX, XCircle, Columns3, Square, Wallet } from 'lucide-react';
 import { api } from '../data/api';
 import { useInvalidate, useList } from '../data/hooks';
 import type { Appointment, AppointmentStatus, Contact, Service } from '../data/types';
@@ -9,6 +9,7 @@ import { useMeCtx } from '../context';
 import { slotsForDate } from '../data/availability';
 import { Avatar, Badge, Button, Empty, Field, IconButton, Input, Modal, MoneyInput, PageHeader, Segmented, Select, cx, useToast } from '../ui';
 import { ContactPicker } from '../ui/pickers';
+import { WaitlistDrawer, useWaitlistCount } from './agenda/Waitlist';
 import { addDays, brl, fmtDate, fmtLong, formatPhone, fromLocal, localDate, localParts, localTime, MONTHS_SHORT, todayLocal, weekdayOf, WEEKDAYS_SHORT } from '../../shared/format';
 
 const ST_LABEL: Record<AppointmentStatus, string> = { pendente: 'A confirmar', confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado', faltou: 'Não compareceu' };
@@ -26,6 +27,8 @@ export default function Agenda() {
   const [view, setView] = useState<View>(() => (window.innerWidth < 860 ? 'dia' : 'semana'));
   const [anchor, setAnchor] = useState(today);
   const [open, setOpen] = useState<Appointment | null>(null);
+  const [waitOpen, setWaitOpen] = useState(!!params.get('espera'));
+  const waitCount = useWaitlistCount();
   const [form, setForm] = useState<{ date: string; time?: string; contactId?: string | null; quoteId?: string | null } | null>(params.get('novo') ? { date: today, contactId: params.get('cliente'), quoteId: params.get('orcamento') } : null);
 
   const days = useMemo(() => {
@@ -58,8 +61,10 @@ export default function Agenda() {
       <PageHeader title="Agenda" subtitle="Os horários que a IA e a equipe marcaram. A IA só oferece horários livres, dentro do seu horário de funcionamento."
         actions={<>
           <Segmented label="Visualização" value={view} onChange={setView} options={[{ value: 'semana', label: 'Semana', icon: <Columns3 /> }, { value: 'dia', label: 'Dia', icon: <Square /> }, { value: 'lista', label: 'Lista', icon: <List /> }]} />
+          <Button icon={<CalendarClock />} onClick={() => setWaitOpen(true)}>Lista de espera{waitCount ? <span className="count-pill">{waitCount}</span> : null}</Button>
           <Button variant="solid" icon={<CalendarPlus />} onClick={() => setForm({ date: anchor < today ? today : anchor })}>Novo horário</Button>
         </>} />
+      <WaitlistDrawer open={waitOpen} onClose={() => { setWaitOpen(false); if (params.get('espera')) setParams({}, { replace: true }); }} />
       <div className="cal-toolbar">
         <IconButton label="Anterior" onClick={() => step(-1)}><ChevronLeft /></IconButton>
         <Button onClick={() => setAnchor(today)}>Hoje</Button>

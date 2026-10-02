@@ -164,3 +164,6 @@
 .sim-log .receipt { background: var(--surface); box-shadow: var(--shadow-1); border-radius: 14px; padding: 10px 12px; }
 .side-toggle { display: none !important; }
 @media (max-width: 1280px) { .side-toggle { display: inline-grid !important; } }
+
+/* áudio transcrito: o texto vem logo abaixo, como a mensagem */
+.msg-file + .txt { margin-top: 6px; }

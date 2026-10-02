@@ -14,9 +14,9 @@ import { useAssistant, useMeCtx, useTheme } from '../context';
 import { useList, useInvalidate } from '../data/hooks';
 import { api, isDemo, leaveDemo, canUseRealAccount } from '../data/api';
 import { CommandPalette } from './CommandPalette';
-import type { Notification, Role } from '../data/types';
+import type { ModuleKey, Notification, Role } from '../data/types';
 
-type NavItem = { to: string; label: string; icon: typeof Bell; end?: boolean; roles?: Role[] };
+type NavItem = { to: string; label: string; icon: typeof Bell; end?: boolean; roles?: Role[]; module?: ModuleKey };
 const MANAGERS: Role[] = ['dono', 'gerente'];
 export const PRIMARY: NavItem[] = [
   { to: '/', label: 'Visão geral', icon: LayoutGrid, end: true },
@@ -25,12 +25,12 @@ export const PRIMARY: NavItem[] = [
   { to: '/orcamentos', label: 'Orçamentos', icon: FileText },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/financeiro', label: 'Financeiro', icon: Landmark, roles: MANAGERS },
-  { to: '/estoque', label: 'Estoque', icon: Package },
+  { to: '/estoque', label: 'Estoque', icon: Package, module: 'estoque' },
 ];
 export const SECONDARY: NavItem[] = [
   { to: '/modulos', label: 'Módulos ORBYTA', icon: Orbit },
   { to: '/vendas', label: 'Vendas', icon: Wallet, roles: MANAGERS },
-  { to: '/cobrancas', label: 'Cobranças e notas', icon: ReceiptText, roles: MANAGERS },
+  { to: '/cobrancas', label: 'Cobranças e notas', icon: ReceiptText, roles: MANAGERS, module: 'cobrancas' },
   { to: '/catalogo', label: 'Serviços e preços', icon: Tag },
   { to: '/tarefas', label: 'Tarefas', icon: ClipboardList },
   { to: '/analises', label: 'Análises', icon: BarChart3 },
@@ -40,7 +40,7 @@ export const SECONDARY: NavItem[] = [
   { to: '/historico', label: 'Histórico de ações', icon: History },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
-export const allowed = (items: NavItem[], role: Role) => items.filter((i) => !i.roles || i.roles.includes(role));
+export const allowed = (items: NavItem[], role: Role, modules: ModuleKey[] = []) => items.filter((i) => (!i.roles || i.roles.includes(role)) && (!i.module || modules.includes(i.module)));
 
 function useAttentionCount() {
   const { data } = useList('conversations', { filters: [{ col: 'needs_attention', op: 'eq', value: true }, { col: 'status', op: 'eq', value: 'aberta' }] });
@@ -77,7 +77,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <nav className="rail" aria-label="Atalhos">
         <IconButton label="Assistente (Ctrl+J)" active={assistant.open} onClick={() => assistant.setOpen(!assistant.open)}><Sparkles /><span className="tip">Assistente IA</span></IconButton>
         <div className="rail-sep" />
-        {allowed(SECONDARY, me.role).map((s) => (
+        {allowed(SECONDARY, me.role, me.company.modules).map((s) => (
           <IconButton key={s.to} label={s.label} active={loc.pathname.startsWith(s.to)} onClick={() => nav(s.to)}><s.icon /><span className="tip">{s.label}</span></IconButton>
         ))}
         {me.isPlatformAdmin && <IconButton label="Admin da plataforma" active={loc.pathname.startsWith('/admin')} onClick={() => nav('/admin')}><ShieldCheck /><span className="tip">Admin da plataforma</span></IconButton>}
@@ -90,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="brand-name" dangerouslySetInnerHTML={{ __html: wordmarkHtml(30) }} />
           </NavLink>
           <ScrollPills>
-            {allowed(PRIMARY, me.role).map((p) => (
+            {allowed(PRIMARY, me.role, me.company.modules).map((p) => (
               <NavLink key={p.to} to={p.to} end={p.end} className={({ isActive }) => cx('pill', isActive && 'active')}>
                 <p.icon />{p.label}{p.to === '/conversas' && attention > 0 && <span className="n">{attention}</span>}
               </NavLink>
@@ -163,7 +163,7 @@ function ScrollPills({ children }: { children: ReactNode }) {
 
 function MoreSheet({ onClose }: { onClose: () => void }) {
   const { me } = useMeCtx();
-  const items = [...allowed(PRIMARY, me.role).filter((p) => !['/', '/conversas', '/agenda'].includes(p.to)), ...allowed(SECONDARY, me.role), ...(me.isPlatformAdmin ? [{ to: '/admin', label: 'Admin da plataforma', icon: ShieldCheck }] : [])];
+  const items = [...allowed(PRIMARY, me.role, me.company.modules).filter((p) => !['/', '/conversas', '/agenda'].includes(p.to)), ...allowed(SECONDARY, me.role, me.company.modules), ...(me.isPlatformAdmin ? [{ to: '/admin', label: 'Admin da plataforma', icon: ShieldCheck }] : [])];
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-label="Menu">

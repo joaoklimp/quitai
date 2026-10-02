@@ -2,6 +2,7 @@
 // Recebe mensagens e status de entrega. Responde 200 na hora e processa em segundo plano.
 // - Número verificado da equipe → comandos (cadastra, orça, agenda, confirma com botões).
 // - Qualquer outro número → atendimento ao cliente pela IA (uma resposta para várias mensagens seguidas).
+import { transcribe } from '../_shared/transcribe.ts';
 import { db } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { AUDIO_REPLY, countUsage, customerGate, customerTurn, ownerTurn, resolvePending, yesNo, type Member } from '../_shared/agent.ts';
@@ -101,6 +102,7 @@ async function storeMedia(acc: WaAccount, obj: WaMedia, type: MediaInfo['type'])
     const path = `${acc.company_id}/${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${EXT[clean] ?? 'bin'}`;
     const { error } = await db.storage.from('whatsapp-media').upload(path, bytes, { contentType: clean, upsert: false });
     if (!error) { info.path = path; info.mime = clean; } else console.error('guardar mídia', error.message);
+    if (type === 'audio') info.transcript = await transcribe(bytes, clean); // a IA entende mensagens de voz
   } catch (e) { console.error('baixar mídia', (e as Error).message); }
   return info;
 }
@@ -118,7 +120,7 @@ async function onMessage(acc: WaAccount, m: WaMessage, profileName: string | nul
     case 'button': buttonId = m.button?.payload ?? null; body = m.button?.text ?? ''; break;
     case 'image': case 'audio': case 'video': case 'document': case 'sticker': {
       const obj = m[m.type as 'image'];
-      if (obj) { media = await storeMedia(acc, obj, m.type as MediaInfo['type']); body = obj.caption ?? ''; }
+      if (obj) { media = await storeMedia(acc, obj, m.type as MediaInfo['type']); body = obj.caption ?? media.transcript ?? ''; }
       break;
     }
     case 'location': media = { type: 'location', caption: [m.location?.name, m.location?.address, m.location ? `${m.location.latitude},${m.location.longitude}` : ''].filter(Boolean).join(' · ') }; break;

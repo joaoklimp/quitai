@@ -1,5 +1,5 @@
 // Dados de exemplo dos módulos de gestão (financeiro, estoque e base de conhecimento) da empresa da demonstração.
-import type { Charge, CompanyIntegration, Contact, FaqItem, FinanceEntry, FiscalNote, Product, StockMovement } from '../types';
+import type { Charge, CompanyIntegration, Contact, FaqItem, FinanceEntry, FiscalNote, Product, StockMovement, WaitlistEntry } from '../types';
 import { addDays, fromLocal } from '../../../shared/format';
 import { DEMO_COMPANY_ID, DEMO_USER_ID, demoId } from './seed';
 
@@ -14,7 +14,7 @@ export const DEMO_FAQ: FaqItem[] = [
   { q: 'Vocês emitem nota fiscal?', a: 'Sim, emitimos nota fiscal de serviço. É só pedir no momento do pagamento.' },
 ];
 
-export function buildGestao(now: Date, today: string, contacts: Contact[]): { finance_entries: FinanceEntry[]; products: Product[]; stock_movements: StockMovement[]; charges: Charge[]; fiscal_notes: FiscalNote[]; company_integrations: CompanyIntegration[] } {
+export function buildGestao(now: Date, today: string, contacts: Contact[]): { finance_entries: FinanceEntry[]; products: Product[]; stock_movements: StockMovement[]; charges: Charge[]; fiscal_notes: FiscalNote[]; company_integrations: CompanyIntegration[]; waitlist: WaitlistEntry[] } {
   const at = (date: string, hhmm = '10:00') => fromLocal(date, hhmm, TZ).toISOString();
   const created = at(addDays(today, -40));
   const monthDay = (d: number) => { const [y, m] = today.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; };
@@ -93,5 +93,16 @@ export function buildGestao(now: Date, today: string, contacts: Contact[]): { fi
     pdf_url: n ? 'https://homologacao.focusnfe.com.br/notas_fiscais_servico/exemplo.pdf' : null, xml_url: null, error: null, issued_at: n ? ago(d, '16:00') : null, created_via: 'painel', created_at: ago(d), updated_at: ago(d),
   });
   const fiscal_notes: FiscalNote[] = [note(named('Bruno'), 280, 'Limpeza de 8 cadeiras', 'autorizada', 3, '2026000123'), note(named('Juliana'), 180, 'Limpeza de sofá 3 lugares', 'autorizada', 9, '2026000117')];
-  return { finance_entries, products, stock_movements, charges, fiscal_notes, company_integrations };
+  // lista de espera: dois aguardando e um que já conseguiu encaixe nesta semana
+  const wl = (c: Contact, desired: string | null, period: WaitlistEntry['period'], status: WaitlistEntry['status'], d: number, notes: string | null = null): WaitlistEntry => ({
+    id: demoId('f7'), company_id: DEMO_COMPANY_ID, contact_id: c.id, service_id: null, desired_date: desired, period, notes, status,
+    offered_at: status !== 'aguardando' ? ago(d - 1, '09:10') : null, offered_starts_at: status !== 'aguardando' ? at(addDays(today, 1), '15:00') : null,
+    appointment_id: null, created_via: d % 2 ? 'ia_cliente' : 'painel', created_at: ago(d), updated_at: ago(status === 'agendado' ? d - 1 : d),
+  });
+  const waitlist: WaitlistEntry[] = [
+    wl(named('Fernanda'), addDays(today, 1), 'tarde', 'aguardando', 1, 'Sofá de 3 lugares. Só consegue depois das 14h.'),
+    wl(named('Ricardo'), null, 'manha', 'aguardando', 2),
+    wl(named('Débora'), addDays(today, 1), 'qualquer', 'agendado', 3),
+  ];
+  return { finance_entries, products, stock_movements, charges, fiscal_notes, company_integrations, waitlist };
 }

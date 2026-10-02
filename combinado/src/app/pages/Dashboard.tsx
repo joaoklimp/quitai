@@ -12,6 +12,7 @@ import { PairBars, RadialGauge, GoalBar, Funnel, HBars, Sparkline } from '../cha
 import { Badge, Button, Delta, Empty, IconButton, Menu, PageHeader, Avatar, cx, useToast } from '../ui';
 import { addDays, brl, brl0, brlShort, firstName, fmtAgo, fmtDuration, fmtLong, fmtTime, localDate, MONTHS, num, todayLocal, fromLocal } from '../../shared/format';
 import type { AuditEntry, Contact, DailyStat } from '../data/types';
+import { GettingStarted, ValueCard } from './dashboard/ValueCards';
 
 export default function Dashboard() {
   const { me } = useMeCtx();
@@ -59,6 +60,9 @@ export default function Dashboard() {
           <Button variant="solid" icon={<Share2 />} onClick={share}>Compartilhar resumo</Button>
         </>}
       />
+
+      <GettingStarted />
+      <ValueCard />
 
       <div className={cx('dash', isFetching && rows && 'refetching')}>
         <KpiStrip cur={cur} prev={prev} periodShort={PERIOD_SHORT[period]} month={month} goal={me.company.monthly_goal} today={today} last30={last30} />

@@ -6,7 +6,7 @@ import type {
   PayMethod, ContactSource, AutomationKind, ActionReceipt, PendingAction,
 } from '../types';
 import { addDays, fromLocal, localDate, localParts, normalizePhone, weekdayOf } from '../../../shared/format';
-import type { Charge, CompanyIntegration, FinanceEntry, FiscalNote, Product, StockMovement } from '../types';
+import type { Charge, CompanyIntegration, FinanceEntry, FiscalNote, Product, StockMovement, WaitlistEntry } from '../types';
 import { buildGestao, DEMO_FAQ } from './gestao';
 
 export const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
@@ -42,6 +42,7 @@ export interface DemoDB {
   charges: Charge[];
   fiscal_notes: FiscalNote[];
   company_integrations: CompanyIntegration[];
+  waitlist: WaitlistEntry[];
   /** campos de mensagens por dia (o resto do agregado vem das linhas) */
   msgStats: Record<string, Pick<DailyStat, 'msgs_in' | 'msgs_ai' | 'msgs_team' | 'conversations' | 'response_sum' | 'response_count' | 'handoffs'>>;
   /** agregados de vendas/orçamentos para dias anteriores à janela de linhas */
@@ -49,7 +50,7 @@ export interface DemoDB {
   seq: { quote: number; id: number };
 }
 
-export const DEMO_VERSION = 6;
+export const DEMO_VERSION = 7;
 const HISTORY_DAYS = 365;
 const RAW_DAYS = 75;
 const AI_START = 120; // a empresa começou a usar a IA há 120 dias
@@ -116,6 +117,7 @@ function companyRow(nowIso: string, today: string): Company {
     min_notice_minutes: 120,
     max_days_ahead: 45,
     monthly_goal: 32000,
+    modules: ['estoque', 'cobrancas'],
     plan: 'profissional',
     billing_status: 'active',
     billing_cycle: 'mensal',
@@ -259,14 +261,17 @@ const SCRIPTS: Script[] = [
     ],
   },
   {
-    name: 'Thiago Martins', minutesAgo: 1300, stage: 'novo', temp: 'frio', tags: [], handler: 'humano', unread: 0,
-    media: { 0: { type: 'audio', url: null, mime: 'audio/ogg', caption: null } },
+    name: 'Thiago Martins', minutesAgo: 1300, stage: 'fechado', temp: 'quente', tags: ['colchão'], unread: 0,
+    media: { 0: { type: 'audio', url: null, mime: 'audio/ogg', caption: null, transcript: 'Oi, boa tarde! Eu queria saber se vocês fazem higienização de colchão de casal e se tem horário quinta-feira à tarde, porque eu trabalho de manhã.' } },
     lines: [
-      ['c', '[áudio de 0:42]'],
-      ['ia', 'Oi! Ainda não consigo ouvir áudios por aqui. 🙏 Pode me mandar por escrito? Ou, se preferir, uma pessoa da equipe vai ouvir e te responder.', 0.2, [
-        { tool: 'chamar_atendente', label: 'Áudio encaminhado para a equipe', status: 'ok' },
+      ['c', 'Oi, boa tarde! Eu queria saber se vocês fazem higienização de colchão de casal e se tem horário quinta-feira à tarde, porque eu trabalho de manhã.'],
+      ['ia', 'Oi, Thiago! 😊 Fazemos sim: a higienização de colchão casal sai por R$ 160 e leva cerca de 1 hora. Quinta à tarde tenho às 14h e às 16h. Qual fica melhor?', 0.3, [
+        { tool: 'consultar_horarios', label: 'Consultou a agenda de quinta', status: 'ok', detail: '14:00 e 16:00 livres' },
       ]],
-      ['eq', 'Oi Thiago, aqui é a Carla! Ouvi seu áudio: temos horário quinta às 15h para o colchão. Posso confirmar?', 22],
+      ['c', 'Às 16h, por favor', 3],
+      ['ia', 'Prontinho, Thiago! ✅ Reservei quinta às 16h para a higienização do colchão casal. Na véspera eu te mando um lembrete.', 0.2, [
+        { tool: 'agendar_horario', label: 'Horário agendado', status: 'ok', detail: 'Quinta às 16:00 · Higienização de colchão casal' },
+      ]],
     ],
   },
   {
@@ -589,6 +594,8 @@ export function buildDemo(now = new Date()): DemoDB {
     ['pos_atendimento', true, { horas_depois: 3, pedir_avaliacao: true, link_avaliacao: 'g.page/brilholar' }, 'pos_atendimento'],
     ['reativacao', false, { dias_sem_compra: 120, desconto_pct: 10 }, 'reativacao_cliente'],
     ['lembrete_tarefa', true, { minutos_antes: 30 }, null],
+    ['relatorio_semanal', true, { dia: 1, horario: '08:00' }, 'relatorio_semanal'],
+    ['encaixe', true, { antecedencia_horas: 2 }, 'encaixe_disponivel'],
   ];
   const automations: Automation[] = autos.map(([kind, enabled, config, template_name]) => ({ id: demoId('9a'), company_id: DEMO_COMPANY_ID, kind, enabled, config, template_name, last_run_at: enabled ? minutesAgo(int(5, 300)) : null, created_at: company.created_at }));
   const automation_runs: AutomationRun[] = [];

@@ -109,3 +109,41 @@ describe('cobrança e nota fiscal', () => {
     await db.as(user(dona), (q) => q.exec(`insert into contacts (company_id, name, document) values ($1, 'Cliente PJ', '11222333000181')`, [cid]));
   });
 });
+
+describe('valor para o empreendedor', () => {
+  it('empresa nova já vem com relatório semanal e encaixe ligados, e módulos vazios', async () => {
+    const autos = await db.as(user(dona), (q) => q.rows<{ kind: string; enabled: boolean }>(`select kind, enabled from automations where kind in ('relatorio_semanal', 'encaixe') order by kind`));
+    expect(autos).toEqual([{ kind: 'encaixe', enabled: true }, { kind: 'relatorio_semanal', enabled: true }]);
+    const c = await db.as(user(dona), (q) => q.one<{ modules: string[] }>(`select modules from companies where id = $1`, [cid]));
+    expect(c.modules).toEqual([]);
+    await db.as(user(dona), (q) => q.exec(`update companies set modules = array['estoque'] where id = $1`, [cid]));
+    await expect(db.as(user(dona), (q) => q.exec(`update companies set modules = array['foguete'] where id = $1`, [cid]))).rejects.toThrow(/check constraint/);
+  });
+
+  it('lista de espera: equipe adiciona, um cliente só tem um pedido aberto, outra empresa não vê', async () => {
+    const ct = await db.as(user(dona), (q) => q.one<{ id: string }>(`insert into contacts (company_id, name, phone) values ($1, 'Rita Espera', '5561911112222') returning id`, [cid]));
+    await db.as(user(atendente), (q) => q.exec(`insert into waitlist (company_id, contact_id, desired_date, period) values ($1, $2, current_date + 2, 'tarde')`, [cid, ct.id]));
+    await expect(db.as(user(dona), (q) => q.exec(`insert into waitlist (company_id, contact_id) values ($1, $2)`, [cid, ct.id]))).rejects.toThrow(/waitlist_one_open_uq/);
+    expect(await db.as(user(outro), (q) => q.rows(`select id from waitlist`))).toHaveLength(0);
+    await expect(db.as(user(atendente), (q) => q.exec(`update waitlist set offered_at = now()`))).rejects.toThrow(/permission denied/);
+    const log = await db.as(user(dona), (q) => q.rows<{ summary: string }>(`select summary from audit_log where action = 'lista_espera'`));
+    expect(log[0].summary).toMatch(/Colocou Rita Espera na lista de espera para/);
+  });
+
+  it('relatório de valor conta o que a IA fez, inclusive fora do horário', async () => {
+    const ct = await db.as(user(dona), (q) => q.one<{ id: string }>(`insert into contacts (company_id, name, phone) values ($1, 'Bia Valor', '5561933334444') returning id`, [cid]));
+    await db.as('service', async (q) => {
+      const conv = await q.one<{ id: string }>(`insert into conversations (company_id, contact_id, kind, channel) values ($1, $2, 'cliente', 'whatsapp') returning id`, [cid, ct.id]);
+      // terça 10h (horário comercial) e terça 23h (fora), no fuso de São Paulo
+      await q.exec(`insert into messages (company_id, conversation_id, direction, sender, body, channel, created_at) values
+        ($1, $2, 'out', 'ia', 'Oi!', 'whatsapp', '2026-09-29 10:00-03'), ($1, $2, 'out', 'ia', 'Boa noite!', 'whatsapp', '2026-09-29 23:00-03')`, [cid, conv.id]);
+      await q.exec(`insert into appointments (company_id, contact_id, title, starts_at, ends_at, created_via, created_at) values ($1, $2, 'Corte', '2026-10-01 10:00-03', '2026-10-01 11:00-03', 'ia_cliente', '2026-09-29 23:01-03')`, [cid, ct.id]);
+    });
+    const r = await db.as(user(dona), (q) => q.one<{ r: Record<string, number> }>(`select public.value_report('2026-09-28', '2026-10-05') as r`));
+    expect(r.r).toMatchObject({ ia_replies: 2, ia_conversations: 1, after_hours: 1, appointments: 1 });
+    expect(r.r.minutes_saved).toBe(7);
+    const other = await db.as(user(outro), (q) => q.one<{ r: Record<string, number> }>(`select public.value_report('2026-09-28', '2026-10-05') as r`));
+    expect(other.r.ia_replies).toBe(0);
+    await expect(db.as(user(dona), (q) => q.one(`select public.value_report_for($1, now() - interval '1 day', now())`, [cid]))).rejects.toThrow(/permission denied/);
+  });
+});

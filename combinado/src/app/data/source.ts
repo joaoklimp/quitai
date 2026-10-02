@@ -2,7 +2,7 @@
 // - demo (localStorage, sem servidor) para quem quer ver o produto funcionando na hora;
 // - Supabase (banco real com RLS + Edge Functions com a IA e o WhatsApp).
 import type {
-  AgentReply, AiSettings, Company, DailyStat, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role,
+  AgentReply, AiSettings, Company, ModuleKey, ValueReport, DailyStat, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role,
 } from './types';
 import type { ProductRow } from './sheet';
 import type { Cycle, PaidPlanId } from '../../shared/plans';
@@ -11,7 +11,7 @@ export type IntegrationAction = 'connect_asaas' | 'connect_focus' | 'disconnect'
 export interface SignUpInput { name: string; email: string; password: string }
 /** Login social. 'azure' é a conta Microsoft (Outlook, Hotmail, Microsoft 365). */
 export type AuthProvider = 'google' | 'apple' | 'azure';
-export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean }
+export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean; modules?: ModuleKey[] }
 export interface CheckoutInput { plan: PaidPlanId; cycle: Cycle; method: 'cartao' | 'pix_boleto'; cpfCnpj?: string }
 
 export interface DataSource {
@@ -55,6 +55,8 @@ export interface DataSource {
   importProducts(rows: ProductRow[]): Promise<ImportResult>;
   /** Cobrança dos clientes (Asaas) e nota fiscal (Focus NFe): conectar, cobrar, emitir, consultar e cancelar. */
   integrations<T = Record<string, unknown>>(action: IntegrationAction, payload?: Record<string, unknown>): Promise<T>;
+  /** O que a ORBYTA fez pela empresa no período (respostas, horários, orçamentos, cobranças, tempo economizado). */
+  valueReport(from: string, to: string): Promise<ValueReport>;
 
   /* orçamentos */
   getQuote(id: string): Promise<Quote | null>;

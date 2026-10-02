@@ -179,3 +179,32 @@ describe('cobrança e nota fiscal (demonstração)', () => {
     expect(r.actions).toHaveLength(0);
   });
 });
+
+describe('valor para o empreendedor (demonstração)', () => {
+  it('relatório de valor mostra o que a IA fez no mês', async () => {
+    const { demoValueReport } = await import('../demoSource');
+    const now = new Date();
+    const r = demoValueReport(new Date(now.getTime() - 30 * 86400000).toISOString(), now.toISOString());
+    expect(r.ia_replies).toBeGreaterThan(0);
+    expect(r.minutes_saved).toBeGreaterThan(0);
+    expect(r.after_hours).toBeLessThanOrEqual(r.ia_replies);
+  });
+  it('horário cancelado é oferecido para quem está na lista de espera', async () => {
+    const { api } = await import('../../api');
+    const fernanda = table('waitlist').find((w) => w.status === 'aguardando' && w.desired_date)!;
+    const day = fernanda.desired_date!;
+    const other = table('contacts').find((c) => c.id !== fernanda.contact_id)!;
+    const ap = await api.insert('appointments', { contact_id: other.id, title: 'Limpeza de sofá 3 lugares', starts_at: new Date(`${day}T15:00:00-03:00`).toISOString(), ends_at: new Date(`${day}T16:00:00-03:00`).toISOString(), status: 'confirmado', created_via: 'painel' });
+    await api.update('appointments', ap.id, { status: 'cancelado' });
+    const w = table('waitlist').find((x) => x.id === fernanda.id)!;
+    expect(w.status).toBe('oferecido');
+    expect(table('notifications')[0].title).toMatch(/Encaixe oferecido/);
+    const r = await runOwnerCommand('Quem está na lista de espera?');
+    expect(r.reply).toMatch(/encaixe oferecido/);
+  });
+  it('no simulador, o cliente pede para entrar na lista de espera', async () => {
+    const r = await runSimulator('Me coloca na lista de espera para sábado', { reset: true, name: 'Lia Teste' });
+    expect(r.actions[0]).toMatchObject({ tool: 'entrar_lista_espera' });
+    expect(table('waitlist').some((w) => w.status === 'aguardando' && findContacts('Lia Teste')[0]?.id === w.contact_id)).toBe(true);
+  });
+});

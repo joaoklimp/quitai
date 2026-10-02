@@ -1,7 +1,7 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
-import type { AgentReply, AiSettings, Company, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
+import type { AgentReply, AiSettings, Company, ValueReport, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
 import type { ProductRow } from '../sheet';
 
 export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || '';
@@ -170,8 +170,9 @@ export class SupabaseSource implements DataSource {
     if (error) throw friendly(error);
   }
   async onboard(input: OnboardInput) {
-    const { error } = await this.sb.rpc('onboard_company', { p_name: input.company, p_segment: input.segment, p_phone: input.phone, p_city: input.city ?? null, p_preset: input.preset ?? true });
+    const { data: id, error } = await this.sb.rpc('onboard_company', { p_name: input.company, p_segment: input.segment, p_phone: input.phone, p_city: input.city ?? null, p_preset: input.preset ?? true });
     if (error) throw friendly(error);
+    if (input.modules?.length) await this.sb.from('companies').update({ modules: input.modules }).eq('id', id as string);
   }
   onAuthChange(cb: () => void) {
     const { data } = this.sb.auth.onAuthStateChange((event) => { if (event !== 'TOKEN_REFRESHED') cb(); });
@@ -255,6 +256,11 @@ export class SupabaseSource implements DataSource {
   async remove(table: TableName, id: string) {
     const { error } = await this.sb.from(table).delete().eq('id', id);
     if (error) throw friendly(error);
+  }
+  async valueReport(from: string, to: string): Promise<ValueReport> {
+    const { data, error } = await this.sb.rpc('value_report', { p_from: from, p_to: to });
+    if (error) throw friendly(error);
+    return data as ValueReport;
   }
   async integrations<T = Record<string, unknown>>(action: IntegrationAction, payload: Record<string, unknown> = {}) {
     return this.fn<T>('integrations', { action, ...payload });
@@ -367,7 +373,7 @@ export class SupabaseSource implements DataSource {
     const cid = this.companyId;
     if (!cid) return () => {};
     const ch = this.sb.channel(`empresa-${cid}`);
-    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes'] as TableName[]) {
+    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes', 'waitlist'] as TableName[]) {
       ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t, filter: `company_id=eq.${cid}` } as never, () => cb(t));
     }
     ch.subscribe();

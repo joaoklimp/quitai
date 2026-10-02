@@ -15,7 +15,7 @@ export interface PlanInfo {
   highlight?: boolean;
   blurb: string;
   features: string[];
-  automations: boolean; // lembretes, acompanhamento de orçamentos, resumo diário
+  automations: boolean; // acompanhamento de orçamentos, pós-atendimento, reativação e encaixe (lembretes, resumo e relatório valem em todos)
 }
 
 export const TRIAL_DAYS = 7;
@@ -30,9 +30,10 @@ export const PLANS: Record<PlanId, PlanInfo> = {
     id: 'essencial', name: 'Essencial', monthly: 149, yearly: 1490, aiReplies: 500, users: 2, numbers: 1, automations: false,
     blurb: 'Para quem atende sozinho e quer parar de perder cliente no WhatsApp.',
     features: [
-      'IA atendendo no WhatsApp 24h',
+      'IA que atende, agenda e orça no WhatsApp',
+      'Entende áudio e responde por texto',
       '500 respostas da IA por mês',
-      'Agenda, orçamentos e clientes',
+      'Lembrete de horário, resumo do dia e relatório da semana',
       'Comandos do dono pelo WhatsApp',
       'Até 2 pessoas na equipe',
     ],
@@ -43,9 +44,9 @@ export const PLANS: Record<PlanId, PlanInfo> = {
     features: [
       'Tudo do Essencial',
       '1.500 respostas da IA por mês',
-      'Lembretes de horário e acompanhamento de orçamentos',
-      'Resumo diário no seu WhatsApp',
-      'Relatórios completos',
+      'Encaixe automático com lista de espera',
+      'Acompanhamento de orçamentos e pedido de avaliação',
+      'Reativação de clientes sumidos',
       'Até 5 pessoas na equipe',
     ],
   },
@@ -56,7 +57,6 @@ export const PLANS: Record<PlanId, PlanInfo> = {
       'Tudo do Profissional',
       '4.000 respostas da IA por mês',
       'Até 15 pessoas na equipe',
-      'Reativação de clientes inativos',
       'Implantação assistida e suporte prioritário',
     ],
   },

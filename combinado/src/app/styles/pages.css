@@ -491,6 +491,8 @@
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 18px; }
 .mod { display: flex; flex-direction: column; gap: 12px; }
 .mod.locked { opacity: .7; }
+.mod.off { border-style: dashed; background: color-mix(in oklab, var(--surface) 70%, transparent); }
+.mod.off .mod-ic { filter: grayscale(1); opacity: .6; }
 .mod-head { display: flex; gap: 12px; align-items: flex-start; }
 .mod-head p { margin: 4px 0 0; }
 .mod-ic { flex: none; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); }
@@ -501,3 +503,60 @@
 .mod-go svg { width: 16px; height: 16px; }
 .faq-list { display: flex; flex-direction: column; gap: 12px; }
 .faq-item { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--r-md, 14px); background: var(--surface-2); border: 1px solid var(--line); }
+
+/* valor entregue e primeiros passos (visão geral) */
+.value-card { margin-bottom: 18px; overflow: hidden; position: relative; }
+.value-card::before { content: ""; position: absolute; inset: -40% -10% auto auto; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(47, 123, 255, .12), transparent 65%); pointer-events: none; }
+.value-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; position: relative; }
+.value-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--blue-ink); }
+.value-eyebrow svg { width: 14px; height: 14px; }
+.value-head h3 { margin-top: 6px; font-size: clamp(20px, 2.4vw, 26px); font-weight: 600; letter-spacing: -0.03em; }
+.value-head h3 b { font-weight: 750; background: var(--ai); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.value-head p { margin-top: 4px; max-width: 560px; }
+.value-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 18px; position: relative; }
+.value-tile { display: grid; gap: 2px; padding: 14px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line); }
+.value-tile b { font-size: 24px; font-weight: 750; letter-spacing: -0.03em; margin-top: 8px; }
+.vt-label { font-size: 13px; font-weight: 650; color: var(--ink-2); }
+.vt-sub { font-size: 12px; color: var(--ink-3); }
+.value-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+.value-ic svg { width: 16px; height: 16px; }
+.value-ic.blue { background: var(--blue-soft); color: var(--blue-ink); } .value-ic.violet { background: var(--violet-soft); color: var(--violet-ink); }
+.value-ic.orange { background: var(--orange-soft); color: var(--orange-ink); } .value-ic.green { background: var(--green-soft); color: var(--green-ink); }
+.value-ic.pink { background: var(--pink-soft); color: var(--pink); }
+.value-note { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 13px; color: var(--ink-2); position: relative; }
+.value-note svg { width: 15px; height: 15px; color: var(--violet-ink); flex: none; }
+@media (max-width: 1100px) { .value-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .value-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .value-tile b { font-size: 20px; } }
+.starter { margin-bottom: 18px; }
+.starter-head { display: flex; gap: 14px; align-items: flex-start; }
+.starter-ic { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--ai); color: #fff; }
+.starter-ic svg { width: 21px; height: 21px; }
+.starter-head h3 { font-size: 17px; }
+.starter-bar { margin-top: 10px; height: 6px; border-radius: 6px; background: var(--surface-3); overflow: hidden; max-width: 420px; }
+.starter-bar i { display: block; height: 100%; border-radius: 6px; background: var(--ai); transition: width .4s; }
+.starter-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 16px; }
+.starter-steps li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); }
+.starter-steps li .grow { display: grid; gap: 2px; min-width: 0; }
+.starter-steps li b { font-size: 14px; }
+.starter-steps .st-ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-2); }
+.starter-steps .st-ic svg { width: 16px; height: 16px; }
+.starter-steps li.done { opacity: .62; }
+.starter-steps li.done .st-ic { background: var(--green-soft); color: var(--green-ink); }
+.starter-steps li.done b { text-decoration: line-through; text-decoration-color: var(--ink-4); }
+
+/* lista de espera */
+.count-pill { margin-left: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 11.5px; font-weight: 750; background: var(--orange); color: #fff; }
+.wl-form { display: grid; gap: 12px; margin: 14px 0; padding: 16px; }
+.wl-list { display: grid; gap: 8px; margin-top: 14px; }
+.wl-list li { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); }
+.wl-list.done li { padding: 8px 12px; opacity: .8; }
+.wl-pos { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 750; background: var(--surface-3); color: var(--ink-2); }
+.wl-sub { margin-top: 22px; font-size: 13px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+
+/* módulos no cadastro da empresa */
+.onb-mods { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.onb-mods > .muted { margin-top: -4px; }
+.onb-mod { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.onb-mod .grow { display: grid; gap: 1px; }
+.onb-mod .om-ic { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue-ink); flex: none; }
+.onb-mod .om-ic svg { width: 17px; height: 17px; }

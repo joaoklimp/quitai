@@ -12,6 +12,7 @@ export const FILES = [
   ['src/shared/templates.ts', 'templates.ts'],
   ['src/app/data/types.ts', 'types.ts'],
   ['src/app/data/availability.ts', 'availability.ts'],
+  ['src/shared/value.ts', 'value.ts'],
 ];
 const IMPORTS = {
   "'./format'": "'./format.ts'",

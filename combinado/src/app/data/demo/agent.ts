@@ -243,6 +243,13 @@ const qtyIn = (f: string) => { const m = f.match(/(\d+(?:[.,]\d+)?)\s*(?:un|unid
 
 function handleGestao(ctx: Ctx, clause: string, f: string): boolean {
   const today = ctx.today;
+  // lista de espera
+  if (/\blista de espera\b/.test(f) && !/\b(coloca|poe|adiciona|bota)\b/.test(f)) {
+    const list = table('waitlist').filter((w) => w.status === 'aguardando' || w.status === 'oferecido');
+    ctx.lines.push(list.length ? `Na lista de espera (${list.length}):\n` + list.map((w) => `• ${contactById(w.contact_id)?.name ?? 'Cliente'} · ${w.desired_date ? fmtDate(w.desired_date).slice(0, 5) : 'qualquer dia'}${w.status === 'oferecido' ? ' · encaixe oferecido, esperando resposta' : ''}`).join('\n') + '\nQuando alguém cancelar, eu ofereço o horário na ordem da lista.' : 'Ninguém na lista de espera agora. 👌');
+    ctx.actions.push({ tool: 'lista_espera', label: 'Consultou a lista de espera', status: 'ok', detail: `${list.length} ${list.length === 1 ? 'cliente' : 'clientes'}`, link: '#/agenda?espera=1' });
+    return true;
+  }
   // cobrar cliente com Pix/boleto (sensível)
   if (/\bcobr(a|ar|e|ança|anca)\b/.test(f) && parseMoneyIn(clause) && !/\?\s*$/.test(clause) && !/\b(quanto|qual)\b/.test(f)) {
     const amount = parseMoneyIn(clause)!;
@@ -358,7 +365,7 @@ function resolveContact(ctx: Ctx, clause: string): Contact | null | 'ambiguous' 
   return found[0];
 }
 
-const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\n• "Cobra R$ 250 da Juliana para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (vendas, cobranças, notas fiscais, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
+const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\n• "Quem está na lista de espera?"\n• "Cobra R$ 250 da Juliana para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (vendas, cobranças, notas fiscais, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
 
 function handleClause(ctx: Ctx, clause: string) {
   const f = fold(clause);
@@ -721,6 +728,13 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
 
   if (conv.handler === 'humano') {
     reply = '';
+  } else if (/\blista de espera\b|\bme (avisa|coloca)\b.*\b(desmarcar|vaga|lista)\b/.test(f)) {
+    const now = new Date().toISOString();
+    const open = table('waitlist').find((w) => w.contact_id === contact.id && (w.status === 'aguardando' || w.status === 'oferecido'));
+    if (!open) table('waitlist').push({ id: newId(), company_id: DEMO_COMPANY_ID, contact_id: contact.id, service_id: sim.service, desired_date: sim.date, period: 'qualquer', notes: null, status: 'aguardando', offered_at: null, offered_starts_at: null, appointment_id: null, created_via: 'ia_cliente', created_at: now, updated_at: now });
+    emit('waitlist');
+    actions.push({ tool: 'entrar_lista_espera', label: 'Cliente na lista de espera', status: 'ok', detail: `${contact.name}${sim.date ? ` · ${fmtDate(sim.date).slice(0, 5)}` : ''}`, link: '#/agenda?espera=1' });
+    reply = `Prontinho! ${emo ? '📝 ' : ''}Você está na lista de espera${sim.date ? ` para ${fmtDate(sim.date).slice(0, 5)}` : ''}. Se abrir um horário, eu te mando uma mensagem aqui na hora.`;
   } else if (/\b(atendente|humano|pessoa|alguem da equipe|falar com (o|a) (dono|responsavel|gerente))\b/.test(f)) {
     handoff = true;
     reply = `Claro! Já chamei uma pessoa da equipe para falar com você. ${emo ? '🙋' : ''} Enquanto isso, se quiser, me conta o que você precisa.`;
@@ -765,7 +779,7 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
     contact.updated_at = new Date().toISOString(); emit('contacts');
     sim.askedData = true;
     const slots = slotsForDate(sim.date, company, table('appointments'), service?.duration_min ?? company.slot_minutes).slice(0, 4).map((s) => s.time);
-    reply = slots.length ? `Anotado, ${firstName(contact.name)}! ${emo ? '📝 ' : ''}Agora só falta escolher o horário: ${slots.join(', ')}. Qual prefere?` : `Anotado, ${firstName(contact.name)}! Esse dia lotou. Quer ver outro dia?`;
+    reply = slots.length ? `Anotado, ${firstName(contact.name)}! ${emo ? '📝 ' : ''}Agora só falta escolher o horário: ${slots.join(', ')}. Qual prefere?` : `Anotado, ${firstName(contact.name)}! Esse dia lotou. Quer ver outro dia? Se preferir, coloco você na lista de espera e te aviso se alguém desmarcar.`;
   } else if ((date || time) && (sim.service || /\b(horario|agend|marc|pode ser|quero|tem)\b/.test(f) || sim.date)) {
     const day = sim.date ?? today;
     const dur = service?.duration_min ?? company.slot_minutes;
@@ -777,8 +791,8 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
         if (sim.askedData && contact.address) reply = `Perfeito! Posso confirmar ${fmtLong(day)} às ${sim.time} no endereço ${contact.address}? Responda "sim" para eu reservar.`;
         else { reply = `Temos esse horário disponível! Posso reservar ${fmtLong(day)} às ${sim.time} para você? Só preciso do seu nome completo e do endereço.`; sim.askedData = true; }
       }
-      else reply = slots.length ? `Esse horário não está livre. ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} ainda tenho ${slots.slice(0, 4).map((s) => s.time).join(', ')}. Algum desses serve?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} está lotado. Quer ver outro dia?`;
-    } else reply = slots.length ? `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} tenho ${slots.slice(0, 5).map((s) => s.time).join(', ')}. Qual fica melhor?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} não tenho horários livres. Quer tentar outro dia?`;
+      else reply = slots.length ? `Esse horário não está livre. ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} ainda tenho ${slots.slice(0, 4).map((s) => s.time).join(', ')}. Algum desses serve?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} está lotado. Quer ver outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
+    } else reply = slots.length ? `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} tenho ${slots.slice(0, 5).map((s) => s.time).join(', ')}. Qual fica melhor?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} não tenho horários livres. Quer tentar outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
   } else if (/\b(quanto|valor|preco|custa|cobra|orcamento)\b/.test(f) || svcFound) {
     if (/\bsofa\b/.test(f) && !/\b(2|3|dois|tres|retratil|reclinavel|impermeab)\b/.test(f)) {
       const s2 = table('services').find((s) => s.name.startsWith('Limpeza de sofá 2'))!, s3 = table('services').find((s) => s.name.startsWith('Limpeza de sofá 3'))!, sr = table('services').find((s) => s.name.startsWith('Limpeza de sofá retrátil'))!;

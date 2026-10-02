@@ -83,6 +83,8 @@ Nos exemplos abaixo, troque:
    | `CRON_SECRET` | **O mesmo segredo** guardado no Vault como `cron_secret` |
    | `SITE_URL` | Endereço do site, sem barra no final: `https://seudominio.com.br` (vai nos links de orçamento, convites e retorno do pagamento) |
    | `ALLOWED_ORIGINS` | Endereços que podem chamar as funções, separados por vírgula: `https://seudominio.com.br,https://www.seudominio.com.br` |
+   | `TRANSCRIBE_API_KEY` | Opcional, recomendado: chave para transcrever os áudios do WhatsApp (clientes e equipe). Padrão: [Groq](https://console.groq.com/keys) com Whisper, que custa centavos por hora de áudio. Sem ela, a IA pede para a pessoa escrever |
+   | `TRANSCRIBE_API_URL` / `TRANSCRIBE_MODEL` | Opcionais: outro serviço compatível com a rota de transcrição da OpenAI (ex.: `https://api.openai.com/v1/audio/transcriptions` e `gpt-4o-mini-transcribe`). Padrão: Groq e `whisper-large-v3-turbo` |
    | `WA_DEBOUNCE_MS` | Quanto esperar (em milissegundos) por mais mensagens seguidas do cliente antes de responder tudo de uma vez. Padrão `2500` |
 
    `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já existem nas funções, não precisa definir.
@@ -213,6 +215,8 @@ Fora das 24 horas depois da última mensagem do cliente, o WhatsApp só deixa a 
 | `lembrete_tarefa` | Utilidade | Lembrete da ORBYTA: {{1}}. Responda esta mensagem se precisar de algo. |
 | `aviso_equipe` | Utilidade | Aviso da ORBYTA: {{1}}. Abra o painel para ver os detalhes. |
 | `cobranca_cliente` | Utilidade | Olá, {{1}}! Segue a cobrança de {{2}} referente a {{3}}, com vencimento em {{4}}. Para pagar com Pix ou boleto, é só abrir o link: {{5}} |
+| `encaixe_disponivel` | Utilidade | Olá, {{1}}! Abriu um horário {{2}} às {{3}} para {{4}}. Quer ficar com ele? É só responder SIM por aqui. |
+| `relatorio_semanal` | Utilidade | Sua semana na {{1}} com a ORBYTA: {{2}}. Responda esta mensagem para ver o relatório completo. |
 
 Os modelos são de cada conta do WhatsApp: no cadastro incorporado, cada cliente precisa tê-los na própria conta (eles aparecem no painel para copiar).
 

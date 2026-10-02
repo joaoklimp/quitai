@@ -54,7 +54,7 @@ function Media({ m }: { m: NonNullable<Message['media']> }) {
   const url = m.url ?? signed ?? null;
   if (m.type === 'image' && url) return <img className="msg-img" src={url} alt={m.caption ?? 'Imagem enviada'} loading="lazy" />;
   const I = m.type === 'audio' ? Mic : m.type === 'image' ? ImageIcon : m.type === 'location' ? MapPin : FileText;
-  const label = m.type === 'audio' ? 'Áudio' : m.type === 'image' ? 'Imagem' : m.type === 'location' ? (m.caption || 'Localização') : m.filename ?? 'Documento';
+  const label = m.type === 'audio' ? (m.transcript ? 'Áudio · transcrito pela IA' : 'Áudio') : m.type === 'image' ? 'Imagem' : m.type === 'location' ? (m.caption || 'Localização') : m.filename ?? 'Documento';
   return <div className="msg-file">{url ? <a href={url} target="_blank" rel="noreferrer"><I />{label}</a> : <><I />{label}</>}{m.type === 'audio' && url && <audio controls src={url} preload="none" />}</div>;
 }
 

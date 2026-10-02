@@ -1,7 +1,7 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
 import type { DataSource, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import { PRESETS } from '../../../shared/presets';
-import type { AiSettings, Charge, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
+import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
 import type { ProductRow } from '../sheet';
 import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
@@ -43,7 +43,7 @@ export class DemoSource implements DataSource {
   async onboard(input: OnboardInput) {
     await wait(700);
     const d = demoDb();
-    Object.assign(d.company, { name: input.company.trim(), segment: input.segment, ...(input.phone ? { phone: input.phone } : {}), ...(input.city ? { city: input.city } : {}) });
+    Object.assign(d.company, { name: input.company.trim(), segment: input.segment, modules: input.modules ?? [], ...(input.phone ? { phone: input.phone } : {}), ...(input.city ? { city: input.city } : {}) });
     if (input.preset !== false && PRESETS[input.segment]) {
       const now = new Date().toISOString();
       d.services = PRESETS[input.segment].map((p, i) => ({ id: newId(), company_id: DEMO_COMPANY_ID, name: p.name, description: null, price: p.price, price_type: p.price_type, duration_min: p.duration_min, category: p.category, active: true, sort: i, created_at: now }));
@@ -105,7 +105,7 @@ export class DemoSource implements DataSource {
   async insert<T extends TableName>(name: T, row: Partial<RowMap[T]>): Promise<RowMap[T]> {
     await wait(120);
     const now = new Date().toISOString();
-    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(['contacts', 'appointments', 'quotes', 'finance_entries', 'products'].includes(name) ? { updated_at: now } : {}), ...row } as unknown as RowMap[T];
+    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(['contacts', 'appointments', 'quotes', 'finance_entries', 'products', 'waitlist'].includes(name) ? { updated_at: now } : {}), ...(name === 'waitlist' ? { status: 'aguardando', created_via: 'painel', offered_at: null, offered_starts_at: null, appointment_id: null, period: 'qualquer', notes: null, service_id: null, desired_date: null } : {}), ...row } as unknown as RowMap[T];
     if (name === 'stock_movements') applyMovement(full as unknown as StockMovement); // valida e atualiza o saldo (no servidor é um gatilho)
     const rows = table(name) as unknown as RowMap[T][];
     rows.unshift(full);
@@ -150,6 +150,14 @@ export class DemoSource implements DataSource {
       const c = contactById(row.contact_id as string);
       const what = op === 'insert' ? 'Agendou' : before && before.status !== row.status ? `Marcou como ${row.status}` : 'Atualizou o horário de';
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: op === 'insert' ? 'agendar' : 'atualizar_agendamento', summary: `${what} ${c?.name ?? row.title}`, target_type: 'appointment', target_id: row.id as string, status: 'ok' });
+      // horário cancelado: oferece para quem está na lista de espera (no servidor, a automação "encaixe" faz isso)
+      if (op === 'update' && row.status === 'cancelado' && before?.status !== 'cancelado') demoEncaixe(row as unknown as Appointment);
+      // quem estava na lista e foi agendado sai dela
+      if (op === 'insert' && row.contact_id) for (const w of table('waitlist').filter((x) => x.contact_id === row.contact_id && (x.status === 'aguardando' || x.status === 'oferecido'))) { Object.assign(w, { status: 'agendado', appointment_id: row.id, updated_at: new Date().toISOString() }); emit('waitlist'); }
+    }
+    if (name === 'waitlist' && op === 'insert') {
+      const c = contactById(row.contact_id as string);
+      audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'lista_espera', summary: `Colocou ${c?.name ?? 'o cliente'} na lista de espera`, target_type: 'waitlist', target_id: row.id as string, status: 'ok' });
     }
     if (name === 'services' && op === 'update' && before && before.price !== row.price) {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'atualizar_servico', summary: `Alterou o preço de "${row.name}" de ${brl(Number(before.price))} para ${brl(Number(row.price))}`, target_type: 'service', target_id: row.id as string, status: 'ok' });
@@ -185,6 +193,10 @@ export class DemoSource implements DataSource {
   }
 
   /** Demonstração: imita o Asaas e a Focus NFe (nada sai daqui). */
+  async valueReport(from: string, to: string): Promise<ValueReport> {
+    await wait(150);
+    return demoValueReport(from, to);
+  }
   async integrations<T = Record<string, unknown>>(action: IntegrationAction, b: Record<string, unknown> = {}): Promise<T> {
     await wait(600);
     const now = new Date().toISOString();
@@ -511,4 +523,66 @@ export function demoSession(): DemoSession {
 export function setDemoSession(s: DemoSession) {
   memSession = s;
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* navegador sem armazenamento: fica só na memória */ }
+}
+
+/* ---------- relatório de valor e encaixe da demonstração (no servidor: value_report e a automação "encaixe") ---------- */
+export function demoValueReport(from: string, to: string): ValueReport {
+  const d = demoDb();
+  const inRange = (iso: string | null | undefined) => !!iso && iso >= from && iso < to;
+  const kinds = new Map(d.conversations.map((c) => [c.id, c.kind]));
+  const hours = d.company.business_hours as Record<string, [string, string][]>;
+  const tz = d.company.timezone;
+  const ia = d.messages.filter((m) => m.sender === 'ia' && m.direction === 'out' && kinds.get(m.conversation_id) === 'cliente' && inRange(m.created_at));
+  const afterHours = ia.filter((m) => {
+    const day = String(new Date(localDate(m.created_at, tz) + 'T12:00:00Z').getUTCDay());
+    const t = localTimeOf(m.created_at, tz);
+    return !(hours[day] ?? []).some(([a, b]) => t >= a && t < b);
+  }).length;
+  // as conversas mais antigas da demonstração ficam só nos números do dia (msgStats)
+  const statDays = Object.entries(d.msgStats).filter(([day]) => day + 'T12:00:00Z' >= from && day + 'T00:00:00Z' < to);
+  const iaStat = statDays.reduce((s, [, v]) => s + v.msgs_ai, 0);
+  const convStat = statDays.reduce((s, [, v]) => s + v.conversations, 0);
+  const iaReplies = Math.max(ia.length, iaStat);
+  const iaConvs = Math.max(new Set(ia.map((m) => m.conversation_id)).size, Math.round(convStat * 0.8));
+  const after = ia.length ? Math.round((afterHours / ia.length) * iaReplies) : Math.round(iaReplies * 0.3);
+  const appts = d.appointments.filter((a) => (a.created_via === 'ia_cliente' || a.created_via === 'ia_dono') && inRange(a.created_at));
+  const quotes = d.quotes.filter((q) => (q.created_via === 'ia_cliente' || q.created_via === 'ia_dono') && inRange(q.created_at));
+  const approved = quotes.filter((q) => q.status === 'aprovado');
+  const sales = d.sales.filter((s) => s.origin === 'ia' && inRange(s.paid_at));
+  const charges = d.charges.filter((c) => c.status === 'paga' && inRange(c.paid_at));
+  const runs = d.automation_runs.filter((r) => r.status === 'enviado' && inRange(r.ran_at));
+  const runsOf = (k: string) => runs.filter((r) => r.kind === k).length;
+  const owner = d.messages.filter((m) => m.sender === 'dono' && kinds.get(m.conversation_id) === 'dono' && inRange(m.created_at)).length;
+  const encaixes = d.waitlist.filter((w) => w.status === 'agendado' && inRange(w.updated_at)).length;
+  const r: ValueReport = {
+    from, to, ia_replies: iaReplies, ia_conversations: iaConvs, after_hours: after, owner_commands: owner,
+    appointments: appts.length, quotes: quotes.length, quotes_approved: approved.length, quotes_approved_value: approved.reduce((s, q) => s + q.total, 0),
+    sales_ia: sales.length, sales_ia_value: sales.reduce((s, x) => s + x.amount, 0), charges_paid: charges.length, charges_value: charges.reduce((s, x) => s + x.amount, 0),
+    reminders: runsOf('lembrete_agendamento'), followups: runsOf('followup_orcamento'), reviews_asked: runsOf('pos_atendimento'), reactivations: runsOf('reativacao'), encaixes, minutes_saved: 0,
+  };
+  r.minutes_saved = Math.round(r.ia_replies * 1.5 + r.appointments * 4 + r.quotes * 6 + (r.reminders + r.followups + r.reviews_asked + r.reactivations) + r.charges_paid * 3);
+  return r;
+}
+const localTimeOf = (iso: string, tz: string) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
+
+export function demoEncaixe(ap: Appointment) {
+  if (Date.parse(ap.starts_at) < Date.now() + 2 * 3600000) return;
+  const tz = demoDb().company.timezone;
+  const date = localDate(ap.starts_at, tz);
+  const hour = Number(localTimeOf(ap.starts_at, tz).slice(0, 2));
+  const period = hour < 12 ? 'manha' : hour < 18 ? 'tarde' : 'noite';
+  const w = table('waitlist').filter((x) => x.status === 'aguardando' && x.contact_id !== ap.contact_id && (!x.desired_date || x.desired_date === date) && (x.period === 'qualquer' || x.period === period))
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
+  if (!w) return;
+  const c = contactById(w.contact_id);
+  if (!c) return;
+  const now = new Date().toISOString();
+  Object.assign(w, { status: 'oferecido', offered_at: now, offered_starts_at: ap.starts_at, service_id: w.service_id ?? ap.service_id, updated_at: now });
+  const hora = localTimeOf(ap.starts_at, tz);
+  const conv = table('conversations').find((x) => x.contact_id === c.id && x.kind === 'cliente');
+  const text = `Olá, ${c.name.split(' ')[0]}! Boa notícia: abriu um horário ${new Date(date + 'T12:00:00Z').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'UTC' })} às ${hora} para ${ap.title}. Quer ficar com ele? É só responder *SIM* por aqui.`;
+  if (conv) pushMessage(conv, { direction: 'out', sender: 'ia', sender_name: 'Encaixe automático', body: text, media: null, wa_status: 'enviada', actions: null, response_seconds: null, channel: 'whatsapp' });
+  notify({ kind: 'agendamento', title: `Encaixe oferecido para ${c.name.split(' ')[0]}`, body: `${date.split('-').reverse().slice(0, 2).join('/')} às ${hora} · ${ap.title}`, link: '#/agenda' });
+  audit({ actor_type: 'sistema', actor_name: 'Encaixe automático', channel: 'automacao', action: 'encaixe', summary: `Ofereceu o horário cancelado de ${hora} para ${c.name}, que estava na lista de espera`, target_type: 'waitlist', target_id: w.id, status: 'ok' });
+  emit('waitlist');
 }

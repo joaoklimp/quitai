@@ -1,6 +1,7 @@
 // Automações agendadas (a função "cron" chama runCron a cada 5 minutos).
 // Roda as automações ligadas em cada empresa: lembrete de horário, acompanhamento de orçamento, resumo do dia,
-// pós-atendimento, reativação de clientes e lembretes de tarefas. Cada envio é registrado uma vez só.
+// pós-atendimento, reativação de clientes, lembretes de tarefas, relatório semanal de valor e encaixe de
+// clientes da lista de espera em horários cancelados. Cada envio é registrado uma vez só.
 import { db, notify } from '../_shared/db.ts';
 import { syncNote } from '../_shared/fiscal.ts';
 import type { FiscalNote } from '../_shared/types.ts';
@@ -9,7 +10,9 @@ import { deliverToContact } from '../_shared/conversation.ts';
 import { lastOwnerWhatsApp } from '../_shared/tools.ts';
 import { loadAccount, sendTemplate, sendText, withinWindow } from '../_shared/whatsapp.ts';
 import { addDays, brl, firstName, fmtDate, fromLocal, localDate, localTime, WEEKDAYS } from '../_shared/format.ts';
-import type { Appointment, Automation, AutomationKind, Contact } from '../_shared/types.ts';
+import { isFree } from '../_shared/availability.ts';
+import { fmtMinutes, valueHighlights, valueOneLine } from '../_shared/value.ts';
+import type { Appointment, Automation, AutomationKind, Contact, ValueReport, WaitlistEntry } from '../_shared/types.ts';
 import { TEMPLATES } from '../_shared/templates.ts';
 
 const MAX_PER_RUN = 150;
@@ -32,7 +35,7 @@ export async function runCron(req: Request): Promise<Response> {
       const acc = await loadAccount(companyId);
       for (const a of list) {
         if (!allowed(b, a.kind) || budget <= 0) continue;
-        if (!acc && a.kind !== 'lembrete_tarefa') continue; // sem WhatsApp conectado só sobra o aviso no painel
+        if (!acc && a.kind !== 'lembrete_tarefa' && a.kind !== 'relatorio_semanal') continue; // sem WhatsApp conectado só sobra o aviso no painel
         const n = await RUN[a.kind](b, a);
         if (n) { report[a.kind] = (report[a.kind] ?? 0) + n; await db.from('automations').update({ last_run_at: new Date().toISOString() }).eq('id', a.id); }
       }
@@ -46,10 +49,10 @@ export async function runCron(req: Request): Promise<Response> {
   return Response.json({ ok: true, sent: report });
 }
 
-/** Mesma regra da tela de Automações: o teste grátis libera tudo; reativação é do plano Empresa. */
+/** Mesma regra da tela de Automações: o que mostra valor todo dia vale em todos os planos; o resto, do Profissional em diante. */
+export const ALL_PLANS: AutomationKind[] = ['lembrete_tarefa', 'lembrete_agendamento', 'resumo_diario', 'relatorio_semanal'];
 function allowed(b: Base, kind: AutomationKind): boolean {
-  if (kind === 'lembrete_tarefa' || b.plan.id === 'teste') return true;
-  if (kind === 'reativacao') return b.plan.id === 'empresa';
+  if (ALL_PLANS.includes(kind) || b.plan.id === 'teste') return true;
   return b.plan.automations;
 }
 
@@ -132,19 +135,35 @@ const RUN: Record<AutomationKind, Runner> = {
     const dayStart = (d: string) => fromLocal(d, '00:00', b.tz).toISOString();
     const from = dayStart(today), to = dayStart(addDays(today, 1)), to2 = dayStart(addDays(today, 2));
     const id = b.company.id;
-    const [sales, quotes, waiting, tomorrow] = await Promise.all([
+    const tomorrowDate = addDays(today, 1);
+    const [sales, quotes, waiting, tomorrow, money, overdue, waitlist, quotesOpen] = await Promise.all([
       db.from('sales').select('amount').eq('company_id', id).gte('paid_at', from).lt('paid_at', to),
       db.from('quotes').select('status').eq('company_id', id).gte('created_at', from).lt('created_at', to),
       db.from('conversations').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('needs_attention', true).eq('status', 'aberta'),
       db.from('appointments').select('starts_at, title, contact:contacts(name)').eq('company_id', id).gte('starts_at', to).lt('starts_at', to2).neq('status', 'cancelado').order('starts_at').limit(12),
+      db.from('finance_entries').select('kind, amount, due_date').eq('company_id', id).is('paid_at', null).lte('due_date', tomorrowDate),
+      db.from('charges').select('amount').eq('company_id', id).eq('status', 'vencida'),
+      db.from('waitlist').select('id', { count: 'exact', head: true }).eq('company_id', id).in('status', ['aguardando', 'oferecido']),
+      db.from('quotes').select('total').eq('company_id', id).eq('status', 'enviado'),
     ]);
     const total = (sales.data ?? []).reduce((t, x) => t + Number(x.amount), 0);
     const agenda = (tomorrow.data ?? []) as unknown as { starts_at: string; title: string; contact: { name: string } | null }[];
+    const fin = (money.data ?? []) as { kind: string; amount: number; due_date: string }[];
+    const sum = (l: { amount: number }[]) => l.reduce((t, x) => t + Number(x.amount), 0);
+    const payTomorrow = fin.filter((x) => x.kind === 'pagar' && x.due_date === tomorrowDate);
+    const payLate = fin.filter((x) => x.kind === 'pagar' && x.due_date <= today);
+    const receive = fin.filter((x) => x.kind === 'receber' && x.due_date <= tomorrowDate);
+    const open = (quotesOpen.data ?? []) as { total: number }[];
     const lines = [
       `*Resumo de hoje na ${b.company.name}*`,
       `💰 Vendas: ${(sales.data ?? []).length} · ${brl(total)}`,
-      `📄 Orçamentos criados: ${(quotes.data ?? []).length}`,
+      `📄 Orçamentos criados: ${(quotes.data ?? []).length}${open.length ? ` · ${open.length} esperando o cliente aprovar (${brl(open.reduce((t, x) => t + Number(x.total), 0))})` : ''}`,
       `💬 Esperando resposta: ${waiting.count ?? 0}`,
+      payLate.length ? `⚠️ Contas a pagar vencidas: ${payLate.length} (${brl(sum(payLate))})` : '',
+      payTomorrow.length ? `📤 Vencem amanhã: ${payTomorrow.length} ${payTomorrow.length === 1 ? 'conta' : 'contas'} (${brl(sum(payTomorrow))})` : '',
+      receive.length ? `📥 A receber até amanhã: ${brl(sum(receive))}` : '',
+      (overdue.data ?? []).length ? `🔴 Cobranças vencidas: ${(overdue.data ?? []).length} (${brl(sum(overdue.data as { amount: number }[]))})` : '',
+      waitlist.count ? `⏳ Lista de espera: ${waitlist.count} ${waitlist.count === 1 ? 'cliente' : 'clientes'}` : '',
       a.config.incluir_agenda !== false ? (agenda.length ? `📅 Amanhã:\n${agenda.map((x) => `• ${localTime(x.starts_at, b.tz)} ${x.contact?.name ?? ''} — ${x.title}`).join('\n')}` : '📅 Amanhã: agenda livre') : '',
     ].filter(Boolean).join('\n');
     let sent = 0;
@@ -234,6 +253,92 @@ const RUN: Record<AutomationKind, Runner> = {
       await settle(run, true, detail);
       sent++;
     }
+    return sent;
+  },
+
+  /* relatório semanal "o que a ORBYTA fez por você" (dono e gerentes, no WhatsApp e no painel) */
+  async relatorio_semanal(b, a) {
+    const day = Math.min(6, Math.max(0, num(a.config.dia, 1)));
+    const hhmm = /^\d{2}:\d{2}$/.test(String(a.config.horario)) ? String(a.config.horario) : '08:00';
+    const now = new Date();
+    const today = localDate(now, b.tz);
+    if (new Date(today + 'T12:00:00Z').getUTCDay() !== day || localTime(now, b.tz) < hhmm) return 0;
+    const from = fromLocal(addDays(today, -7), '00:00', b.tz).toISOString(), to = fromLocal(today, '00:00', b.tz).toISOString();
+    const { data: report, error } = await db.rpc('value_report_for', { p_company: b.company.id, p_from: from, p_to: to });
+    if (error || !report) { console.error('relatório semanal', error?.message); return 0; }
+    const r = report as ValueReport;
+    const items = valueHighlights(r);
+    const saved = r.minutes_saved >= 30 ? `⏱️ Tempo que você deixou de gastar (estimativa): ${fmtMinutes(r.minutes_saved)}` : '';
+    const text = [`*Sua semana na ${b.company.name} com a ORBYTA*`, ...(items.length ? items : ['Semana tranquila: nenhuma conversa nova.']), saved, b.origin ? `Relatório completo: ${b.origin}/app/#/` : ''].filter(Boolean).join('\n');
+    let sent = 0;
+    // aviso no painel (uma vez por semana), mesmo sem WhatsApp conectado
+    if (await claim(b, a, `${today}:painel`, 'Painel')) {
+      await notify(b.company.id, 'sistema', 'Sua semana com a ORBYTA', valueOneLine(r), '#/');
+      sent++;
+    }
+    const acc = await loadAccount(b.company.id);
+    if (!acc) return sent;
+    const { data: people } = await db.from('members').select('user_id, name, phone').eq('company_id', b.company.id).eq('active', true).in('role', ['dono', 'gerente']).not('phone_verified_at', 'is', null);
+    for (const p of people ?? []) {
+      if (!p.phone || budget <= 0) continue;
+      const run = await claim(b, a, `${today}:${p.user_id}`, p.name);
+      if (!run) continue;
+      let ok = false, detail = 'Relatório da semana';
+      try {
+        if (withinWindow(await lastOwnerWhatsApp(b.company.id, p.user_id))) await sendText(acc, p.phone, text);
+        else await sendTemplate(acc, p.phone, a.template_name || TEMPLATES.relatorio.name, [b.company.name, valueOneLine(r)]);
+        ok = true;
+      } catch (e) { detail = (e as Error).message; }
+      await settle(run, ok, detail);
+      if (ok) { sent++; budget--; await db.rpc('bump_usage', { p_company: b.company.id, p_wa: 1 }); }
+    }
+    return sent;
+  },
+
+  /* encaixe: horário cancelado vira oferta para quem está na lista de espera */
+  async encaixe(b, a) {
+    const minHours = num(a.config.antecedencia_horas, 2);
+    const now = Date.now();
+    const { data: cancelled } = await db.from('appointments').select('*').eq('company_id', b.company.id).eq('status', 'cancelado')
+      .gt('starts_at', new Date(now + minHours * 3600000).toISOString()).lt('starts_at', new Date(now + 21 * 86400000).toISOString())
+      .gt('updated_at', new Date(now - 3 * 86400000).toISOString()).order('starts_at').limit(20);
+    if (!cancelled?.length) return 0;
+    const { data: waiting } = await db.from('waitlist').select('*, contact:contacts(*)').eq('company_id', b.company.id).eq('status', 'aguardando').order('created_at').limit(100);
+    const queue = ((waiting ?? []) as (WaitlistEntry & { contact: Contact | null })[]).filter((w) => w.contact?.phone && w.contact.opt_in);
+    if (!queue.length) return 0;
+    let sent = 0;
+    for (const ap of cancelled as Appointment[]) {
+      if (budget <= 0 || !queue.length) break;
+      // uma oferta por vez para cada horário: espera 2 horas pela resposta antes de oferecer ao próximo (até 3)
+      const { data: prev } = await db.from('automation_runs').select('ran_at, target_key').eq('company_id', b.company.id).eq('kind', 'encaixe').like('target_key', `${ap.id}:%`).order('ran_at', { ascending: false });
+      if ((prev ?? []).length >= 3 || (prev?.[0] && now - Date.parse(prev[0].ran_at) < 2 * 3600000)) continue;
+      const date = localDate(ap.starts_at, b.tz);
+      const hour = Number(localTime(ap.starts_at, b.tz).slice(0, 2));
+      const period = hour < 12 ? 'manha' : hour < 18 ? 'tarde' : 'noite';
+      const duration = Math.round((Date.parse(ap.ends_at) - Date.parse(ap.starts_at)) / 60000);
+      const dayStart = fromLocal(date, '00:00', b.tz).toISOString(), dayEnd = fromLocal(addDays(date, 1), '00:00', b.tz).toISOString();
+      const { data: dayAppts } = await db.from('appointments').select('*').eq('company_id', b.company.id).lt('starts_at', dayEnd).gt('ends_at', dayStart).not('status', 'in', '(cancelado,faltou)');
+      if (!isFree(ap.starts_at, duration, b.company, (dayAppts ?? []) as Appointment[]).ok) continue; // alguém já ocupou
+      const offeredBefore = new Set((prev ?? []).map((x) => x.target_key.split(':')[2]));
+      const idx = queue.findIndex((w) => !offeredBefore.has(w.contact_id) && (!w.desired_date || w.desired_date === date) && (w.period === 'qualquer' || w.period === period) && (!w.service_id || !ap.service_id || w.service_id === ap.service_id) && w.contact_id !== ap.contact_id);
+      if (idx < 0) continue;
+      const w = queue.splice(idx, 1)[0];
+      const c = w.contact!;
+      const run = await claim(b, a, `${ap.id}:${(prev ?? []).length + 1}:${c.id}`, c.name);
+      if (!run) continue;
+      const quando = dayName(b, ap.starts_at), hora = localTime(ap.starts_at, b.tz);
+      const servico = b.services.find((x) => x.id === (w.service_id ?? ap.service_id))?.name ?? ap.title ?? 'o atendimento';
+      const text = `Olá, ${firstName(c.name)}! Boa notícia: abriu um horário ${quando} às ${hora} para ${servico}. Quer ficar com ele? É só responder *SIM* por aqui.`;
+      const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Encaixe automático', template: { name: a.template_name || TEMPLATES.encaixe.name, params: [firstName(c.name), quando, hora, servico] } });
+      await settle(run, r.sent, r.sent ? `Horário ${quando} às ${hora} oferecido` : r.reason ?? 'não enviado');
+      if (r.sent) {
+        await db.from('waitlist').update({ status: 'oferecido', offered_at: new Date().toISOString(), offered_starts_at: ap.starts_at, service_id: w.service_id ?? ap.service_id }).eq('id', w.id);
+        await notify(b.company.id, 'agendamento', `Encaixe oferecido para ${firstName(c.name)}`, `${quando} às ${hora} · ${servico}`, '#/agenda');
+        sent++; budget--;
+      }
+    }
+    // ofertas sem resposta há mais de 2 horas voltam para a fila
+    await db.from('waitlist').update({ status: 'aguardando', offered_at: null, offered_starts_at: null }).eq('company_id', b.company.id).eq('status', 'oferecido').lt('offered_at', new Date(now - 2 * 3600000).toISOString());
     return sent;
   },
 };

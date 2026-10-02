@@ -24,7 +24,7 @@ describe('primeira configuração', () => {
       select (select count(*)::int from services) as services, (select count(*)::int from automations) as automations,
              (select role from members where user_id = auth.uid()) as role, (select greeting from ai_settings) as greeting,
              (select phone from companies) as phone, (select count(*)::int from audit_log) as audits`));
-    expect(info).toEqual({ services: 5, automations: 6, role: 'dono', greeting: 'Olá! Aqui é da Brilho Lar Higienização. Como posso ajudar?', phone: '5561999990000', audits: 1 });
+    expect(info).toEqual({ services: 5, automations: 8, role: 'dono', greeting: 'Olá! Aqui é da Brilho Lar Higienização. Como posso ajudar?', phone: '5561999990000', audits: 1 });
   });
 
   it('não deixa a mesma pessoa criar duas empresas', async () => {

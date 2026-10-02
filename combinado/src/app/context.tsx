@@ -1,4 +1,5 @@
 // Contextos do painel: usuário logado, assistente (gaveta da IA) e tema.
+import type { ModuleKey } from './data/types';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Me } from './data/types';
 
@@ -9,6 +10,8 @@ export function useMeCtx() {
   return v;
 }
 export const can = (me: Me, ...roles: Me['role'][]) => roles.includes(me.role);
+/** Módulo opcional ligado na empresa (estoque, cobranças e notas). */
+export const hasModule = (me: Me, key: ModuleKey) => (me.company?.modules ?? []).includes(key);
 
 /* gaveta do assistente (comandos para a IA) */
 interface AssistantState { open: boolean; setOpen: (v: boolean) => void; prefill: string | null; ask: (text?: string) => void; clearPrefill: () => void }
