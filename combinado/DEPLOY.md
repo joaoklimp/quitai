@@ -267,7 +267,7 @@ Estimativa por resposta, em dólares (preços da Anthropic: Opus 5.5 a US$ 4 / U
 
 | | Opus 5.5 | Sonnet 5.5 |
 |---|---|---|
-| Resposta a cliente | US$ 0,02 a 0,035 | US$ 0,01 a 0,02 |
+| Resposta a cliente | US$ 0,02 a 0,04 | US$ 0,01 a 0,02 |
 | Comando do dono | US$ 0,05 a 0,08 | US$ 0,03 a 0,04 |
 
 O valor menor vale para empresas com conversas frequentes (o cache fica ativo). O maior, para mensagens espaçadas.
@@ -276,11 +276,11 @@ Custo máximo por empresa se ela usar **todas** as respostas do plano:
 
 | Plano | Preço | Respostas/mês | Tudo no Opus 5.5 | Clientes no Sonnet 5.5 |
 |---|---|---|---|---|
-| Essencial | R$ 149 | 500 | US$ 10 a 18 | US$ 5 a 10 |
-| Profissional | R$ 299 | 1.500 | US$ 30 a 53 | US$ 15 a 30 |
-| Empresa | R$ 699 | 4.000 | US$ 80 a 140 | US$ 40 a 80 |
+| Essencial | R$ 149 | 500 | US$ 10 a 20 | US$ 5 a 10 |
+| Profissional | R$ 299 | 1.500 | US$ 30 a 60 | US$ 15 a 30 |
+| Empresa | R$ 699 | 4.000 | US$ 80 a 160 | US$ 45 a 80 |
 
-Multiplique pela cotação do dólar. Com o dólar a R$ 5,50, o plano Empresa todo no Opus pode custar até R$ 770 de IA, mais que o preço do plano. Por isso a recomendação para o lançamento:
+Multiplique pela cotação do dólar. Com o dólar a R$ 5,50, o plano Empresa todo no Opus pode custar até R$ 880 de IA, mais que o preço do plano. Por isso a recomendação para o lançamento:
 
 - `AI_MODEL_CUSTOMER=claude-sonnet-5-5`: atendimento rápido e bom, pela metade do custo;
 - `AI_MODEL=claude-opus-5-5` (padrão): os comandos do dono, que são menos e mais complexos.
