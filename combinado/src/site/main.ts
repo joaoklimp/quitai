@@ -12,6 +12,9 @@ import './site.css';
 import { PLANS, PAID_PLANS, TRIAL_DAYS, monthlyEquivalent, type Cycle, type PaidPlanId } from '../shared/plans';
 import { brl0, fmtLong, MONTHS, MONTHS_SHORT, num, todayLocal } from '../shared/format';
 
+// link de e-mail de acesso que caiu aqui (endereço de retorno não liberado no Supabase): segue para o painel
+if (/[?&#](code|token_hash|access_token|error_description)=/.test(location.search + location.hash)) location.replace(`/app/${location.search}${location.hash}`);
+
 const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T & Element>(sel) as T | null;
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => Array.from(root.querySelectorAll(sel)) as T[];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;

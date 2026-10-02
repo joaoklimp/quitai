@@ -1,7 +1,7 @@
 // Turnos do agente: responder um cliente, executar comandos da equipe, resolver confirmações
 // e o simulador do painel. Usado pelas funções "agent" (painel) e "whatsapp-webhook".
 import { db, audit } from './db.ts';
-import { runAgent, aiConfigured, aiErrorMessage } from './ai.ts';
+import { runAgent, aiConfigured, aiErrorMessage, CUSTOMER_MODEL } from './ai.ts';
 import { customerDynamic, customerSystem, ownerDynamic, ownerSystem, type Base } from './context.ts';
 import { buildHistory } from './conversation.ts';
 import { CUSTOMER_TOOLS, EXECUTORS, OWNER_TOOLS, type AgentCtx } from './tools.ts';
@@ -65,7 +65,7 @@ export async function customerTurn(b: Base, conv: Conversation, contact: Contact
   try {
     const run = await runAgent({
       system: customerSystem(b), dynamic: await customerDynamic(b, contact, await firstContact(conv.id)),
-      history, tools: CUSTOMER_TOOLS, ctx, effort: 'low', maxTokens: 6000, maxSteps: 7,
+      history, tools: CUSTOMER_TOOLS, ctx, effort: 'low', model: CUSTOMER_MODEL, maxTokens: 6000, maxSteps: 7,
     });
     const handoff = run.receipts.some((r) => r.tool === 'chamar_atendente');
     if (run.text) return { reply: run.text, actions: run.receipts, handoff, usage: run.usage };

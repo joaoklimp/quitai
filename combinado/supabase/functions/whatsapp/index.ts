@@ -27,7 +27,10 @@ serve(async (req) => {
         if (body.pin || token !== str(body.access_token, 2000)) {
           // números novos do cadastro incorporado precisam ser registrados na Cloud API (PIN de 6 dígitos)
           const pin = /^\d{6}$/.test(str(body.pin)) ? str(body.pin) : String(Math.floor(100000 + Math.random() * 900000));
-          try { await registerNumber(phoneNumberId, token, pin); } catch (e) { console.error('registrar número', (e as Error).message); }
+          try { await registerNumber(phoneNumberId, token, pin); } catch (e) {
+            console.error('registrar número', (e as Error).message);
+            if (body.pin) throw e; // a pessoa informou o PIN: mostra o motivo da recusa
+          }
         }
         await db.from('whatsapp_credentials').upsert({ company_id: me.companyId, access_token: token });
         const { data: account, error } = await db.from('whatsapp_accounts').upsert({

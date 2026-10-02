@@ -5,7 +5,7 @@ import { caller, db } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { countUsage, customerGate, customerTurn, ownerTurn, resolvePending, usageLeft, type Member } from '../_shared/agent.ts';
 import { buildHistory, findOrCreateConversation, insertMessage } from '../_shared/conversation.ts';
-import { aiConfigured, aiErrorMessage, complete } from '../_shared/ai.ts';
+import { aiConfigured, aiErrorMessage, complete, CUSTOMER_MODEL } from '../_shared/ai.ts';
 import type { Contact } from '../_shared/types.ts';
 
 serve(async (req) => {
@@ -71,7 +71,7 @@ serve(async (req) => {
         const sys = `Você ajuda a equipe da ${b.company.name} a responder clientes no WhatsApp. Escreva UMA sugestão de resposta curta (até 3 frases), em português do Brasil, no tom ${b.ai.tone}, para a equipe enviar agora. Use só fatos da conversa e da tabela abaixo; se faltar informação, sugira uma pergunta ao cliente. Responda apenas com o texto da mensagem, sem aspas.\n\nServiços: ${b.services.map((s) => `${s.name} (${s.price_type === 'sob_consulta' ? 'sob consulta' : `${s.price_type === 'a_partir_de' ? 'a partir de ' : ''}R$ ${s.price}`})`).join('; ')}\nRegras da empresa: ${b.ai.instructions || '—'}`;
         const last = history[history.length - 1];
         const hist = last.role === 'user' ? history : [...history, { role: 'user' as const, content: '(Sugira a próxima mensagem da equipe para continuar a conversa.)' }];
-        const r = await complete({ system: sys, history: hist, effort: 'low', maxTokens: 3000 });
+        const r = await complete({ system: sys, history: hist, effort: 'low', model: CUSTOMER_MODEL, maxTokens: 3000 });
         await countUsage(b, r.usage);
         return json({ text: r.text || 'Olá! Como posso ajudar?' }, 200, req);
       } catch (e) {

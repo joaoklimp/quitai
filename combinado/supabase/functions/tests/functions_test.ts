@@ -7,7 +7,7 @@ Deno.env.set('SUPABASE_URL', 'http://127.0.0.1:9');
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'teste');
 Deno.env.set('ANTHROPIC_API_KEY', 'sk-ant-teste');
 
-const { runAgent, __setClientForTests } = await import('../_shared/ai.ts');
+const { runAgent, fallbackParams, __setClientForTests } = await import('../_shared/ai.ts');
 const { yesNo } = await import('../_shared/agent.ts');
 const { verifySignature, withinWindow } = await import('../_shared/whatsapp.ts');
 const { customerSystem, ownerSystem, priceText } = await import('../_shared/context.ts');
@@ -51,6 +51,24 @@ Deno.test('runAgent: resposta direta, com cache no sistema, esforço e fallback 
   assertEquals(p.betas, ['server-side-fallback-2026-07-01']);
   assertEquals(p.fallbacks, 'default');
   assertEquals(p.model, 'claude-opus-5-5');
+});
+
+Deno.test('runAgent: modelo por chamada (ex.: Sonnet nas respostas aos clientes), sem o fallback do Opus', async () => {
+  const fake = fakeClaude([{ stop_reason: 'end_turn', content: [text('Oi! Como posso ajudar?')] }]);
+  __setClientForTests(fake.client);
+  const r = await runAgent({ system: 'regras', history, tools: [], ctx: {}, effort: 'low', model: 'claude-sonnet-5-5' });
+  assertEquals(r.text, 'Oi! Como posso ajudar?');
+  const p = fake.calls[0] as { model: string; betas?: string[]; fallbacks?: string };
+  assertEquals(p.model, 'claude-sonnet-5-5');
+  assertEquals(p.betas, undefined);
+  assertEquals(p.fallbacks, undefined);
+});
+
+Deno.test('fallbackParams: só a família Opus 5 recebe o fallback no servidor', () => {
+  assertEquals(fallbackParams('claude-opus-5-5'), { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  assertEquals(fallbackParams('claude-opus-5'), { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  assertEquals(fallbackParams('claude-sonnet-5-5'), {});
+  assertEquals(fallbackParams('claude-haiku-4-5'), {});
 });
 
 Deno.test('runAgent: executa ferramentas, devolve resultados numa mensagem só e junta os recibos', async () => {

@@ -8,8 +8,10 @@ const FLAG = 'combinado-modo';
 function pickMode(): 'demo' | 'supabase' {
   try {
     const params = new URLSearchParams(location.search);
-    if (params.has('demo')) localStorage.setItem(FLAG, 'demo');
-    if (params.has('real')) localStorage.removeItem(FLAG);
+    // link dos e-mails de acesso (confirmação, convite, nova senha) é sempre da conta real
+    const authLink = /[?&#](code|token_hash|access_token|error_description)=/.test(location.search + location.hash);
+    if (params.has('demo') && !authLink) localStorage.setItem(FLAG, 'demo');
+    if (params.has('real') || authLink) localStorage.removeItem(FLAG);
     if (!hasSupabase()) return 'demo';
     return localStorage.getItem(FLAG) === 'demo' ? 'demo' : 'supabase';
   } catch {

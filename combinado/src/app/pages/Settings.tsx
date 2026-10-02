@@ -257,13 +257,14 @@ function WhatsAppTab() {
 }
 
 function ManualConnect({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
-  const [f, setF] = useState({ phone_number_id: '', waba_id: '', access_token: '' });
+  const [f, setF] = useState({ phone_number_id: '', waba_id: '', access_token: '', pin: '' });
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const save = async () => {
     if (!f.phone_number_id.trim() || !f.access_token.trim()) { toast('Preencha o identificador do número e o token', 'err'); return; }
+    if (f.pin.trim() && !/^\d{6}$/.test(f.pin.trim())) { toast('O PIN tem 6 números', 'err'); return; }
     setBusy(true);
-    try { const w: WhatsAppAccount = await api.connectWhatsApp({ phone_number_id: f.phone_number_id.trim(), waba_id: f.waba_id.trim(), access_token: f.access_token.trim() }); toast(`Conectado: ${w.display_phone ?? 'número'}`); onDone(); onClose(); }
+    try { const w: WhatsAppAccount = await api.connectWhatsApp({ phone_number_id: f.phone_number_id.trim(), waba_id: f.waba_id.trim(), access_token: f.access_token.trim(), ...(f.pin.trim() ? { pin: f.pin.trim() } : {}) }); toast(`Conectado: ${w.display_phone ?? 'número'}`); onDone(); onClose(); }
     catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
   };
   return (
@@ -272,6 +273,7 @@ function ManualConnect({ open, onClose, onDone }: { open: boolean; onClose: () =
         <Field label="Identificação do número (Phone number ID)" className="full"><Input value={f.phone_number_id} onChange={(e) => setF({ ...f, phone_number_id: e.target.value })} inputMode="numeric" /></Field>
         <Field label="Identificação da conta (WABA ID)" className="full"><Input value={f.waba_id} onChange={(e) => setF({ ...f, waba_id: e.target.value })} inputMode="numeric" /></Field>
         <Field label="Token de acesso permanente" className="full"><Input type="password" value={f.access_token} onChange={(e) => setF({ ...f, access_token: e.target.value })} autoComplete="off" /></Field>
+        <Field label="PIN de 6 números (opcional)" className="full" hint="Para número novo na API: registra o número com este PIN de verificação em duas etapas. Se o número já tem PIN, use o mesmo."><Input value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" autoComplete="off" placeholder="000000" /></Field>
       </div>
     </Modal>
   );

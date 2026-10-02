@@ -6,7 +6,7 @@ import { api } from './data/api';
 import { useMe } from './data/hooks';
 import { AssistantProvider, MeContext, readTheme, applyTheme } from './context';
 import { Shell } from './layout/Shell';
-import { Loader, Empty, Button } from './ui';
+import { Loader, Empty, Button, useToast } from './ui';
 import { setDisplayTimeZone } from '../shared/format';
 import { AssistantDrawer } from './assistant/AssistantDrawer';
 import Dashboard from './pages/Dashboard';
@@ -40,7 +40,10 @@ export function App() {
   const qc = useQueryClient();
   const loc = useLocation();
 
+  const toast = useToast();
+
   useEffect(() => api.onAuthChange(() => { void qc.invalidateQueries({ queryKey: ['me'] }); }), [qc]);
+  useEffect(() => { if (!isLoading) { const n = api.authNotice?.(); if (n) toast(n, 'err'); } }, [isLoading, toast]);
   useEffect(() => { if (me?.company) setDisplayTimeZone(me.company.timezone); }, [me?.company]);
   // atualização ao vivo: qualquer mudança no banco invalida as listas da tabela e os números
   useEffect(() => {

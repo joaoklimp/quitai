@@ -1,10 +1,20 @@
 // Cliente do Claude e o laço de ferramentas do agente (manual, para controlar confirmações, recibos e custo).
-// O modelo é configurável por AI_MODEL; o padrão é o Claude Opus 5.5. Para baratear, use claude-sonnet-5-5.
+// Modelos: AI_MODEL (padrão: Claude Opus 5.5) e, só para as respostas aos clientes, AI_MODEL_CUSTOMER
+// (o maior volume; claude-sonnet-5-5 custa metade). Sem AI_MODEL_CUSTOMER, os clientes usam o AI_MODEL.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.131.0';
 import type { ActionReceipt } from './types.ts';
 
 export const MODEL = Deno.env.get('AI_MODEL') || 'claude-opus-5-5';
+export const CUSTOMER_MODEL = Deno.env.get('AI_MODEL_CUSTOMER') || MODEL;
 export const aiConfigured = () => !!Deno.env.get('ANTHROPIC_API_KEY');
+
+/**
+ * Se o Opus recusar um pedido por política, a própria API refaz no modelo recomendado ("fallbacks: default").
+ * O parâmetro só vai para a família Opus 5; nos outros modelos a recusa volta como resposta vazia e é tratada.
+ */
+export function fallbackParams(model: string): { betas?: string[]; fallbacks?: 'default' } {
+  return model.startsWith('claude-opus-5') ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' } : {};
+}
 
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
@@ -46,9 +56,11 @@ export async function runAgent<C>(o: {
   tools: Tool<C>[];
   ctx: C;
   effort: Effort;
+  model?: string;
   maxTokens?: number;
   maxSteps?: number;
 }): Promise<AgentRun> {
+  const model = o.model ?? MODEL;
   const messages: Msg[] = [...o.history];
   const system: Anthropic.Beta.BetaTextBlockParam[] = [{ type: 'text', text: o.system, cache_control: { type: 'ephemeral' } }];
   if (o.dynamic) system.push({ type: 'text', text: o.dynamic });
@@ -59,10 +71,9 @@ export async function runAgent<C>(o: {
 
   for (let step = 0; step < (o.maxSteps ?? 8); step++) {
     const res = await anthropic().beta.messages.create({
-      model: MODEL,
+      model,
       max_tokens: o.maxTokens ?? 8000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      ...fallbackParams(model),
       output_config: { effort: o.effort },
       system,
       ...(tools.length ? { tools } : {}),
@@ -102,12 +113,12 @@ export async function runAgent<C>(o: {
 }
 
 /** Uma resposta simples, sem ferramentas (ex.: sugestão de resposta para a equipe). */
-export async function complete(o: { system: string; history: Msg[]; effort?: Effort; maxTokens?: number }): Promise<{ text: string; usage: { input: number; output: number } }> {
+export async function complete(o: { system: string; history: Msg[]; effort?: Effort; model?: string; maxTokens?: number }): Promise<{ text: string; usage: { input: number; output: number } }> {
+  const model = o.model ?? MODEL;
   const res = await anthropic().beta.messages.create({
-    model: MODEL,
+    model,
     max_tokens: o.maxTokens ?? 4000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
+    ...fallbackParams(model),
     output_config: { effort: o.effort ?? 'low' },
     system: [{ type: 'text', text: o.system, cache_control: { type: 'ephemeral' } }],
     messages: o.history,

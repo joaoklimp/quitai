@@ -102,7 +102,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {canUseRealAccount ? <Button size="sm" variant="solid" onClick={leaveDemo}>Criar minha conta</Button> : <Button size="sm" onClick={() => { api.resetDemo?.(); toast('Demonstração restaurada'); }}>Restaurar dados</Button>}
           </div>
         )}
-        {!isDemo && trialDays !== null && trialDays > 0 && (
+        {!isDemo && !me.company.complimentary && trialDays !== null && trialDays > 0 && (
           <div className="demo-bar" role="note"><Info /><span className="grow">Seu teste grátis termina em <b>{trialDays} {trialDays === 1 ? 'dia' : 'dias'}</b>. Assine para manter a IA atendendo.</span><Button size="sm" variant="solid" onClick={() => nav('/configuracoes/assinatura')}>Ver planos</Button></div>
         )}
         {!isDemo && blocked && (

@@ -22,13 +22,15 @@ export interface DataSource {
   updatePassword(password: string): Promise<void>;
   onboard(input: OnboardInput): Promise<void>;
   onAuthChange(cb: () => void): () => void;
+  /** Aviso sobre um link de e-mail (confirmação, convite, nova senha) que expirou ou já foi usado. */
+  authNotice?(): string | null;
 
   /* empresa e configurações */
   updateCompany(patch: Partial<Company>): Promise<Company>;
   aiSettings(): Promise<AiSettings>;
   updateAiSettings(patch: Partial<AiSettings>): Promise<AiSettings>;
   whatsapp(): Promise<WhatsAppAccount>;
-  connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string }): Promise<WhatsAppAccount>;
+  connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string; pin?: string }): Promise<WhatsAppAccount>;
   disconnectWhatsApp(): Promise<void>;
   ownerLinkCode(): Promise<{ code: string; number: string | null; expires_at: string }>;
   inviteMember(input: { name: string; email: string; role: Role }): Promise<Member>;

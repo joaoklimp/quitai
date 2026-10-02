@@ -42,7 +42,7 @@ export class DemoSource implements DataSource {
     return structuredClone(d.ai);
   }
   async whatsapp(): Promise<WhatsAppAccount> { return structuredClone(demoDb().whatsapp); }
-  async connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string }): Promise<WhatsAppAccount> {
+  async connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string; pin?: string }): Promise<WhatsAppAccount> {
     await wait(900);
     const d = demoDb();
     Object.assign(d.whatsapp, { phone_number_id: input.phone_number_id, waba_id: input.waba_id, status: 'conectado', connected_at: new Date().toISOString(), last_error: null });

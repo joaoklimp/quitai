@@ -1,5 +1,5 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminOverview, CheckoutInput, DataSource, OnboardInput, SignUpInput } from '../source';
 import type { AgentReply, AiSettings, Company, DailyStat, Filter, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
 
@@ -48,13 +48,55 @@ function apply(b: Record<string, Function>, f: Filter) {
   }
 }
 
+const LINK_TYPES: EmailOtpType[] = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'];
+
 export class SupabaseSource implements DataSource {
   readonly mode = 'supabase' as const;
   sb: SupabaseClient;
   private companyId: string | null = null;
+  private linkReady: Promise<void>;
+  private linkNotice: string | null = null;
 
   constructor() {
     this.sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
+    this.linkReady = this.consumeEmailLink();
+  }
+
+  /**
+   * Links dos e-mails de acesso (confirmação de cadastro, convite da equipe, nova senha):
+   * - modelos do Combinado (supabase/templates): ?token_hash=…&type=…, confirmado aqui e válido em qualquer aparelho;
+   * - convite com o modelo padrão do Supabase: a sessão vem no fim do endereço (#…access_token=…),
+   *   formato que o cliente em modo PKCE não aceita sozinho;
+   * - ?code=… (cadastro e nova senha pedidos neste mesmo navegador): o próprio cliente resolve.
+   */
+  private async consumeEmailLink(): Promise<void> {
+    if (typeof location === 'undefined') return;
+    const url = new URL(location.href);
+    const q = url.searchParams;
+    const cut = url.hash.lastIndexOf('#'); // o painel usa rotas com # e o Supabase acrescenta outro #
+    const frag = new URLSearchParams(cut >= 0 ? url.hash.slice(cut + 1) : '');
+    const tokenHash = q.get('token_hash');
+    const access = frag.get('access_token');
+    const refresh = frag.get('refresh_token');
+    if (!tokenHash && !access && !q.get('error_description') && !frag.get('error_description')) return;
+    const type = (q.get('type') ?? frag.get('type')) as EmailOtpType | null;
+    let ok = false;
+    try {
+      await this.sb.auth.initialize();
+      if (tokenHash && type && LINK_TYPES.includes(type)) ok = !(await this.sb.auth.verifyOtp({ token_hash: tokenHash, type })).error;
+      else if (access && refresh) ok = !(await this.sb.auth.setSession({ access_token: access, refresh_token: refresh })).error;
+    } catch { ok = false; }
+    if (!ok) this.linkNotice = 'Este link expirou ou já foi usado. Entre com seu e-mail e senha ou peça um novo em “Esqueci minha senha”.';
+    for (const k of ['token_hash', 'type', 'error', 'error_code', 'error_description']) q.delete(k);
+    url.hash = ok && (type === 'invite' || type === 'recovery') ? '#/nova-senha' : '#/';
+    history.replaceState(history.state, '', url.toString());
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state })); // avisa as rotas do painel
+  }
+  /** Aviso sobre um link de e-mail que não funcionou (entregue uma vez só). */
+  authNotice(): string | null {
+    const n = this.linkNotice;
+    this.linkNotice = null;
+    return n;
   }
 
   private async fn<T = Record<string, unknown>>(name: string, body: Record<string, unknown>): Promise<T> {
@@ -70,6 +112,7 @@ export class SupabaseSource implements DataSource {
 
   /* ---------- sessão ---------- */
   async me(): Promise<Me | null> {
+    await this.linkReady;
     const { data: s } = await this.sb.auth.getSession();
     const user = s.session?.user;
     if (!user) return null;
@@ -138,7 +181,7 @@ export class SupabaseSource implements DataSource {
     if (error) throw friendly(error);
     return (data ?? { company_id: this.cid(), phone_number_id: null, waba_id: null, display_phone: null, verified_name: null, status: 'desconectado', last_error: null, connected_at: null }) as WhatsAppAccount;
   }
-  async connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string }) {
+  async connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string; pin?: string }) {
     const r = await this.fn<{ account: WhatsAppAccount }>('whatsapp', { action: 'connect', ...input });
     return r.account;
   }

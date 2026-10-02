@@ -1,7 +1,21 @@
 # Supabase CLI — Combinado.
-# As funções de webhook e o agendador não recebem login de usuário: cada uma confere o próprio segredo
-# (assinatura da Meta, token do Asaas, x-cron-secret). As demais exigem o token de quem está logado.
+# Nenhuma função depende da verificação automática de token do Supabase (verify_jwt): cada uma confere a sua.
+# - agent, whatsapp, billing e team: validam o login do usuário no Supabase Auth (caller() em _shared/db.ts),
+#   o que funciona tanto com as chaves antigas (anon) quanto com as novas chaves e chaves de assinatura do projeto;
+# - whatsapp-webhook, asaas-webhook e cron: conferem a assinatura da Meta, o token do Asaas e o x-cron-secret.
 project_id = "combinado"
+
+[functions.agent]
+verify_jwt = false
+
+[functions.whatsapp]
+verify_jwt = false
+
+[functions.billing]
+verify_jwt = false
+
+[functions.team]
+verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
