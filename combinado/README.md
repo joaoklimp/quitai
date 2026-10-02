@@ -130,7 +130,7 @@ Algumas regras (planos, formatos, modelos de mensagem, disponibilidade de horár
 | `npm run test:functions` | Testes das Edge Functions (Deno, Claude simulado) |
 | `npm run check:functions` | Confere os tipos das Edge Functions |
 | `npm run sync:functions` | Copia `src/shared` para as Edge Functions |
-| `npm run assets` | Gera de novo o céu do site, os ícones e a imagem de compartilhamento |
+| `npm run assets` | Gera de novo o céu do site, os ícones e a imagem de compartilhamento. Usa o Playwright, que não vem instalado: antes, rode `npm i -D playwright` e `npx playwright install chromium` |
 
 ### Teste de ponta a ponta das funções
 
@@ -154,4 +154,4 @@ O nome aparece em poucos lugares:
 4. os e-mails em `supabase/templates/`
 5. os modelos de mensagem do WhatsApp em `src/shared/templates.ts` (“Lembrete do Combinado…”). Depois de mudar, rode `npm run sync:functions`.
 
-Depois, `npm run assets` gera de novo os ícones e a imagem de compartilhamento.
+Depois, `npm run assets` gera de novo os ícones e a imagem de compartilhamento (veja a observação sobre o Playwright em “Comandos”).
