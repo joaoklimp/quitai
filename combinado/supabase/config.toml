@@ -1,0 +1,13 @@
+# Supabase CLI — Combinado.
+# As funções de webhook e o agendador não recebem login de usuário: cada uma confere o próprio segredo
+# (assinatura da Meta, token do Asaas, x-cron-secret). As demais exigem o token de quem está logado.
+project_id = "combinado"
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.cron]
+verify_jwt = false

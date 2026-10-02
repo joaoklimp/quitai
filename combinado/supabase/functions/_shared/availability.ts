@@ -1,7 +1,8 @@
+// GERADO por scripts/sync-functions.mjs a partir de src/app/data/availability.ts. Não edite aqui: edite o original e rode "npm run sync:functions".
 // Horários livres de um dia, a partir do horário de funcionamento, do tamanho do horário e da capacidade.
 // O servidor usa a mesma regra (cópia gerada em supabase/functions/_shared/availability.ts).
-import type { Appointment, Company } from './types';
-import { fromLocal, localDate, weekdayOf } from '../../shared/format';
+import type { Appointment, Company } from './types.ts';
+import { fromLocal, localDate, weekdayOf } from './format.ts';
 
 export interface Slot { time: string; startsAt: string; endsAt: string; free: number }
 

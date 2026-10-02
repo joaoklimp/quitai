@@ -13,6 +13,7 @@ import type { AiSettings, BusinessHours, Company, Member, Role, Tone, WhatsAppAc
 import { useMeCtx, can, useTheme } from '../context';
 import { Avatar, Badge, Button, Empty, Field, Input, Loader, Modal, MoneyInput, PageHeader, PhoneInput, Segmented, Select, Switch, Textarea, cx, useConfirm, useToast } from '../ui';
 import { brl, fmtDate, fmtAgo, formatPhone, WEEKDAYS } from '../../shared/format';
+import { TEMPLATE_LIST } from '../../shared/templates';
 import { PLANS, PAID_PLANS, planPrice, monthlyEquivalent, type Cycle, type PaidPlanId } from '../../shared/plans';
 
 const TABS = [
@@ -184,14 +185,6 @@ function AssistantTab() {
 }
 
 /* ================= whatsapp ================= */
-const TEMPLATES: [string, string, string][] = [
-  ['lembrete_agendamento', 'Utilidade', 'Olá, {{1}}! Passando para lembrar do seu horário de {{2}} em {{3}}. Responda SIM para confirmar ou me chame para remarcar.'],
-  ['acompanhamento_orcamento', 'Utilidade', 'Oi, {{1}}! Seu orçamento nº {{2}} no valor de {{3}} ainda está disponível. Quer que eu reserve um horário?'],
-  ['resumo_diario', 'Utilidade', 'Resumo de {{1}}: {{2}}. Responda esta mensagem para ver os detalhes.'],
-  ['pos_atendimento', 'Utilidade', 'Obrigado pela confiança, {{1}}! Se puder, avalie nosso atendimento: {{2}}'],
-  ['reativacao_cliente', 'Marketing', 'Oi, {{1}}! Faz um tempinho que não cuidamos de você. Esta semana tem {{2}} para clientes da casa. Quer agendar?'],
-  ['aviso_equipe', 'Utilidade', 'Aviso do sistema: {{1}}. Abra o painel para ver os detalhes.'],
-];
 function WhatsAppTab() {
   const { me, refresh } = useMeCtx();
   const { data: wa, isLoading, refetch } = useQuery({ queryKey: ['wa'], queryFn: () => api.whatsapp() });
@@ -249,10 +242,11 @@ function WhatsAppTab() {
           <li><span>Cadastre os modelos de mensagem abaixo (idioma: português do Brasil) no Gerenciador do WhatsApp. Eles são usados pelas automações fora da janela de 24 horas.</span></li>
         </ol>
         <div className="mini-list" style={{ marginTop: 16 }}>
-          {TEMPLATES.map(([name, cat, body]) => (
-            <div key={name} style={{ flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
-              <div className="row between"><b><code>{name}</code></b><span className="row" style={{ gap: 6 }}><Badge size="sm">{cat}</Badge><button className="icon-btn xs" onClick={() => copy(body)} aria-label="Copiar texto"><Copy /></button></span></div>
-              <span className="muted small">{body}</span>
+          {TEMPLATE_LIST.map((t) => (
+            <div key={t.name} style={{ flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
+              <div className="row between"><b><code>{t.name}</code></b><span className="row" style={{ gap: 6 }}><Badge size="sm">{t.category}</Badge><button className="icon-btn xs" onClick={() => copy(t.body)} aria-label="Copiar texto"><Copy /></button></span></div>
+              <span className="small" style={{ color: 'var(--ink-2)' }}>{t.body}</span>
+              <span className="muted tiny">{t.use} Variáveis: {t.params.map((x, i) => `{{${i + 1}}} ${x}`).join(' · ')}</span>
             </div>
           ))}
         </div>

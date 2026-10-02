@@ -1,5 +1,6 @@
+// GERADO por scripts/sync-functions.mjs a partir de src/app/data/types.ts. Não edite aqui: edite o original e rode "npm run sync:functions".
 // Tipos do domínio — espelham as tabelas do Supabase (supabase/migrations).
-import type { Cycle, PlanId } from '../../shared/plans';
+import type { Cycle, PlanId } from './plans.ts';
 
 export type UUID = string;
 export type ISO = string; // instante (timestamptz) em ISO 8601

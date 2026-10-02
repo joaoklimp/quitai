@@ -1,9 +1,11 @@
 // Peças de conversa usadas na caixa de entrada, no assistente e no simulador.
 import { Fragment, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, CheckCheck, Clock3, Sparkles, XCircle, CircleSlash, Mic, FileText, Image as ImageIcon, MapPin, MessageCircle } from 'lucide-react';
 import type { ActionReceipt, Message } from '../data/types';
 import { daysBetween, fmtDate, fmtTime, localDate, WEEKDAYS } from '../../shared/format';
 import { cx } from './index';
+import { api } from '../data/api';
 
 export function dayLabel(iso: string): string {
   const d = localDate(iso), today = localDate(new Date());
@@ -47,10 +49,13 @@ export function Receipts({ actions, onResolve, compact }: { actions: ActionRecei
 }
 
 function Media({ m }: { m: NonNullable<Message['media']> }) {
-  if (m.type === 'image' && m.url) return <img className="msg-img" src={m.url} alt={m.caption ?? 'Imagem enviada'} loading="lazy" />;
+  // arquivos do WhatsApp ficam numa pasta privada: o link é temporário e pedido na hora de mostrar
+  const { data: signed } = useQuery({ queryKey: ['media', m.path], queryFn: () => api.mediaUrl?.(m.path!) ?? null, enabled: !m.url && !!m.path && !!api.mediaUrl, staleTime: 50 * 60_000 });
+  const url = m.url ?? signed ?? null;
+  if (m.type === 'image' && url) return <img className="msg-img" src={url} alt={m.caption ?? 'Imagem enviada'} loading="lazy" />;
   const I = m.type === 'audio' ? Mic : m.type === 'image' ? ImageIcon : m.type === 'location' ? MapPin : FileText;
-  const label = m.type === 'audio' ? 'Áudio' : m.type === 'image' ? 'Imagem' : m.type === 'location' ? 'Localização' : m.filename ?? 'Documento';
-  return <div className="msg-file">{m.url ? <a href={m.url} target="_blank" rel="noreferrer"><I />{label}</a> : <><I />{label}</>}{m.type === 'audio' && m.url && <audio controls src={m.url} preload="none" />}</div>;
+  const label = m.type === 'audio' ? 'Áudio' : m.type === 'image' ? 'Imagem' : m.type === 'location' ? (m.caption || 'Localização') : m.filename ?? 'Documento';
+  return <div className="msg-file">{url ? <a href={url} target="_blank" rel="noreferrer"><I />{label}</a> : <><I />{label}</>}{m.type === 'audio' && url && <audio controls src={url} preload="none" />}</div>;
 }
 
 /** Linha de mensagens agrupadas por dia. `mine` decide quais ficam à direita. */

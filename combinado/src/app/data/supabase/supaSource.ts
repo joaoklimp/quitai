@@ -213,6 +213,10 @@ export class SupabaseSource implements DataSource {
   }
 
   /* ---------- conversas ---------- */
+  async mediaUrl(path: string) {
+    const { data } = await this.sb.storage.from('whatsapp-media').createSignedUrl(path, 3600);
+    return data?.signedUrl ?? null;
+  }
   async sendMessage(conversationId: string, text: string) { await this.fn('whatsapp', { action: 'send', conversation_id: conversationId, text }); }
   async setHandler(conversationId: string, handler: 'ia' | 'humano') {
     const patch = handler === 'ia' ? { handler, needs_attention: false, attention_reason: null } : { handler };

@@ -48,6 +48,8 @@ export interface DataSource {
   sendQuote(id: string): Promise<{ sent: boolean; link: string; reason?: string }>;
 
   /* conversas */
+  /** Link temporário de um arquivo recebido pelo WhatsApp (guardado em pasta privada da empresa). */
+  mediaUrl?(path: string): Promise<string | null>;
   sendMessage(conversationId: string, text: string): Promise<void>;
   setHandler(conversationId: string, handler: 'ia' | 'humano'): Promise<void>;
   markRead(conversationId: string): Promise<void>;
