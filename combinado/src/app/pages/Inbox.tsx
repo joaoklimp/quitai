@@ -12,7 +12,7 @@ import { Thread } from '../ui/chat';
 import { brl, fmtDate, fmtListTime, fold, formatPhone } from '../../shared/format';
 
 type Filter = 'todas' | 'equipe' | 'ia' | 'nao_lidas';
-export const STAGE_LABEL: Record<Stage, string> = { novo: 'Novo', conversando: 'Em conversa', orcamento: 'Orçamento enviado', fechado: 'Cliente', perdido: 'Perdido' };
+export const STAGE_LABEL: Record<Stage, string> = { novo: 'Novo contato', conversando: 'Em conversa', orcamento: 'Orçamento enviado', fechado: 'Paciente', perdido: 'Não seguiu' };
 export const TEMP_LABEL: Record<Temperature, string> = { quente: 'Quente', morno: 'Morno', frio: 'Frio' };
 export const TEMP_TONE: Record<Temperature, 'orange' | 'yellow' | 'blue'> = { quente: 'orange', morno: 'yellow', frio: 'blue' };
 
@@ -44,7 +44,7 @@ export default function Inbox() {
     <>
       <div className="page-head" style={{ marginBottom: 18 }}>
         <div className="page-head-text"><h1>Conversas</h1><p>A IA responde no WhatsApp. Quando precisar de você, a conversa sobe com um aviso laranja.</p></div>
-        <div className="page-head-actions"><Link to="/simulador" className="btn"><Smartphone />Testar como cliente</Link></div>
+        <div className="page-head-actions"><Link to="/simulador" className="btn"><Smartphone />Testar como paciente</Link></div>
       </div>
       <section ref={boxRef} className={cx('card inbox', current && 'has-chat')}>
         <aside className="ib-list">
@@ -59,7 +59,7 @@ export default function Inbox() {
           </div>
           <div className="ib-items" role="list">
             {isLoading && <Loader />}
-            {!isLoading && list.length === 0 && <Empty icon={<MessageCircle />} title="Nenhuma conversa aqui">{filter === 'todas' ? 'Quando um cliente chamar no WhatsApp, a conversa aparece aqui.' : 'Tente outro filtro.'}</Empty>}
+            {!isLoading && list.length === 0 && <Empty icon={<MessageCircle />} title="Nenhuma conversa aqui">{filter === 'todas' ? 'Quando um paciente chamar no WhatsApp, a conversa aparece aqui.' : 'Tente outro filtro.'}</Empty>}
             {list.map((c) => <ConvItem key={c.id} c={c} contact={byId.get(c.contact_id ?? '')} active={c.id === id} />)}
           </div>
         </aside>
@@ -71,7 +71,7 @@ export default function Inbox() {
 }
 
 function ConvItem({ c, contact, active }: { c: Conversation; contact?: Contact; active: boolean }) {
-  const name = contact?.name ?? formatPhone(contact?.phone) ?? 'Cliente';
+  const name = contact?.name ?? formatPhone(contact?.phone) ?? 'Paciente';
   return (
     <Link to={`/conversas/${c.id}`} className={cx('ib-item', active && 'active', c.needs_attention && 'attention')} role="listitem">
       <Avatar name={name} />
@@ -110,7 +110,7 @@ function Chat({ conv, contact }: { conv: Conversation; contact?: Contact }) {
 
   const windowLeft = conv.last_inbound_at ? 24 - (Date.now() - Date.parse(conv.last_inbound_at)) / 3600000 : -1;
   const windowOpen = conv.channel === 'simulador' || windowLeft > 0;
-  const name = contact?.name ?? 'Cliente';
+  const name = contact?.name ?? 'Paciente';
 
   const send = async () => {
     const t = text.trim();
@@ -144,7 +144,7 @@ function Chat({ conv, contact }: { conv: Conversation; contact?: Contact }) {
           <div className="who-sub">{contact?.phone ? formatPhone(contact.phone) : conv.channel === 'simulador' ? 'Conversa de teste (simulador)' : ''}{conv.handler === 'ia' ? ' · IA atendendo' : ' · Equipe atendendo'}</div>
         </div>
         <Button size="sm" variant={conv.handler === 'ia' ? 'solid' : 'ai'} icon={conv.handler === 'ia' ? <Hand /> : <Sparkles />} onClick={toggleHandler}>{conv.handler === 'ia' ? 'Assumir conversa' : 'Devolver para a IA'}</Button>
-        <IconButton label="Ficha do cliente" size="sm" className="side-toggle" onClick={() => setSideOpen(true)}><Info /></IconButton>
+        <IconButton label="Ficha do paciente" size="sm" className="side-toggle" onClick={() => setSideOpen(true)}><Info /></IconButton>
         <Menu trigger={({ toggle }) => <IconButton label="Mais opções" size="sm" onClick={toggle}><MoreVertical /></IconButton>}>
           {(close) => <>
             {contact && <button onClick={() => { close(); nav(`/clientes/${contact.id}`); }}><UserRound />Ver ficha completa</button>}
@@ -173,7 +173,7 @@ function Chat({ conv, contact }: { conv: Conversation; contact?: Contact }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} aria-label="Mensagem" />
         <button className="send" onClick={send} disabled={!text.trim() || busy} aria-label="Enviar"><Send /></button>
       </div>
-      {contact && <Drawer open={sideOpen} onClose={() => setSideOpen(false)} title="Ficha do cliente"><ContactSide contact={contact} inDrawer /></Drawer>}
+      {contact && <Drawer open={sideOpen} onClose={() => setSideOpen(false)} title="Ficha do paciente"><ContactSide contact={contact} inDrawer /></Drawer>}
     </div>
   );
 }
@@ -208,10 +208,12 @@ export function ContactSide({ contact, inDrawer }: { contact: Contact; inDrawer?
         <div className="score"><div className="progress"><span style={{ width: `${contact.score}%`, background: contact.score > 70 ? 'var(--orange)' : contact.score > 40 ? 'var(--yellow)' : 'var(--blue)' }} /></div><b className="small">{contact.score}</b></div>
       </div>
       <dl className="kv">
-        <dt>Cliente desde</dt><dd>{fmtDate(contact.created_at)}</dd>
-        <dt>Já comprou</dt><dd>{brl(contact.total_spent)}</dd>
+        <dt>Paciente desde</dt><dd>{fmtDate(contact.created_at)}</dd>
+        <dt>Convênio</dt><dd>{contact.insurance ? `${contact.insurance}${contact.insurance_card ? ` · ${contact.insurance_card}` : ''}` : 'Particular'}</dd>
+        {contact.birthday && <><dt>Nascimento</dt><dd>{fmtDate(contact.birthday + 'T12:00:00Z')}</dd></>}
+        {contact.guardian_name && <><dt>Responsável</dt><dd>{contact.guardian_name}</dd></>}
+        <dt>Total pago</dt><dd>{brl(contact.total_spent)}</dd>
         {contact.email && <><dt>E-mail</dt><dd>{contact.email}</dd></>}
-        {contact.address && <><dt>Endereço</dt><dd>{contact.address}</dd></>}
         <dt>Origem</dt><dd style={{ textTransform: 'capitalize' }}>{contact.source}</dd>
       </dl>
       <div>
@@ -222,7 +224,7 @@ export function ContactSide({ contact, inDrawer }: { contact: Contact; inDrawer?
         </div>
       </div>
       <div>
-        <h4>Horários</h4>
+        <h4>Consultas</h4>
         <div className="mini-list">
           {appts.length === 0 && <div className="muted">Nenhum ainda</div>}
           {appts.map((a) => <Link key={a.id} to="/agenda"><span className="truncate">{fmtDate(a.starts_at)} · {a.title}</span><span className="muted">{a.status}</span></Link>)}
@@ -230,7 +232,7 @@ export function ContactSide({ contact, inDrawer }: { contact: Contact; inDrawer?
       </div>
       <div>
         <h4>Anotações</h4>
-        <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => { if (notes !== (contact.notes ?? '')) void save({ notes }).then(() => toast('Anotação salva')); }} placeholder="Ex.: prefere atendimento à tarde, tem cachorro..." />
+        <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => { if (notes !== (contact.notes ?? '')) void save({ notes }).then(() => toast('Anotação salva')); }} placeholder="Ex.: prefere horários à tarde, vem com o filho..." />
       </div>
     </aside>
   );

@@ -1,4 +1,4 @@
-// Simulador: converse com a IA como se fosse um cliente no WhatsApp, antes de ligar o número de verdade.
+// Simulador: converse com a IA como se fosse um paciente no WhatsApp, antes de ligar o número de verdade.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,13 +11,13 @@ import { Avatar, Button, Field, Input, PageHeader, useToast } from '../ui';
 import { Receipts, Thread } from '../ui/chat';
 import { fmtTime } from '../../shared/format';
 
-const TRIES = ['Oi! Quanto custa uma limpeza de sofá?', 'Tem horário sexta às 14h?', 'Vocês atendem em Valparaíso?', 'Quais as formas de pagamento?', 'Faz por 20% de desconto?', 'Quero falar com uma pessoa'];
+const TRIES = ['Oi! Quanto custa uma limpeza?', 'Tem horário sexta às 14h com a Dra. Marina?', 'Vocês aceitam Unimed?', 'Quanto custa colocar aparelho?', 'Estou com dor de dente, posso tomar remédio?', 'Quero falar com uma pessoa'];
 
 export default function Simulator() {
   const { me } = useMeCtx();
   const qc = useQueryClient();
   const toast = useToast();
-  const [name, setName] = useState('Cliente de teste');
+  const [name, setName] = useState('Paciente de teste');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(null);
@@ -48,15 +48,15 @@ export default function Simulator() {
 
   return (
     <>
-      <PageHeader title="Simulador do WhatsApp" subtitle="Teste a IA como se você fosse um cliente. O que acontecer aqui entra de verdade no sistema, marcado como teste." actions={<><Link className="btn" to="/configuracoes/assistente"><Settings2 />Ajustar a IA</Link><Button icon={<RotateCcw />} onClick={restart}>Recomeçar</Button></>} />
+      <PageHeader title="Simulador do WhatsApp" subtitle="Teste a IA como se você fosse um paciente. O que acontecer aqui entra de verdade no sistema, marcado como teste." actions={<><Link className="btn" to="/configuracoes/assistente"><Settings2 />Ajustar a IA</Link><Button icon={<RotateCcw />} onClick={restart}>Recomeçar</Button></>} />
       <div className="sim">
         <div className="col" style={{ gap: 18 }}>
           <section className="card">
             <h3 style={{ fontSize: 16 }}>Como a {ai ?? 'IA'} vai atender</h3>
-            <p className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>Ela responde com base na sua tabela de serviços e preços, no horário de funcionamento, na agenda livre e nas instruções que você escreveu. Quando não sabe ou o cliente pede, ela chama uma pessoa da equipe.</p>
+            <p className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>Ela responde com base nos procedimentos e valores, nos convênios aceitos, na agenda de cada profissional e nas instruções que você escreveu. Nunca orienta sintomas: nesses casos, e quando o paciente pede, ela chama a equipe.</p>
             <div className="form-grid" style={{ marginTop: 16 }}>
-              <Field label="Nome do cliente de teste"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-              <Field label="Empresa"><Input value={me.company.name} disabled /></Field>
+              <Field label="Nome do paciente de teste"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+              <Field label="Clínica"><Input value={me.company.name} disabled /></Field>
             </div>
             <div className="label" style={{ marginTop: 18 }}>Experimente perguntar</div>
             <div className="row wrap" style={{ marginTop: 8, gap: 8 }}>{TRIES.map((t) => <button key={t} className="chip" onClick={() => void send(t)} disabled={!!busy}>{t}</button>)}</div>
@@ -77,11 +77,11 @@ export default function Simulator() {
                 <Sparkles style={{ width: 18, opacity: 0.8 }} />
               </div>
               <div className="phone-chat" ref={chatRef}>
-                {shown.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: '#54656F', fontSize: 13 }}>Mande uma mensagem como se fosse um cliente. 👇</div>
+                {shown.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: '#54656F', fontSize: 13 }}>Mande uma mensagem como se fosse um paciente. 👇</div>
                   : <Thread messages={shown} mine={(m) => m.direction === 'in'} showSender={false} renderAfter={busy ? <div className="typing-row" style={{ background: '#fff', color: '#54656F' }}><span className="typing"><i /><i /><i /></span></div> : null} />}
               </div>
               <form className="phone-input" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Mensagem" aria-label="Mensagem do cliente de teste" />
+                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Mensagem" aria-label="Mensagem do paciente de teste" />
                 <button type="submit" aria-label="Enviar" disabled={!!busy}><Send /></button>
               </form>
             </div>

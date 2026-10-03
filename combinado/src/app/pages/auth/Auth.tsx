@@ -22,12 +22,12 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         <div className="auth-pitch">
           <span className="auth-eyebrow"><Sparkles />Gestão empresarial com IA que executa</span>
           <h1>Sua empresa inteira, <em>numa conversa.</em></h1>
-          <p>Peça pelo WhatsApp ou pelo painel e a {BRAND.name} faz: atende clientes, monta orçamentos, organiza a agenda, cobra e cuida do caixa.</p>
+          <p>Peça pelo WhatsApp ou pelo painel e a {BRAND.name} faz: atende pacientes, monta orçamentos, organiza a agenda, cobra e cuida do caixa.</p>
           <div className="auth-demo" aria-hidden="true">
             <div className="ad-msg me">Cadastra a Maria e manda um orçamento de R$ 350 pra ela</div>
             <div className="ad-msg ai"><b><Sparkles />{BRAND.name}</b>Pronto! Já fiz tudo isso:</div>
             <div className="ad-receipt">
-              <span><i><Check /></i>Cliente Maria cadastrada</span>
+              <span><i><Check /></i>Paciente Maria cadastrada</span>
               <span><i><Check /></i>Orçamento nº 0419 de R$ 350,00</span>
               <span><i><Check /></i>Link enviado no WhatsApp</span>
             </div>

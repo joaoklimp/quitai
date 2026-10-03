@@ -7,9 +7,9 @@ import { Badge, Button, Empty, Loader, PageHeader, Select, cx, useDebounced } fr
 import { dayLabel } from '../ui/chat';
 import { fmtDateTime, fmtTime, fold, localDate } from '../../shared/format';
 
-const CH_LABEL: Record<Channel, string> = { painel: 'Painel', ia_cliente: 'IA atendendo cliente', ia_dono: 'Pedido do dono (IA)', automacao: 'Automação', site: 'Site', whatsapp: 'WhatsApp' };
+const CH_LABEL: Record<Channel, string> = { painel: 'Painel', ia_cliente: 'IA atendendo paciente', ia_dono: 'Pedido do dono (IA)', automacao: 'Automação', site: 'Site', whatsapp: 'WhatsApp' };
 const ACTOR: Record<AuditEntry['actor_type'], { label: string; icon: typeof Bot; cls: string }> = {
-  ia: { label: 'IA', icon: Bot, cls: 'ai' }, usuario: { label: 'Equipe', icon: User, cls: 'team' }, sistema: { label: 'Sistema', icon: Workflow, cls: 'sys' }, cliente: { label: 'Cliente', icon: User, cls: 'client' },
+  ia: { label: 'IA', icon: Bot, cls: 'ai' }, usuario: { label: 'Equipe', icon: User, cls: 'team' }, sistema: { label: 'Sistema', icon: Workflow, cls: 'sys' }, cliente: { label: 'Paciente', icon: User, cls: 'client' },
 };
 const ST: Record<AuditEntry['status'], { label: string; tone: 'green' | 'yellow' | 'red' | undefined; icon: typeof Check }> = {
   ok: { label: 'Feito', tone: 'green', icon: Check }, aguardando: { label: 'Aguardando confirmação', tone: 'yellow', icon: Clock3 }, negado: { label: 'Negado', tone: 'red', icon: CircleSlash }, erro: { label: 'Erro', tone: 'red', icon: XCircle }, cancelado: { label: 'Cancelado', tone: undefined, icon: CircleSlash },

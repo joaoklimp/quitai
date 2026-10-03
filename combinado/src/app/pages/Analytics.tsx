@@ -1,4 +1,4 @@
-// Análises: como o atendimento e as vendas evoluem, onde a IA ajuda e quando os clientes chamam.
+// Análises: como o atendimento e as vendas evoluem, onde a IA ajuda e quando os pacientes chamam.
 import { useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, Table2 } from 'lucide-react';
 import { useList, usePeakHours, usePeriod, useStats } from '../data/hooks';
@@ -93,7 +93,7 @@ export default function Analytics() {
             </div>
           </section>
           <section className="card an-wide">
-            <div className="card-head"><div><h3>Tempo médio de resposta</h3><div className="sub">Do “oi” do cliente até a primeira resposta</div></div><IconButton label="Alternar tabela" size="sm" onClick={t('resp')}><Table2 /></IconButton></div>
+            <div className="card-head"><div><h3>Tempo médio de resposta</h3><div className="sub">Do “oi” do paciente até a primeira resposta</div></div><IconButton label="Alternar tabela" size="sm" onClick={t('resp')}><Table2 /></IconButton></div>
             {tables.resp ? <table className="chart-table"><thead><tr><th>Período</th><th>Tempo médio</th></tr></thead><tbody>{buckets.map((b) => <tr key={b.key}><td>{b.long}</td><td>{fmtDuration(avgResponse(b.stat))}</td></tr>)}</tbody></table>
               : <LineChart points={buckets.map((b) => ({ label: b.label, long: b.long, value: avgResponse(b.stat) }))} format={(v) => fmtDuration(v)} />}
           </section>
@@ -102,12 +102,12 @@ export default function Analytics() {
             <Funnel steps={[{ label: 'Conversas', value: cur.conversations }, { label: 'Orçamentos', value: cur.quotes_sent }, { label: 'Aprovados', value: cur.quotes_approved }, { label: 'Vendas', value: cur.sales_count }]} />
           </section>
           <section className="card an-wide">
-            <div className="card-head"><div><h3>Quando os clientes chamam</h3><div className="sub">{busiest ? `Pico: ${busiest}. A IA cobre noites e fins de semana.` : 'Mensagens recebidas por dia e hora'}</div></div></div>
+            <div className="card-head"><div><h3>Quando os pacientes chamam</h3><div className="sub">{busiest ? `Pico: ${busiest}. A IA cobre noites e fins de semana.` : 'Mensagens recebidas por dia e hora'}</div></div></div>
             <Heatmap rows={order.map((d) => wd[d])} cols={hourCols} values={order.map((d) => peakVals[d])} unit="mensagens" />
           </section>
           <section className="card">
-            <div className="card-head"><div><h3>De onde vêm os clientes</h3><div className="sub">Novos cadastros no período</div></div></div>
-            {sources.length ? <HBars rows={sources} color="var(--c4)" /> : <p className="muted">Sem novos clientes no período.</p>}
+            <div className="card-head"><div><h3>De onde vêm os pacientes</h3><div className="sub">Novos cadastros no período</div></div></div>
+            {sources.length ? <HBars rows={sources} color="var(--c4)" /> : <p className="muted">Sem novos pacientes no período.</p>}
             <div className="divider" />
             <div className="card-head" style={{ marginBottom: 10 }}><div><h3>Mais pedidos</h3><div className="sub">Serviços nos orçamentos</div></div></div>
             {requested.length ? <HBars rows={requested} /> : <p className="muted">Sem orçamentos no período.</p>}

@@ -1,6 +1,6 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
 import type { DataSource, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
-import { PRESETS } from '../../../shared/presets';
+import { presetsFor } from '../../../shared/presets';
 import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
 import type { ProductRow } from '../sheet';
 import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
@@ -44,9 +44,9 @@ export class DemoSource implements DataSource {
     await wait(700);
     const d = demoDb();
     Object.assign(d.company, { name: input.company.trim(), segment: input.segment, modules: input.modules ?? [], ...(input.phone ? { phone: input.phone } : {}), ...(input.city ? { city: input.city } : {}) });
-    if (input.preset !== false && PRESETS[input.segment]) {
+    if (input.preset !== false) {
       const now = new Date().toISOString();
-      d.services = PRESETS[input.segment].map((p, i) => ({ id: newId(), company_id: DEMO_COMPANY_ID, name: p.name, description: null, price: p.price, price_type: p.price_type, duration_min: p.duration_min, category: p.category, active: true, sort: i, created_at: now }));
+      d.services = presetsFor(input.segment).map((p, i) => ({ id: newId(), company_id: DEMO_COMPANY_ID, name: p.name, description: null, price: p.price, price_type: p.price_type, duration_min: p.duration_min, category: p.category, return_days: p.return_days, active: true, sort: i, created_at: now }));
       emit('services');
     }
     setDemoSession({ ...demoSession(), state: 'on' });
@@ -56,7 +56,7 @@ export class DemoSource implements DataSource {
   async updateCompany(patch: Partial<Company>): Promise<Company> {
     const d = demoDb();
     Object.assign(d.company, patch);
-    audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'atualizar_empresa', summary: 'Atualizou os dados da empresa', target_type: 'company', target_id: d.company.id, status: 'ok' });
+    audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'atualizar_empresa', summary: 'Atualizou os dados da clínica', target_type: 'company', target_id: d.company.id, status: 'ok' });
     emit('members');
     return structuredClone(d.company);
   }
@@ -105,7 +105,7 @@ export class DemoSource implements DataSource {
   async insert<T extends TableName>(name: T, row: Partial<RowMap[T]>): Promise<RowMap[T]> {
     await wait(120);
     const now = new Date().toISOString();
-    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(['contacts', 'appointments', 'quotes', 'finance_entries', 'products', 'waitlist'].includes(name) ? { updated_at: now } : {}), ...(name === 'waitlist' ? { status: 'aguardando', created_via: 'painel', offered_at: null, offered_starts_at: null, appointment_id: null, period: 'qualquer', notes: null, service_id: null, desired_date: null } : {}), ...row } as unknown as RowMap[T];
+    const full = { id: newId(), company_id: DEMO_COMPANY_ID, created_at: now, ...(['contacts', 'appointments', 'quotes', 'finance_entries', 'products', 'waitlist', 'professionals'].includes(name) ? { updated_at: now } : {}), ...(name === 'professionals' ? { specialty: null, council: null, color: '#3D86F0', business_hours: null, service_ids: [], member_user_id: null, active: true, sort: table('professionals').length + 1 } : {}), ...(name === 'appointments' ? { payment_kind: 'particular', insurance: null, patient_confirmed_at: null, professional_id: null } : {}), ...(name === 'waitlist' ? { status: 'aguardando', created_via: 'painel', offered_at: null, offered_starts_at: null, appointment_id: null, period: 'qualquer', notes: null, service_id: null, desired_date: null } : {}), ...row } as unknown as RowMap[T];
     if (name === 'stock_movements') applyMovement(full as unknown as StockMovement); // valida e atualiza o saldo (no servidor é um gatilho)
     const rows = table(name) as unknown as RowMap[T][];
     rows.unshift(full);
@@ -143,6 +143,11 @@ export class DemoSource implements DataSource {
       if (c) { c.total_spent += Number(row.amount); c.stage = 'fechado'; emit('contacts'); }
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'registrar_venda', summary: `Registrou venda de ${brl(Number(row.amount))}${c ? ` para ${c.name}` : ''}`, target_type: 'sale', target_id: row.id as string, status: 'ok' });
     }
+    if (name === 'professionals') {
+      const was = before as { active?: boolean } | undefined;
+      if (op === 'insert' || (was && was.active !== row.active)) audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: op === 'insert' ? 'criar_profissional' : 'atualizar_profissional', summary: op === 'insert' ? `Cadastrou o profissional ${row.name}` : `${row.active ? 'Reativou' : 'Desativou'} o profissional ${row.name}`, target_type: 'professional', target_id: row.id as string, status: 'ok' });
+    }
+    if (name === 'appointments' && row.payment_kind === 'particular') row.insurance = null;
     if (name === 'contacts') {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: op === 'insert' ? 'cadastrar_cliente' : 'atualizar_cliente', summary: `${op === 'insert' ? 'Cadastrou' : 'Atualizou'} ${row.name}`, target_type: 'contact', target_id: row.id as string, status: 'ok' });
     }
@@ -157,7 +162,7 @@ export class DemoSource implements DataSource {
     }
     if (name === 'waitlist' && op === 'insert') {
       const c = contactById(row.contact_id as string);
-      audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'lista_espera', summary: `Colocou ${c?.name ?? 'o cliente'} na lista de espera`, target_type: 'waitlist', target_id: row.id as string, status: 'ok' });
+      audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'lista_espera', summary: `Colocou ${c?.name ?? 'o paciente'} na lista de espera`, target_type: 'waitlist', target_id: row.id as string, status: 'ok' });
     }
     if (name === 'services' && op === 'update' && before && before.price !== row.price) {
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: 'atualizar_servico', summary: `Alterou o preço de "${row.name}" de ${brl(Number(before.price))} para ${brl(Number(row.price))}`, target_type: 'service', target_id: row.id as string, status: 'ok' });
@@ -438,7 +443,7 @@ export class DemoSource implements DataSource {
   resetDemo() { resetDemoDb(); }
 }
 
-const LABEL: Partial<Record<TableName, string>> = { contacts: 'o cliente', services: 'o serviço', quotes: 'o orçamento', appointments: 'o agendamento', sales: 'a venda', tasks: 'a tarefa', automations: 'a automação' };
+const LABEL: Partial<Record<TableName, string>> = { contacts: 'o paciente', services: 'o procedimento', professionals: 'o profissional', quotes: 'o orçamento', appointments: 'o agendamento', sales: 'a venda', tasks: 'a tarefa', automations: 'a automação' };
 
 /** Saída maior que o saldo é recusada; avisa quando o produto fica abaixo do mínimo (como o gatilho do banco). */
 export function applyMovement(m: StockMovement) {

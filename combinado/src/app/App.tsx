@@ -15,6 +15,7 @@ const Inbox = lazy(() => import('./pages/Inbox'));
 const Contacts = lazy(() => import('./pages/Contacts'));
 const Quotes = lazy(() => import('./pages/Quotes'));
 const Agenda = lazy(() => import('./pages/Agenda'));
+const Professionals = lazy(() => import('./pages/Professionals'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Automations = lazy(() => import('./pages/Automations'));
 const Sales = lazy(() => import('./pages/Sales'));
@@ -82,6 +83,7 @@ export function App() {
               <Route path="/orcamentos" element={<Quotes />} />
               <Route path="/orcamentos/:id" element={<Quotes />} />
               <Route path="/agenda" element={<Agenda />} />
+              <Route path="/profissionais" element={<Professionals />} />
               <Route path="/analises" element={<Analytics />} />
               <Route path="/automacoes" element={<Automations />} />
               <Route path="/vendas" element={<Sales />} />

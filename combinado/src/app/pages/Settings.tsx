@@ -1,4 +1,5 @@
 // Configurações: empresa, assistente IA, WhatsApp, equipe, assinatura e conta.
+import { SPECIALTIES } from '../../shared/presets';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,7 +25,7 @@ const TABS = [
   { id: 'assinatura', label: 'Assinatura', icon: CreditCard },
   { id: 'conta', label: 'Sua conta', icon: UserCog },
 ];
-export const SEGMENTS: [string, string][] = [['limpeza', 'Limpeza e higienização'], ['beleza', 'Beleza e estética'], ['oficina', 'Oficina e serviços automotivos'], ['assistencia', 'Assistência técnica'], ['saude', 'Clínica e consultório'], ['pet', 'Pet shop e veterinária'], ['reformas', 'Reformas e manutenção'], ['eventos', 'Eventos e buffet'], ['educacao', 'Aulas e cursos'], ['outro', 'Outro']];
+export const SEGMENTS: [string, string][] = SPECIALTIES;
 const TZS: [string, string][] = [['America/Sao_Paulo', 'Brasília (SP, RJ, MG, Sul, GO, DF...)'], ['America/Manaus', 'Amazonas (−1h)'], ['America/Cuiaba', 'Mato Grosso e MS (−1h)'], ['America/Belem', 'Pará e Amapá'], ['America/Fortaleza', 'Nordeste'], ['America/Recife', 'Pernambuco'], ['America/Rio_Branco', 'Acre (−2h)'], ['America/Noronha', 'Fernando de Noronha (+1h)']];
 
 export default function Settings() {
@@ -65,14 +66,16 @@ function CompanyTab() {
   const dirty = JSON.stringify(f) !== JSON.stringify(me.company);
   const set = <K extends keyof Company>(k: K, v: Company[K]) => setF((x) => ({ ...x, [k]: v }));
   const owner = can(me, 'dono', 'gerente');
-  const save = async () => { setBusy(true); try { await api.updateCompany(f); refresh(); toast('Dados da empresa salvos'); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); } };
+  const save = async () => { setBusy(true); try { await api.updateCompany(f); refresh(); toast('Dados da clínica salvos'); } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); } };
+  const [newIns, setNewIns] = useState('');
+  const addIns = () => { const v = newIns.trim(); if (!v) return; if (!(f.insurances ?? []).some((x) => x.toLowerCase() === v.toLowerCase())) set('insurances', [...(f.insurances ?? []), v]); setNewIns(''); };
   return (
     <>
       <section className="card set-section">
-        <div className="card-head"><div><h3>Dados da empresa</h3><div className="sub">A IA usa o nome e a cidade para se apresentar.</div></div></div>
+        <div className="card-head"><div><h3>Dados da clínica</h3><div className="sub">A secretária virtual usa o nome, o endereço e a especialidade para se apresentar.</div></div></div>
         <div className="form-grid">
-          <Field label="Nome da empresa" className="full"><Input value={f.name} onChange={(e) => set('name', e.target.value)} disabled={!owner} /></Field>
-          <Field label="Segmento"><Select value={f.segment} onChange={(e) => set('segment', e.target.value)} disabled={!owner}>{SEGMENTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
+          <Field label="Nome da clínica" className="full"><Input value={f.name} onChange={(e) => set('name', e.target.value)} disabled={!owner} /></Field>
+          <Field label="Especialidade"><Select value={f.segment} onChange={(e) => set('segment', e.target.value)} disabled={!owner}>{SEGMENTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
           <Field label="CPF ou CNPJ"><Input value={f.document ?? ''} onChange={(e) => set('document', e.target.value)} disabled={!owner} /></Field>
           <Field label="Telefone comercial"><PhoneInput value={f.phone ?? ''} onChange={(v) => set('phone', v)} /></Field>
           <Field label="E-mail"><Input type="email" value={f.email ?? ''} onChange={(e) => set('email', e.target.value)} disabled={!owner} /></Field>
@@ -83,17 +86,25 @@ function CompanyTab() {
         </div>
       </section>
       <section className="card set-section">
-        <div className="card-head"><div><h3>Horário de funcionamento</h3><div className="sub">A IA só marca horários dentro destes intervalos. Use dois intervalos para a pausa do almoço.</div></div></div>
+        <div className="card-head"><div><h3>Convênios aceitos</h3><div className="sub">A IA só marca por convênio se ele estiver nesta lista. Sem nenhum, a clínica atende só particular.</div></div></div>
+        <div className="ins-list">
+          {(f.insurances ?? []).map((x) => <span key={x} className="ins-chip">{x}{owner && <button type="button" aria-label={`Remover ${x}`} onClick={() => set('insurances', (f.insurances ?? []).filter((y) => y !== x))}><Trash2 /></button>}</span>)}
+          {!(f.insurances ?? []).length && <span className="muted small">Nenhum convênio: só particular.</span>}
+        </div>
+        {owner && <form className="row" style={{ gap: 8, marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); addIns(); }}><Input value={newIns} onChange={(e) => setNewIns(e.target.value)} placeholder="Ex.: Unimed, Amil, Bradesco Saúde" style={{ maxWidth: 320 }} /><Button type="submit">Adicionar</Button></form>}
+      </section>
+      <section className="card set-section">
+        <div className="card-head"><div><h3>Horário de funcionamento</h3><div className="sub">O horário da clínica. Cada profissional pode ter o próprio horário em Profissionais. Use dois intervalos para a pausa do almoço.</div></div></div>
         <HoursEditor value={f.business_hours} onChange={(v) => set('business_hours', v)} disabled={!owner} />
       </section>
       <section className="card set-section">
-        <div className="card-head"><div><h3>Agenda</h3><div className="sub">Como a IA reserva horários.</div></div></div>
+        <div className="card-head"><div><h3>Agenda</h3><div className="sub">Como a IA reserva horários. Com profissionais cadastrados, cada um atende um paciente por vez.</div></div></div>
         <div className="form-grid">
           <Field label="Intervalo entre horários" hint="De quanto em quanto tempo a agenda oferece horários"><Select value={f.slot_minutes} onChange={(e) => set('slot_minutes', Number(e.target.value))} disabled={!owner}>{[15, 20, 30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} minutos</option>)}</Select></Field>
-          <Field label="Atendimentos ao mesmo tempo" hint="Quantas equipes, salas ou cadeiras você tem"><Input type="number" min={1} max={50} value={f.capacity_per_slot} onChange={(e) => set('capacity_per_slot', Math.max(1, Number(e.target.value)))} disabled={!owner} /></Field>
+          <Field label="Atendimentos ao mesmo tempo" hint="Só vale se não houver profissionais cadastrados"><Input type="number" min={1} max={50} value={f.capacity_per_slot} onChange={(e) => set('capacity_per_slot', Math.max(1, Number(e.target.value)))} disabled={!owner} /></Field>
           <Field label="Antecedência mínima"><Select value={f.min_notice_minutes} onChange={(e) => set('min_notice_minutes', Number(e.target.value))} disabled={!owner}>{[[0, 'Sem antecedência'], [30, '30 minutos'], [60, '1 hora'], [120, '2 horas'], [240, '4 horas'], [1440, '1 dia']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
           <Field label="Marcar até quantos dias à frente"><Input type="number" min={1} max={365} value={f.max_days_ahead} onChange={(e) => set('max_days_ahead', Math.max(1, Number(e.target.value)))} disabled={!owner} /></Field>
-          <Field label="Meta de vendas do mês" hint="Aparece na Visão geral"><MoneyInput value={f.monthly_goal} onChange={(v) => set('monthly_goal', v)} /></Field>
+          <Field label="Meta de faturamento do mês" hint="Aparece na Visão geral"><MoneyInput value={f.monthly_goal} onChange={(v) => set('monthly_goal', v)} /></Field>
         </div>
       </section>
       <SaveBar dirty={dirty} busy={busy} onSave={save} onReset={() => setF(me.company)} />
@@ -101,7 +112,7 @@ function CompanyTab() {
   );
 }
 
-function HoursEditor({ value, onChange, disabled }: { value: BusinessHours; onChange: (v: BusinessHours) => void; disabled?: boolean }) {
+export function HoursEditor({ value, onChange, disabled }: { value: BusinessHours; onChange: (v: BusinessHours) => void; disabled?: boolean }) {
   const order = [1, 2, 3, 4, 5, 6, 0];
   const set = (d: number, iv: [string, string][]) => onChange({ ...value, [String(d)]: iv });
   return (
@@ -151,7 +162,7 @@ function AssistantTab() {
     <>
       <section className="card set-section">
         <div className="opt-row" style={{ paddingTop: 0 }}>
-          <div><div className="t">IA atendendo os clientes no WhatsApp</div><div className="d">Desligada, as mensagens ficam para a equipe responder em Conversas. Os seus comandos continuam funcionando.</div></div>
+          <div><div className="t">IA atendendo os pacientes no WhatsApp</div><div className="d">Desligada, as mensagens ficam para a equipe responder em Conversas. Os seus comandos continuam funcionando.</div></div>
           <Switch checked={f.enabled} disabled={!owner} label="IA atendendo" onChange={(v) => set('enabled', v)} />
         </div>
         <div className="form-grid" style={{ marginTop: 6 }}>
@@ -165,15 +176,15 @@ function AssistantTab() {
       <section className="card set-section">
         <div className="card-head"><div><h3>O que a IA precisa saber</h3><div className="sub">Escreva como se explicasse para um funcionário novo. Os preços vêm de <Link className="link" to="/catalogo">Serviços e preços</Link>.</div></div></div>
         <Textarea value={f.instructions} onChange={(e) => set('instructions', e.target.value)} disabled={!owner} style={{ minHeight: 220 }} placeholder={'Exemplos:\n• Onde vocês atendem e se cobram deslocamento\n• Formas de pagamento e parcelamento\n• Prazos, garantia, cuidados\n• O que NÃO fazem\n• Quando chamar uma pessoa'} />
-        <div className="muted small" style={{ marginTop: 8 }}>{f.instructions.length} caracteres · Evite colocar dados pessoais de clientes aqui.</div>
+        <div className="muted small" style={{ marginTop: 8 }}>{f.instructions.length} caracteres · Evite colocar dados pessoais de pacientes aqui.</div>
       </section>
       <section className="card set-section">
-        <div className="card-head"><div><h3>Perguntas frequentes</h3><div className="sub">As dúvidas que os clientes mais mandam e a resposta oficial da empresa. A IA responde com base nelas, com as próprias palavras.</div></div></div>
+        <div className="card-head"><div><h3>Perguntas frequentes</h3><div className="sub">As dúvidas que os pacientes mais mandam e a resposta oficial da empresa. A IA responde com base nelas, com as próprias palavras.</div></div></div>
         <div className="faq-list">
           {(f.faq ?? []).map((item, i) => (
             <div key={i} className="faq-item">
               <div className="grow col" style={{ gap: 8 }}>
-                <Input value={item.q} onChange={(e) => set('faq', f.faq.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)))} disabled={!owner} placeholder="Pergunta do cliente. Ex.: Vocês emitem nota fiscal?" aria-label={`Pergunta ${i + 1}`} maxLength={200} />
+                <Input value={item.q} onChange={(e) => set('faq', f.faq.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)))} disabled={!owner} placeholder="Pergunta do paciente. Ex.: Vocês emitem nota fiscal?" aria-label={`Pergunta ${i + 1}`} maxLength={200} />
                 <Textarea value={item.a} onChange={(e) => set('faq', f.faq.map((x, j) => (j === i ? { ...x, a: e.target.value } : x)))} disabled={!owner} placeholder="Resposta da empresa" aria-label={`Resposta ${i + 1}`} rows={2} maxLength={800} />
               </div>
               {owner && <button className="icon-btn xs" aria-label="Remover pergunta" onClick={() => set('faq', f.faq.filter((_, j) => j !== i))}><Trash2 /></button>}
@@ -193,10 +204,10 @@ function AssistantTab() {
           <Select value={f.schedule_mode} disabled={!owner} onChange={(e) => set('schedule_mode', e.target.value as AiSettings['schedule_mode'])} style={{ width: 240 }}><option value="sempre">Sempre, 24 horas</option><option value="fora_do_horario">Só fora do horário comercial</option><option value="horario_comercial">Só no horário comercial</option></Select></div>
         <div className="opt-row"><div><div className="t">Agendamentos pelo WhatsApp</div><div className="d">“Confirmar na hora”: o horário já entra confirmado. “Equipe aprova”: entra como “a confirmar” até alguém aprovar.</div></div>
           <Segmented label="Agendamentos" value={f.booking_mode} onChange={(v) => set('booking_mode', v)} options={[{ value: 'automatico', label: 'Confirmar na hora' }, { value: 'confirmar', label: 'Equipe aprova' }]} /></div>
-        <div className="opt-row"><div><div className="t">IA monta orçamentos para clientes</div><div className="d">Com base na tabela de preços. Itens “sob consulta” sempre vão para a equipe.</div></div><Switch checked={f.can_quote} disabled={!owner} label="IA monta orçamentos" onChange={(v) => set('can_quote', v)} /></div>
-        <div className="opt-row"><div><div className="t">Desconto máximo sem pedir sua confirmação</div><div className="d">Acima disso, a IA pede sua aprovação (para clientes, ela chama a equipe).</div></div><div className="row" style={{ gap: 6 }}><Input type="number" min={0} max={100} value={f.max_discount_pct} disabled={!owner} onChange={(e) => set('max_discount_pct', Math.min(100, Math.max(0, Number(e.target.value))))} style={{ width: 90 }} />%</div></div>
-        <div className="opt-row"><div><div className="t">Chamar uma pessoa em reclamações</div><div className="d">Quando o cliente reclama, a IA pede desculpas e passa para a equipe na hora.</div></div><Switch checked={f.handoff_on_complaint} disabled={!owner} label="Chamar pessoa em reclamações" onChange={(v) => set('handoff_on_complaint', v)} /></div>
-        <div className="callout" style={{ marginTop: 14 }}><ShieldCheck /><span><strong>Sempre com sua confirmação:</strong> registrar vendas, dar baixa em contas, cancelar horários, mudar preços, mandar mensagens em seu nome e descontos acima do limite. Clientes nunca acessam funções da empresa.</span></div>
+        <div className="opt-row"><div><div className="t">IA monta orçamentos para pacientes</div><div className="d">Com base na tabela de preços. Itens “sob consulta” sempre vão para a equipe.</div></div><Switch checked={f.can_quote} disabled={!owner} label="IA monta orçamentos" onChange={(v) => set('can_quote', v)} /></div>
+        <div className="opt-row"><div><div className="t">Desconto máximo sem pedir sua confirmação</div><div className="d">Acima disso, a IA pede sua aprovação (para pacientes, ela chama a equipe).</div></div><div className="row" style={{ gap: 6 }}><Input type="number" min={0} max={100} value={f.max_discount_pct} disabled={!owner} onChange={(e) => set('max_discount_pct', Math.min(100, Math.max(0, Number(e.target.value))))} style={{ width: 90 }} />%</div></div>
+        <div className="opt-row"><div><div className="t">Chamar uma pessoa em reclamações</div><div className="d">Quando o paciente reclama, a IA pede desculpas e passa para a equipe na hora.</div></div><Switch checked={f.handoff_on_complaint} disabled={!owner} label="Chamar pessoa em reclamações" onChange={(v) => set('handoff_on_complaint', v)} /></div>
+        <div className="callout" style={{ marginTop: 14 }}><ShieldCheck /><span><strong>Sempre com sua confirmação:</strong> registrar vendas, dar baixa em contas, cancelar horários, mudar preços, mandar mensagens em seu nome e descontos acima do limite. Pacientes nunca acessam funções da empresa.</span></div>
       </section>
       <div className="row" style={{ justifyContent: 'flex-end', gap: 10 }}><Button icon={<Smartphone />} onClick={() => nav('/simulador')}>Testar no simulador</Button></div>
       <SaveBar dirty={dirty} busy={busy} onSave={save} onReset={() => setF(ai)} />
@@ -221,7 +232,7 @@ function WhatsAppTab() {
   return (
     <>
       <section className="card set-section">
-        <div className="card-head"><div><h3>Número da empresa</h3><div className="sub">A API oficial do WhatsApp (Meta). Os clientes falam com este número e a IA responde.</div></div></div>
+        <div className="card-head"><div><h3>Número da empresa</h3><div className="sub">A API oficial do WhatsApp (Meta). Os pacientes falam com este número e a IA responde.</div></div></div>
         <div className={cx('conn', !connected && 'off')}>
           <span className="conn-ic"><MessageCircle /></span>
           <div className="grow">
@@ -232,7 +243,7 @@ function WhatsAppTab() {
         <div className="row wrap" style={{ gap: 10, marginTop: 14 }}>
           {!connected && <MetaConnect onDone={() => { void refetch(); refresh(); }} />}
           {!connected && <Button icon={<KeyRound />} onClick={() => setManual(true)}>Conectar com credenciais</Button>}
-          {connected && can(me, 'dono') && <Button variant="danger-soft" icon={<Unlink />} onClick={async () => { if (await confirm({ title: 'Desconectar o WhatsApp?', text: 'A IA para de responder os clientes até você conectar de novo.', confirm: 'Desconectar', danger: true })) { await api.disconnectWhatsApp(); void refetch(); toast('WhatsApp desconectado'); } }}>Desconectar</Button>}
+          {connected && can(me, 'dono') && <Button variant="danger-soft" icon={<Unlink />} onClick={async () => { if (await confirm({ title: 'Desconectar o WhatsApp?', text: 'A IA para de responder os pacientes até você conectar de novo.', confirm: 'Desconectar', danger: true })) { await api.disconnectWhatsApp(); void refetch(); toast('WhatsApp desconectado'); } }}>Desconectar</Button>}
           <Link className="btn" to="/simulador"><Smartphone />Testar no simulador</Link>
         </div>
       </section>
@@ -339,7 +350,7 @@ function loadFbSdk(appId: string): Promise<void> {
 
 /* ================= equipe ================= */
 const ROLE_LABEL: Record<Role, string> = { dono: 'Dono', gerente: 'Gerente', atendente: 'Atendente' };
-const ROLE_DESC: Record<Role, string> = { dono: 'Tudo, inclusive assinatura e exclusão da conta', gerente: 'Tudo, menos assinatura e exclusão da conta', atendente: 'Conversas, clientes, orçamentos e agenda (sem vendas e configurações)' };
+const ROLE_DESC: Record<Role, string> = { dono: 'Tudo, inclusive assinatura e exclusão da conta', gerente: 'Tudo, menos assinatura e exclusão da conta', atendente: 'Conversas, pacientes, orçamentos e agenda (sem vendas e configurações)' };
 function TeamTab() {
   const { me } = useMeCtx();
   const { data: members = [], isLoading } = useList('members');
@@ -527,7 +538,7 @@ function AccountTab() {
         </section>
       )}
       <section className="card set-section">
-        <div className="card-head"><div><h3>Avisos no computador</h3><div className="sub">Receba um alerta quando um cliente precisar de você, mesmo com o painel em outra aba.</div></div></div>
+        <div className="card-head"><div><h3>Avisos no computador</h3><div className="sub">Receba um alerta quando um paciente precisar de você, mesmo com o painel em outra aba.</div></div></div>
         {notifPerm === 'granted' ? <div className="callout ok"><Check /><span>Avisos ativados neste navegador.</span></div> : <Button onClick={() => window.Notification?.requestPermission().then(() => toast('Pronto!'))}>Ativar avisos</Button>}
       </section>
       <section className="card set-section">
@@ -542,7 +553,7 @@ function AccountTab() {
         <div className="card-head"><div><h3>Ajuda</h3></div></div>
         <div className="row wrap" style={{ gap: 10 }}><Link className="btn" to="/ajuda"><Sparkles />Perguntas frequentes</Link><a className="btn" href="/termos/" target="_blank" rel="noreferrer">Termos de uso</a><a className="btn" href="/privacidade/" target="_blank" rel="noreferrer">Privacidade</a></div>
       </section>
-      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Excluir a conta?" size="narrow" footer={<><Button variant="ghost" onClick={() => setDelOpen(false)}>Voltar</Button><Button variant="danger" loading={busy === 'del'} disabled={delText.trim().toUpperCase() !== 'EXCLUIR'} onClick={() => run('del', async () => { if (await confirm({ title: 'Última confirmação', text: 'Tudo será apagado: clientes, conversas, orçamentos, agenda e vendas. A assinatura é cancelada.', confirm: 'Apagar tudo', danger: true })) { await api.deleteAccount(); location.href = '/'; } })}>Excluir definitivamente</Button></>}>
+      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Excluir a conta?" size="narrow" footer={<><Button variant="ghost" onClick={() => setDelOpen(false)}>Voltar</Button><Button variant="danger" loading={busy === 'del'} disabled={delText.trim().toUpperCase() !== 'EXCLUIR'} onClick={() => run('del', async () => { if (await confirm({ title: 'Última confirmação', text: 'Tudo será apagado: pacientes, conversas, orçamentos, agenda e vendas. A assinatura é cancelada.', confirm: 'Apagar tudo', danger: true })) { await api.deleteAccount(); location.href = '/'; } })}>Excluir definitivamente</Button></>}>
         <p className="muted-2" style={{ fontSize: 14 }}>Isso apaga a empresa {me.company.name}, todos os dados e cancela a assinatura. Baixe seus dados antes, se quiser guardar.</p>
         <Field label='Digite EXCLUIR para confirmar' className="full"><Input value={delText} onChange={(e) => setDelText(e.target.value)} /></Field>
       </Modal>

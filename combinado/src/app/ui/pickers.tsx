@@ -1,4 +1,4 @@
-// Seletores reutilizados: cliente (com cadastro rápido) e serviço do catálogo.
+// Seletores reutilizados: paciente (com cadastro rápido) e serviço do catálogo.
 import { useEffect, useRef, useState } from 'react';
 import { Search, UserPlus, X } from 'lucide-react';
 import { api } from '../data/api';
@@ -22,13 +22,13 @@ export function ContactPicker({ value, onChange, autoFocus }: { value: string | 
       <div className="picked">
         <Avatar name={cur.name} size="sm" />
         <div className="grow"><b className="truncate" style={{ display: 'block' }}>{cur.name}</b><span className="muted small">{formatPhone(cur.phone) || cur.email || 'sem contato'}</span></div>
-        <button type="button" className="icon-btn xs" aria-label="Trocar cliente" onClick={() => onChange(null)}><X /></button>
+        <button type="button" className="icon-btn xs" aria-label="Trocar paciente" onClick={() => onChange(null)}><X /></button>
       </div>
     );
   }
   return (
     <div className="picker" ref={ref}>
-      <div className="input-wrap"><Search /><input className="input" value={q} autoFocus={autoFocus} placeholder="Buscar cliente por nome ou telefone" onFocus={() => setOpen(true)} onChange={(e) => { setQ(e.target.value); setOpen(true); }} aria-label="Buscar cliente" /></div>
+      <div className="input-wrap"><Search /><input className="input" value={q} autoFocus={autoFocus} placeholder="Buscar paciente por nome ou telefone" onFocus={() => setOpen(true)} onChange={(e) => { setQ(e.target.value); setOpen(true); }} aria-label="Buscar paciente" /></div>
       {open && (
         <div className="picker-pop">
           {results.map((c) => (
@@ -36,8 +36,8 @@ export function ContactPicker({ value, onChange, autoFocus }: { value: string | 
               <Avatar name={c.name} size="sm" /><span className="grow truncate">{c.name}</span><span className="muted small">{formatPhone(c.phone)}</span>
             </button>
           ))}
-          {results.length === 0 && <div className="muted small" style={{ padding: 10 }}>Nenhum cliente encontrado.</div>}
-          <button type="button" className="picker-opt new" onClick={() => { setCreating(true); setOpen(false); }}><UserPlus />Cadastrar {q.trim() ? `“${q.trim()}”` : 'novo cliente'}</button>
+          {results.length === 0 && <div className="muted small" style={{ padding: 10 }}>Nenhum paciente encontrado.</div>}
+          <button type="button" className="picker-opt new" onClick={() => { setCreating(true); setOpen(false); }}><UserPlus />Cadastrar {q.trim() ? `“${q.trim()}”` : 'novo paciente'}</button>
         </div>
       )}
       <QuickContact open={creating} initialName={q} onClose={() => setCreating(false)} onCreated={(c) => { onChange(c); setQ(''); }} />
@@ -57,14 +57,14 @@ export function QuickContact({ open, onClose, onCreated, initialName = '' }: { o
     setBusy(true);
     try {
       const c = await api.insert('contacts', { name: name.trim(), phone: phone ? normalizePhone(phone) : null, tags: [], stage: 'novo', temperature: 'morno', score: 50, source: 'manual', opt_in: true, total_spent: 0, created_via: 'painel', last_interaction_at: new Date().toISOString() });
-      inv('contacts'); toast('Cliente cadastrado'); onCreated(c); onClose();
+      inv('contacts'); toast('Paciente cadastrado'); onCreated(c); onClose();
     } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
   };
   return (
     <Modal open={open} onClose={onClose} title="Cadastro rápido" size="narrow" footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="solid" loading={busy} onClick={save}>Cadastrar</Button></>}>
       <div className="col" style={{ gap: 14 }}>
         <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
-        <Field label="WhatsApp" hint="Com DDD. A IA usa esse número para falar com o cliente."><PhoneInput value={phone} onChange={setPhone} /></Field>
+        <Field label="WhatsApp" hint="Com DDD. A IA usa esse número para falar com o paciente."><PhoneInput value={phone} onChange={setPhone} /></Field>
       </div>
     </Modal>
   );

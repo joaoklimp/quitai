@@ -1,4 +1,4 @@
-// Busca rápida (Ctrl+K): páginas, clientes, orçamentos e ações.
+// Busca rápida (Ctrl+K): páginas, pacientes, orçamentos e ações.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -30,14 +30,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const go = (to: string) => () => { onClose(); nav(to); };
     const actions: Item[] = [
       { id: 'a-ai', group: 'Ações', label: term ? `Pedir para a IA: “${term}”` : 'Falar com o assistente', icon: Sparkles, run: () => { onClose(); assistant.ask(term || undefined); } },
-      { id: 'a-c', group: 'Ações', label: 'Novo cliente', icon: UserPlus, run: go('/clientes?novo=1') },
+      { id: 'a-c', group: 'Ações', label: 'Novo paciente', icon: UserPlus, run: go('/clientes?novo=1') },
       { id: 'a-q', group: 'Ações', label: 'Novo orçamento', icon: FilePlus2, run: go('/orcamentos/novo') },
       { id: 'a-a', group: 'Ações', label: 'Novo agendamento', icon: CalendarPlus, run: go('/agenda?novo=1') },
     ];
     const pages: Item[] = [...allowed(PRIMARY, me.role, me.company.modules), ...allowed(SECONDARY, me.role, me.company.modules)].map((p) => ({ id: 'p' + p.to, group: 'Páginas', label: p.label, icon: p.icon, run: go(p.to) }));
     const out: Item[] = [];
     out.push(...actions.filter((a) => !f || a.id === 'a-ai' || fold(a.label).includes(f)));
-    out.push(...contacts.map((c) => ({ id: 'c' + c.id, group: 'Clientes', label: c.name, meta: formatPhone(c.phone), icon: User, run: go(`/clientes/${c.id}`) })));
+    out.push(...contacts.map((c) => ({ id: 'c' + c.id, group: 'Pacientes', label: c.name, meta: formatPhone(c.phone), icon: User, run: go(`/clientes/${c.id}`) })));
     out.push(...quotes.map((x) => ({ id: 'q' + x.id, group: 'Orçamentos', label: `Orçamento nº ${String(x.number).padStart(4, '0')}`, meta: brl(x.total), icon: FileText, run: go(`/orcamentos/${x.id}`) })));
     out.push(...pages.filter((p) => !f || fold(p.label).includes(f)));
     return out;
@@ -56,7 +56,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   return createPortal(
     <div className="overlay" style={{ placeItems: 'start center', paddingTop: '12vh' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal cmdk" role="dialog" aria-label="Buscar">
-        <div className="cmdk-input"><Search /><input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder="Busque clientes, orçamentos, páginas ou peça algo à IA" aria-label="Buscar" /></div>
+        <div className="cmdk-input"><Search /><input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder="Busque pacientes, orçamentos, páginas ou peça algo à IA" aria-label="Buscar" /></div>
         <div className="cmdk-list" role="listbox">
           {items.map((it, i) => {
             const head = it.group !== lastGroup ? <div className="cmdk-group">{it.group}</div> : null;

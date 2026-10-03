@@ -22,10 +22,10 @@ export function ValueCard() {
   const { data: r } = useQuery({ queryKey: ['value', range, today], queryFn: () => api.valueReport(from, to), staleTime: 60_000 });
   const auto = r ? r.reminders + r.followups + r.reviews_asked + r.reactivations : 0;
   const tiles = r ? [
-    { icon: MessageCircle, tone: 'blue', value: num(r.ia_conversations), label: 'clientes atendidos pela IA', sub: r.after_hours ? `${num(r.after_hours)} respostas fora do horário` : `${num(r.ia_replies)} respostas` },
-    { icon: CalendarCheck, tone: 'violet', value: num(r.appointments), label: 'horários marcados', sub: r.encaixes ? `${r.encaixes} por encaixe` : 'sem você precisar responder' },
+    { icon: MessageCircle, tone: 'blue', value: num(r.ia_conversations), label: 'pacientes atendidos pela IA', sub: r.after_hours ? `${num(r.after_hours)} respostas fora do horário` : `${num(r.ia_replies)} respostas` },
+    { icon: CalendarCheck, tone: 'violet', value: num(r.appointments), label: 'consultas marcadas', sub: r.encaixes ? `${r.encaixes} por encaixe` : 'sem você precisar responder' },
     { icon: FileText, tone: 'orange', value: num(r.quotes), label: 'orçamentos montados', sub: r.quotes_approved ? `${r.quotes_approved} aprovados · ${brl0(r.quotes_approved_value)}` : 'com link para aprovar' },
-    { icon: CircleDollarSign, tone: 'green', value: brl0(r.charges_value + r.sales_ia_value), label: 'recebido e vendido pela IA', sub: r.charges_paid ? `${r.charges_paid} cobranças pagas` : `${r.sales_ia} vendas fechadas` },
+    { icon: CircleDollarSign, tone: 'green', value: brl0(r.charges_value + r.sales_ia_value), label: 'recebido de consultas da IA', sub: r.charges_paid ? `${r.charges_paid} cobranças pagas` : `${r.sales_ia} vendas fechadas` },
     { icon: BellRing, tone: 'pink', value: num(auto), label: 'lembretes e acompanhamentos', sub: 'enviados sozinhos' },
   ] : [];
   return (
@@ -34,7 +34,7 @@ export function ValueCard() {
         <div>
           <span className="value-eyebrow"><Sparkles />A ORBYTA trabalhou por você</span>
           <h3>{r ? <><b>{fmtMinutes(r.minutes_saved)}</b> que você não precisou gastar</> : 'Calculando…'}</h3>
-          <p className="muted small">Estimativa conservadora do tempo de respostas, agendamentos, orçamentos e cobranças que a IA fez {range === 'semana' ? 'nos últimos 7 dias' : 'neste mês'}.</p>
+          <p className="muted small">Estimativa conservadora do tempo de recepção que a IA economizou (respostas, consultas, confirmações, orçamentos e cobranças) {range === 'semana' ? 'nos últimos 7 dias' : 'neste mês'}.</p>
         </div>
         <Segmented label="Período" value={range} onChange={setRange} options={[{ value: 'semana', label: '7 dias' }, { value: 'mes', label: 'Este mês' }]} />
       </div>
@@ -48,7 +48,7 @@ export function ValueCard() {
           </div>
         ))}
       </div>
-      {r && r.after_hours > 0 && <p className="value-note"><Moon />{num(r.after_hours)} {r.after_hours === 1 ? 'resposta foi dada' : 'respostas foram dadas'} enquanto a empresa estava fechada: cliente que antes esperava até o dia seguinte.</p>}
+      {r && r.after_hours > 0 && <p className="value-note"><Moon />{num(r.after_hours)} {r.after_hours === 1 ? 'resposta foi dada' : 'respostas foram dadas'} enquanto a empresa estava fechada: paciente que antes esperava até o dia seguinte.</p>}
     </section>
   );
 }
@@ -66,11 +66,11 @@ export function GettingStarted() {
   const { data: wa } = useQuery({ queryKey: ['wa'], queryFn: () => api.whatsapp(), enabled: !hidden && owner });
   if (hidden || !owner) return null;
   const steps = [
-    { done: services.length > 0, icon: Tag, title: 'Confira seus serviços e preços', text: 'A IA só responde com o que estiver aqui.', to: '/catalogo', cta: 'Abrir tabela' },
-    { done: sim.length > 0, icon: Sparkles, title: 'Teste a IA como se fosse um cliente', text: 'Pergunte preço, peça um horário, mande um “oi”.', to: '/simulador', cta: 'Abrir simulador' },
-    { done: wa?.status === 'conectado', icon: MessageCircle, title: 'Conecte o WhatsApp da empresa', text: 'A partir daí a IA atende de verdade, 24 horas.', to: '/configuracoes/whatsapp', cta: 'Conectar' },
+    { done: services.length > 0, icon: Tag, title: 'Confira procedimentos, valores e convênios', text: 'A IA só responde com o que estiver aqui.', to: '/catalogo', cta: 'Abrir tabela' },
+    { done: sim.length > 0, icon: Sparkles, title: 'Teste a IA como se fosse um paciente', text: 'Pergunte preço, peça um horário, mande um “oi”.', to: '/simulador', cta: 'Abrir simulador' },
+    { done: wa?.status === 'conectado', icon: MessageCircle, title: 'Conecte o WhatsApp da clínica', text: 'A partir daí a IA atende de verdade, 24 horas.', to: '/configuracoes/whatsapp', cta: 'Conectar' },
     { done: !!mine[0]?.phone_verified_at, icon: Smartphone, title: 'Verifique o seu número', text: 'Para mandar pedidos e áudios para a IA pelo seu WhatsApp.', to: '/configuracoes/whatsapp', cta: 'Verificar' },
-    { done: autos[0]?.enabled === true, icon: Sunset, title: 'Ligue o resumo do dia', text: 'Todo dia: vendas, contas que vencem e a agenda de amanhã.', to: '/automacoes', cta: 'Ligar' },
+    { done: autos[0]?.enabled === true, icon: Sunset, title: 'Ligue o resumo do dia', text: 'Todo dia: o que entrou, contas que vencem e quem não confirmou amanhã.', to: '/automacoes', cta: 'Ligar' },
   ];
   const done = steps.filter((s) => s.done).length;
   if (done === steps.length) return null;

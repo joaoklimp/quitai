@@ -35,11 +35,11 @@ export default function Modules() {
   const { data: quotes = [] } = useList('quotes', { filters: [{ col: 'status', op: 'eq', value: 'enviado' }], limit: 500 });
   const overdue = bills.filter((b) => b.due_date < today);
   const mods: Mod[] = [
-    { key: 'ai', name: `${BRAND.name} AI`, desc: 'Atende clientes no WhatsApp e executa os comandos da equipe.', icon: Bot, to: '/conversas', color: 'var(--c1)', links: [['Conversas', '/conversas'], ['Simulador', '/simulador'], ['Automações', '/automacoes']], stat: `${num(convs.length)} conversas abertas` },
-    { key: 'gestao', name: `${BRAND.name} Gestão`, desc: 'Clientes, orçamentos, agenda e vendas no mesmo lugar.', icon: Briefcase, to: '/clientes', color: 'var(--violet-ink)', links: [['Clientes', '/clientes'], ['Orçamentos', '/orcamentos'], ['Agenda', '/agenda'], ...(manager ? [['Vendas', '/vendas'] as [string, string]] : [])], stat: `${num(quotes.length)} ${quotes.length === 1 ? 'orçamento aguardando' : 'orçamentos aguardando'} resposta` },
+    { key: 'ai', name: `${BRAND.name} AI`, desc: 'Atende pacientes no WhatsApp e executa os comandos da equipe.', icon: Bot, to: '/conversas', color: 'var(--c1)', links: [['Conversas', '/conversas'], ['Simulador', '/simulador'], ['Automações', '/automacoes']], stat: `${num(convs.length)} conversas abertas` },
+    { key: 'gestao', name: `${BRAND.name} Gestão`, desc: 'Clientes, orçamentos, agenda e vendas no mesmo lugar.', icon: Briefcase, to: '/clientes', color: 'var(--violet-ink)', links: [['Pacientes', '/clientes'], ['Orçamentos', '/orcamentos'], ['Agenda', '/agenda'], ...(manager ? [['Vendas', '/vendas'] as [string, string]] : [])], stat: `${num(quotes.length)} ${quotes.length === 1 ? 'orçamento aguardando' : 'orçamentos aguardando'} resposta` },
     { key: 'finance', name: `${BRAND.name} Finance`, desc: 'Contas a pagar e a receber, vencimentos e caixa previsto.', icon: Landmark, to: '/financeiro', color: 'var(--green-ink)', links: [['Contas', '/financeiro'], ['Exportar', '/financeiro']], stat: manager ? (overdue.length ? `${overdue.length} contas vencidas` : `${brl0(bills.reduce((s, b) => s + (b.kind === 'pagar' ? b.amount : 0), 0))} a pagar em aberto`) : undefined, locked: !manager },
     { key: 'estoque', name: `${BRAND.name} Estoque`, desc: 'Entradas, saídas, alertas de reposição e importação do Excel. Para quem vende ou usa produtos.', icon: Package, to: '/estoque', color: 'var(--orange-ink)', links: [['Produtos', '/estoque']], stat: hasModule(me, 'estoque') ? ((n) => (n ? `${n} ${n === 1 ? 'produto' : 'produtos'} para repor` : 'Nada para repor'))(products.filter(isLow).length) : undefined, optional: 'estoque' },
-    { key: 'cobranca', name: `${BRAND.name} Cobrança`, desc: 'Pix e boleto mandados no WhatsApp, baixa sozinha quando o cliente paga e nota fiscal de serviço.', icon: ReceiptText, to: '/cobrancas', color: 'var(--pink)', links: [['Cobranças', '/cobrancas'], ['Notas fiscais', '/cobrancas?aba=notas']], locked: !manager, optional: 'cobrancas' },
+    { key: 'cobranca', name: `${BRAND.name} Cobrança`, desc: 'Pix e boleto mandados no WhatsApp, baixa sozinha quando o paciente paga e nota fiscal de serviço.', icon: ReceiptText, to: '/cobrancas', color: 'var(--pink)', links: [['Cobranças', '/cobrancas'], ['Notas fiscais', '/cobrancas?aba=notas']], locked: !manager, optional: 'cobrancas' },
     { key: 'conecta', name: `${BRAND.name} Conecta`, desc: 'WhatsApp oficial, planilhas, Asaas e Focus NFe. ERP em breve.', icon: Plug, to: '/integracoes', color: 'var(--blue-ink)', links: [['Integrações', '/integracoes']] },
   ];
   return (
@@ -53,7 +53,7 @@ export default function Modules() {
         </div>
         <div className="one-copy">
           <h2>Administre a empresa <em>conversando</em>.</h2>
-          <p>Todos os módulos usam os mesmos clientes, produtos e números. Quando a IA marca um horário, registra uma venda ou dá baixa no estoque, tudo se atualiza junto, com permissão por papel e histórico de cada ação.</p>
+          <p>Todos os módulos usam os mesmos pacientes, produtos e números. Quando a IA marca um horário, registra uma venda ou dá baixa no estoque, tudo se atualiza junto, com permissão por papel e histórico de cada ação.</p>
           <div className="one-tags"><span><Lock />Permissões por papel</span><span><History />Histórico de ações</span><span><Bot />IA em todos os módulos</span></div>
         </div>
       </section>

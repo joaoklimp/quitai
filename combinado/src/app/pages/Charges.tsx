@@ -41,7 +41,7 @@ export default function Charges() {
   if (!can(me, 'dono', 'gerente')) return <Empty icon={<Landmark />} title="Sem acesso">As cobranças e notas ficam visíveis só para o dono e gerentes.</Empty>;
   return (
     <>
-      <PageHeader title="Cobranças e notas fiscais" subtitle="Mande Pix ou boleto para o cliente no WhatsApp e emita a nota do serviço. Quando ele paga, vira venda e a conta é baixada sozinha."
+      <PageHeader title="Cobranças e notas fiscais" subtitle="Mande Pix ou boleto para o paciente no WhatsApp e emita a nota do serviço. Quando ele paga, vira venda e a conta é baixada sozinha."
         actions={<>
           <Button icon={<ReceiptText />} onClick={() => setNoteForm({ open: true })}>Emitir nota</Button>
           <Button variant="solid" icon={<Plus />} onClick={() => setChargeForm(true)}>Nova cobrança</Button>
@@ -117,10 +117,10 @@ function ChargesTab({ connected, testMode, onNew, onNote }: { connected: boolean
           <div><h3>Cobranças</h3><div className="sub">Cada cobrança tem um link com Pix e boleto. O pagamento cai na conta Asaas da empresa.</div></div>
           <Select value={view} onChange={(e) => setView(e.target.value as typeof view)} style={{ width: 180 }} aria-label="Mostrar"><option value="abertas">Em aberto</option><option value="pagas">Pagas</option><option value="todas">Todas</option></Select>
         </div>
-        {isLoading ? <Loader /> : list.length === 0 ? <Empty icon={<Landmark />} title={view === 'pagas' ? 'Nenhuma cobrança paga ainda' : 'Nenhuma cobrança em aberto'} action={<Button variant="solid" icon={<Plus />} onClick={onNew}>Nova cobrança</Button>}>Gere um Pix ou boleto e mande para o cliente no WhatsApp. Quando ele pagar, a ORBYTA registra a venda sozinha.</Empty> : (
+        {isLoading ? <Loader /> : list.length === 0 ? <Empty icon={<Landmark />} title={view === 'pagas' ? 'Nenhuma cobrança paga ainda' : 'Nenhuma cobrança em aberto'} action={<Button variant="solid" icon={<Plus />} onClick={onNew}>Nova cobrança</Button>}>Gere um Pix ou boleto e mande para o paciente no WhatsApp. Quando ele pagar, a ORBYTA registra a venda sozinha.</Empty> : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Vencimento</th><th>Cliente</th><th>Descrição</th><th>Situação</th><th className="num">Valor</th><th /></tr></thead>
+              <thead><tr><th>Vencimento</th><th>Paciente</th><th>Descrição</th><th>Situação</th><th className="num">Valor</th><th /></tr></thead>
               <tbody>{list.slice(0, 400).map((c) => {
                 const st = CHARGE_STATUS[c.status === 'pendente' && c.due_date < today ? 'vencida' : c.status];
                 const ct = cmap.get(c.contact_id ?? '') as Contact | undefined;
@@ -225,7 +225,7 @@ function CancelNote({ note, onClose }: { note: FiscalNote | null; onClose: () =>
   return (
     <Modal open={!!note} onClose={onClose} title={`Cancelar a nota nº ${note?.number ?? ''}`} subtitle={note ? `${note.taker?.name ?? ''} · ${brl(note.amount)}` : ''}
       footer={<><Button variant="ghost" onClick={onClose}>Voltar</Button><Button variant="danger" loading={busy} onClick={go}>Cancelar nota</Button></>}>
-      <Field label="Motivo do cancelamento" hint="A prefeitura exige um motivo. Algumas cidades só aceitam cancelar dentro de um prazo."><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: Serviço não foi prestado, cliente desistiu." autoFocus /></Field>
+      <Field label="Motivo do cancelamento" hint="A prefeitura exige um motivo. Algumas cidades só aceitam cancelar dentro de um prazo."><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: Serviço não foi prestado, paciente desistiu." autoFocus /></Field>
     </Modal>
   );
 }
@@ -239,9 +239,9 @@ function ChargeForm({ open, connected, onClose }: { open: boolean; connected: bo
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) { setContact(null); setF({ document: '', amount: 0, description: '', due_date: addDays(todayLocal(me.company.timezone), 3), method: 'pix_boleto', send: true }); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = async () => {
-    if (!contact) { toast('Escolha o cliente', 'err'); return; }
+    if (!contact) { toast('Escolha o paciente', 'err'); return; }
     const doc = onlyDigits(f.document);
-    if (!/^(\d{11}|\d{14})$/.test(doc)) { toast('Informe o CPF ou CNPJ do cliente (o Asaas exige).', 'err'); return; }
+    if (!/^(\d{11}|\d{14})$/.test(doc)) { toast('Informe o CPF ou CNPJ do paciente (o Asaas exige).', 'err'); return; }
     if (f.amount < 5) { toast('O valor mínimo é R$ 5,00', 'err'); return; }
     setBusy(true);
     try {
@@ -256,14 +256,14 @@ function ChargeForm({ open, connected, onClose }: { open: boolean; connected: bo
       footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="solid" loading={busy} disabled={!connected} onClick={save}>{f.send ? 'Gerar e enviar' : 'Gerar cobrança'}</Button></>}>
       {!connected ? <Empty icon={<Plug />} title="Conecte o Asaas primeiro" action={<Link className="btn solid" to="/integracoes" onClick={onClose}>Ir para Integrações</Link>}>Você cria uma conta grátis no Asaas, copia a chave da API e cola aqui na ORBYTA.</Empty> : (
         <div className="form-grid">
-          <Field label="Cliente" className="full"><ContactPicker value={contact?.id ?? null} onChange={(c) => { setContact(c); setF((x) => ({ ...x, document: c?.document ? fmtDoc(c.document) : x.document })); }} autoFocus /></Field>
-          <Field label="CPF ou CNPJ do cliente"><Input value={f.document} inputMode="numeric" onChange={(e) => setF({ ...f, document: e.target.value })} onBlur={() => setF((x) => ({ ...x, document: fmtDoc(x.document) }))} placeholder="000.000.000-00" /></Field>
+          <Field label="Paciente" className="full"><ContactPicker value={contact?.id ?? null} onChange={(c) => { setContact(c); setF((x) => ({ ...x, document: c?.document ? fmtDoc(c.document) : x.document })); }} autoFocus /></Field>
+          <Field label="CPF ou CNPJ do paciente"><Input value={f.document} inputMode="numeric" onChange={(e) => setF({ ...f, document: e.target.value })} onBlur={() => setF((x) => ({ ...x, document: fmtDoc(x.document) }))} placeholder="000.000.000-00" /></Field>
           <Field label="Valor"><MoneyInput value={f.amount} onChange={(v) => setF({ ...f, amount: v })} /></Field>
           <Field label="Descrição" className="full"><Input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Ex.: Limpeza de sofá 3 lugares" /></Field>
           <Field label="Vencimento"><Input type="date" value={f.due_date} min={todayLocal(me.company.timezone)} onChange={(e) => setF({ ...f, due_date: e.target.value })} /></Field>
           <Field label="Forma"><Select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as ChargeMethod })}>{(Object.keys(CHARGE_METHOD) as ChargeMethod[]).map((m) => <option key={m} value={m}>{CHARGE_METHOD[m]}</option>)}</Select></Field>
-          <label className="row full" style={{ gap: 10 }}><Switch checked={f.send} onChange={(v) => setF({ ...f, send: v })} label="Mandar no WhatsApp" /><span>Mandar o link para o cliente no WhatsApp agora</span></label>
-          <p className="muted small full" style={{ margin: 0 }}>Também entra em Financeiro → a receber. Quando o cliente pagar, a ORBYTA registra a venda e dá baixa sozinha.</p>
+          <label className="row full" style={{ gap: 10 }}><Switch checked={f.send} onChange={(v) => setF({ ...f, send: v })} label="Mandar no WhatsApp" /><span>Mandar o link para o paciente no WhatsApp agora</span></label>
+          <p className="muted small full" style={{ margin: 0 }}>Também entra em Financeiro → a receber. Quando o paciente pagar, a ORBYTA registra a venda e dá baixa sozinha.</p>
         </div>
       )}
     </Modal>
@@ -289,7 +289,7 @@ function NoteForm({ open, preset, connected, onClose }: { open: boolean; preset?
   const { data: picked } = useList('contacts', contactId ? { filters: [{ col: 'id', op: 'eq', value: contactId }] } : { limit: 0 }, { enabled: open && !!contactId });
   useEffect(() => { const c = picked?.[0]; if (c && !f.name) setF((x) => ({ ...x, name: c.name, document: c.document ? fmtDoc(c.document) : x.document, email: c.email ?? x.email })); }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = async () => {
-    if (!f.name.trim()) { toast('Informe o nome do cliente', 'err'); return; }
+    if (!f.name.trim()) { toast('Informe o nome do paciente', 'err'); return; }
     const doc = onlyDigits(f.document);
     if (doc && !/^(\d{11}|\d{14})$/.test(doc)) { toast('CPF ou CNPJ inválido', 'err'); return; }
     if (f.amount <= 0) { toast('Informe o valor', 'err'); return; }
@@ -305,7 +305,7 @@ function NoteForm({ open, preset, connected, onClose }: { open: boolean; preset?
       footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="solid" icon={<Check />} loading={busy} disabled={!connected} onClick={save}>Emitir nota</Button></>}>
       {!connected ? <Empty icon={<Plug />} title="Conecte a emissão de notas primeiro" action={<Link className="btn solid" to="/integracoes" onClick={onClose}>Ir para Integrações</Link>}>Você precisa de uma conta na Focus NFe com o certificado digital da empresa e os dados fiscais que o seu contador passa.</Empty> : (
         <div className="form-grid">
-          <Field label="Cliente cadastrado (opcional)" className="full"><ContactPicker value={contactId} onChange={pick} /></Field>
+          <Field label="Paciente cadastrado (opcional)" className="full"><ContactPicker value={contactId} onChange={pick} /></Field>
           <Field label="Nome ou razão social do tomador" className="full"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
           <Field label="CPF ou CNPJ" hint="Recomendado. Algumas prefeituras exigem."><Input value={f.document} inputMode="numeric" onChange={(e) => setF({ ...f, document: e.target.value })} onBlur={() => setF((x) => ({ ...x, document: fmtDoc(x.document) }))} /></Field>
           <Field label="E-mail (a prefeitura envia a nota)"><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>

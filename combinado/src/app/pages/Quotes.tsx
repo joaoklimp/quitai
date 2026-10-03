@@ -40,16 +40,16 @@ function QuoteList() {
   const count = (s: QuoteStatus) => all.filter((x) => x.status === s).length;
   return (
     <>
-      <PageHeader title="Orçamentos" subtitle="A IA monta orçamentos com a sua tabela de preços. Você acompanha, ajusta e envia o link para o cliente aprovar."
+      <PageHeader title="Orçamentos" subtitle="A IA monta orçamentos com a sua tabela de preços. Você acompanha, ajusta e envia o link para o paciente aprovar."
         actions={<Button variant="solid" icon={<FilePlus2 />} onClick={() => nav('/orcamentos/novo')}>Novo orçamento</Button>} />
       <div className="stat-row">
-        <div className="stat"><span>Em aberto</span><b>{brl0(open.reduce((s, x) => s + x.total, 0))}</b><small>{open.length} orçamentos aguardando o cliente</small></div>
+        <div className="stat"><span>Em aberto</span><b>{brl0(open.reduce((s, x) => s + x.total, 0))}</b><small>{open.length} orçamentos aguardando o paciente</small></div>
         <div className="stat"><span>Aprovados no mês</span><b>{brl0(approvedMonth.reduce((s, x) => s + x.total, 0))}</b><small>{approvedMonth.length} aprovados</small></div>
         <div className="stat"><span>Taxa de aprovação</span><b>{Math.round(rate * 100)}%</b><small>dos orçamentos respondidos</small></div>
         <div className="stat"><span>Ticket médio</span><b>{brl0(ticket)}</b><small>nos aprovados do mês</small></div>
       </div>
       <div className="filters">
-        <div className="input-wrap" style={{ flex: '1 1 240px', maxWidth: 360 }}><Search /><input className="input" placeholder="Buscar por número, cliente ou título" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar orçamentos" /></div>
+        <div className="input-wrap" style={{ flex: '1 1 240px', maxWidth: 360 }}><Search /><input className="input" placeholder="Buscar por número, paciente ou título" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar orçamentos" /></div>
         <div className="row wrap" style={{ gap: 6 }}>
           <button className={cx('chip', status === 'todos' && 'on')} onClick={() => setStatus('todos')}>Todos {all.length}</button>
           {(Object.keys(Q_LABEL) as QuoteStatus[]).map((s) => <button key={s} className={cx('chip', status === s && 'on')} onClick={() => setStatus(s)}>{Q_LABEL[s]} {count(s)}</button>)}
@@ -60,7 +60,7 @@ function QuoteList() {
           <>
             <div className="table-wrap only-desktop">
               <table className="table">
-                <thead><tr><th>Nº</th><th>Cliente</th><th>Serviço</th><th>Situação</th><th>Feito por</th><th>Validade</th><th className="num">Valor</th></tr></thead>
+                <thead><tr><th>Nº</th><th>Paciente</th><th>Serviço</th><th>Situação</th><th>Feito por</th><th>Validade</th><th className="num">Valor</th></tr></thead>
                 <tbody>{list.slice(0, 300).map((x) => {
                   const c = byId.get(x.contact_id);
                   const expired = x.status === 'enviado' && x.valid_until && x.valid_until < todayLocal();
@@ -130,7 +130,7 @@ function QuoteEditor({ id }: { id: string | null }) {
   const setLine = (k: string, patch: Partial<Line>) => { setLines((ls) => ls.map((l) => (l.key === k ? { ...l, ...patch } : l))); touch(); };
 
   const save = async (extra: Partial<Quote> = {}): Promise<Quote | null> => {
-    if (!contactId) { toast('Escolha o cliente do orçamento', 'err'); return null; }
+    if (!contactId) { toast('Escolha o paciente do orçamento', 'err'); return null; }
     const items = lines.filter((l) => l.description.trim() || l.unit_price > 0);
     if (!items.length) { toast('Adicione pelo menos um item', 'err'); return null; }
     const saved = await api.saveQuote({ id: quote?.id, contact_id: contactId, title: title.trim() || items[0].description, discount, valid_until: validUntil, notes: notes.trim() || null, status, ...extra }, items.map((l) => ({ service_id: l.service_id, description: l.description.trim() || 'Item', qty: l.qty, unit_price: l.unit_price })));
@@ -149,14 +149,14 @@ function QuoteEditor({ id }: { id: string | null }) {
         <IconButton label="Voltar" onClick={() => nav('/orcamentos')}><ArrowLeft /></IconButton>
         <div className="grow">
           <h1>{quote ? `Orçamento nº ${qn(quote.number)}` : 'Novo orçamento'}</h1>
-          <p className="muted">{quote ? <>{quote.created_via.startsWith('ia') ? <><Sparkles className="ii" /> Criado pela IA</> : 'Criado pela equipe'} · {fmtAgo(quote.created_at)}{quote.sent_at ? ` · enviado ${fmtAgo(quote.sent_at)}` : ''}</> : 'Monte os itens, confira a prévia e envie para o cliente aprovar pelo link.'}</p>
+          <p className="muted">{quote ? <>{quote.created_via.startsWith('ia') ? <><Sparkles className="ii" /> Criado pela IA</> : 'Criado pela equipe'} · {fmtAgo(quote.created_at)}{quote.sent_at ? ` · enviado ${fmtAgo(quote.sent_at)}` : ''}</> : 'Monte os itens, confira a prévia e envie para o paciente aprovar pelo link.'}</p>
         </div>
         {quote && <Badge tone={Q_TONE[status]} dot>{Q_LABEL[status]}</Badge>}
       </div>
       <div className="editor">
         <section className="card">
           <div className="form-grid">
-            <Field label="Cliente" className="full"><ContactPicker value={contactId} onChange={(c) => { setContactId(c?.id ?? null); touch(); }} autoFocus={!id && !contactId} /></Field>
+            <Field label="Paciente" className="full"><ContactPicker value={contactId} onChange={(c) => { setContactId(c?.id ?? null); touch(); }} autoFocus={!id && !contactId} /></Field>
             <Field label="Título" className="full"><Input value={title} onChange={(e) => { setTitle(e.target.value); touch(); }} placeholder="Ex.: Limpeza de sofá e colchão" /></Field>
           </div>
           <div className="label" style={{ margin: '20px 0 8px' }}>Itens</div>
@@ -180,14 +180,14 @@ function QuoteEditor({ id }: { id: string | null }) {
             <Field label="Desconto" hint={subtotal ? `${((discount / subtotal) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do subtotal` : undefined}><MoneyInput value={discount} onChange={(v) => { setDiscount(Math.min(v, subtotal)); touch(); }} /></Field>
             <Field label="Válido até"><Input type="date" value={validUntil} onChange={(e) => { setValidUntil(e.target.value); touch(); }} /></Field>
             <Field label="Situação"><Select value={status} onChange={(e) => { setStatus(e.target.value as QuoteStatus); touch(); }}>{(Object.keys(Q_LABEL) as QuoteStatus[]).map((s) => <option key={s} value={s}>{Q_LABEL[s]}</option>)}</Select></Field>
-            <Field label="Observações para o cliente" className="full"><Textarea value={notes} onChange={(e) => { setNotes(e.target.value); touch(); }} placeholder="Ex.: Pagamento no Pix com 5% de desconto. Secagem de 4 a 8 horas." /></Field>
+            <Field label="Observações para o paciente" className="full"><Textarea value={notes} onChange={(e) => { setNotes(e.target.value); touch(); }} placeholder="Ex.: Pagamento no Pix com 5% de desconto. Secagem de 4 a 8 horas." /></Field>
           </div>
         </section>
 
         <aside className="col" style={{ gap: 16 }}>
           <section className="card quote-preview" id="quote-print">
             <div className="qp-head"><div><div className="qp-company">{me.company.name}</div><div className="muted small">{formatPhone(me.company.phone)}{me.company.city ? ` · ${me.company.city}` : ''}</div></div><div className="qp-num">nº {quote ? qn(quote.number) : '—'}</div></div>
-            <div className="qp-to"><span className="muted small">Para</span><b>{contact?.name ?? 'Escolha o cliente'}</b></div>
+            <div className="qp-to"><span className="muted small">Para</span><b>{contact?.name ?? 'Escolha o paciente'}</b></div>
             <div className="qp-items">
               {lines.filter((l) => l.description || l.unit_price).map((l) => <div key={l.key} className="qp-item"><span>{l.description || 'Item'}{l.qty !== 1 ? ` × ${l.qty.toLocaleString('pt-BR')}` : ''}</span><b>{brl(l.qty * l.unit_price)}</b></div>)}
             </div>
@@ -203,11 +203,11 @@ function QuoteEditor({ id }: { id: string | null }) {
               const s = await save(); if (!s) return;
               const r = await api.sendQuote(s.id);
               setStatus(s.status === 'rascunho' ? 'enviado' : s.status); inv('quotes', 'messages', 'conversations');
-              toast(r.sent ? 'Orçamento enviado no WhatsApp do cliente' : r.reason ?? 'Link pronto. Copie e envie para o cliente.');
+              toast(r.sent ? 'Orçamento enviado no WhatsApp do paciente' : r.reason ?? 'Link pronto. Copie e envie para o paciente.');
               if (!id) nav(`/orcamentos/${s.id}`, { replace: true });
             })}>Enviar pelo WhatsApp</Button>
             {quote && <Button block icon={<Copy />} onClick={async () => { await navigator.clipboard.writeText(link(quote)); toast('Link do orçamento copiado'); }}>Copiar link de aprovação</Button>}
-            {quote && <a className="btn block" href={link(quote)} target="_blank" rel="noreferrer"><Link2 />Ver como o cliente</a>}
+            {quote && <a className="btn block" href={link(quote)} target="_blank" rel="noreferrer"><Link2 />Ver como o paciente</a>}
             <Button block icon={<Printer />} onClick={() => window.print()}>Imprimir ou salvar PDF</Button>
             {quote && status === 'aprovado' && (
               <div className="callout ok" style={{ marginTop: 6 }}><Check /><div><strong>Aprovado!</strong> Próximos passos:<div className="row wrap" style={{ marginTop: 8, gap: 6 }}>

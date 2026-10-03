@@ -42,7 +42,7 @@ export default function Sales() {
   const byOrigin = (['ia', 'equipe', 'balcao'] as SaleOrigin[]).map((o, i) => ({ key: o, label: ORIGIN_LABEL[o], value: sales.filter((s) => s.origin === o).reduce((a, b) => a + b.amount, 0), color: ['var(--c1)', 'var(--c2)', 'var(--c3)'][i] }));
   const closeForm = () => { setForm(false); if (params.get('novo')) setParams({}, { replace: true }); };
   const exportCsv = () => {
-    const rows = [['Data', 'Cliente', 'Descrição', 'Forma', 'Origem', 'Valor'].join(';'), ...sales.map((s) => [fmtDateTime(s.paid_at), cmap.get(s.contact_id ?? '')?.name ?? '', s.description, METHOD_LABEL[s.method], ORIGIN_LABEL[s.origin], s.amount.toFixed(2).replace('.', ',')].join(';'))];
+    const rows = [['Data', 'Paciente', 'Descrição', 'Forma', 'Origem', 'Valor'].join(';'), ...sales.map((s) => [fmtDateTime(s.paid_at), cmap.get(s.contact_id ?? '')?.name ?? '', s.description, METHOD_LABEL[s.method], ORIGIN_LABEL[s.origin], s.amount.toFixed(2).replace('.', ',')].join(';'))];
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' })); a.download = `vendas-${from}-a-${to}.csv`; a.click();
   };
   if (!can(me, 'dono', 'gerente')) return <Empty title="Sem acesso" >As vendas ficam visíveis só para o dono e gerentes.</Empty>;
@@ -78,7 +78,7 @@ export default function Sales() {
         {isLoading ? <Loader /> : sales.length === 0 ? <Empty icon={<Wallet />} title="Nenhuma venda no período" action={<Button variant="solid" icon={<Plus />} onClick={() => setForm(true)}>Registrar venda</Button>}>Pelo WhatsApp: “registra uma venda de R$ 180 no Pix para a Juliana”.</Empty> : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Data</th><th>Cliente</th><th>Descrição</th><th>Forma</th><th>Origem</th><th className="num">Valor</th><th /></tr></thead>
+              <thead><tr><th>Data</th><th>Paciente</th><th>Descrição</th><th>Forma</th><th>Origem</th><th className="num">Valor</th><th /></tr></thead>
               <tbody>{sales.slice(0, 400).map((s: Sale) => (
                 <tr key={s.id}>
                   <td className="muted nowrap">{fmtDateTime(s.paid_at)}</td>
@@ -126,7 +126,7 @@ function SaleForm({ open, onClose, initial }: { open: boolean; onClose: () => vo
       <div className="form-grid">
         <Field label="Valor"><MoneyInput value={amount} onChange={setAmount} autoFocus /></Field>
         <Field label="Forma de pagamento"><Select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>{(Object.keys(METHOD_LABEL) as PayMethod[]).map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}</Select></Field>
-        <Field label="Cliente (opcional)" className="full"><ContactPicker value={contactId} onChange={(c) => setContactId(c?.id ?? null)} /></Field>
+        <Field label="Paciente (opcional)" className="full"><ContactPicker value={contactId} onChange={(c) => setContactId(c?.id ?? null)} /></Field>
         <Field label="Descrição" className="full"><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Limpeza de sofá 3 lugares" /></Field>
         <Field label="Data"><Input type="date" value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Quem fechou"><Select value={contactId ? origin : 'balcao'} disabled={!contactId} onChange={(e) => setOrigin(e.target.value as SaleOrigin)}>{(Object.keys(ORIGIN_LABEL) as SaleOrigin[]).map((o) => <option key={o} value={o}>{ORIGIN_LABEL[o]}</option>)}</Select></Field>

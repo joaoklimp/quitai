@@ -42,18 +42,18 @@ export default function Integrations() {
     {
       title: 'Conectado hoje', sub: 'Funciona agora',
       items: [
-        { id: 'whatsapp', name: 'WhatsApp (API oficial da Meta)', what: 'A IA atende os clientes e recebe os comandos da equipe pelo número da empresa.', icon: <MessageCircle />, status: 'ativo', action: <Link className="btn sm" to="/configuracoes/whatsapp">Configurar</Link> },
-        { id: 'planilhas', name: 'Planilhas (Excel e CSV)', what: 'Importe produtos para o estoque e exporte clientes, vendas, financeiro e estoque para o Excel.', icon: <FileSpreadsheet />, status: 'ativo', action: <Link className="btn sm" to="/estoque">Importar estoque</Link> },
+        { id: 'whatsapp', name: 'WhatsApp (API oficial da Meta)', what: 'A IA atende os pacientes e recebe os comandos da equipe pelo número da empresa.', icon: <MessageCircle />, status: 'ativo', action: <Link className="btn sm" to="/configuracoes/whatsapp">Configurar</Link> },
+        { id: 'planilhas', name: 'Planilhas (Excel e CSV)', what: 'Importe produtos para o estoque e exporte pacientes, vendas, financeiro e estoque para o Excel.', icon: <FileSpreadsheet />, status: 'ativo', action: <Link className="btn sm" to="/estoque">Importar estoque</Link> },
         {
-          id: 'cobranca', name: 'Cobrança dos seus clientes (Asaas)', icon: <Landmark />, status: asaas ? 'ativo' : 'conectar',
-          what: 'Gere Pix e boleto, mande o link no WhatsApp (pelo painel ou pedindo para a IA) e a ORBYTA dá baixa e registra a venda sozinha quando o cliente paga.',
+          id: 'cobranca', name: 'Cobrança dos seus pacientes (Asaas)', icon: <Landmark />, status: asaas ? 'ativo' : 'conectar',
+          what: 'Gere Pix e boleto, mande o link no WhatsApp (pelo painel ou pedindo para a IA) e a ORBYTA dá baixa e registra a venda sozinha quando o paciente paga.',
           extra: asaas ? <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>{envBadge(asaas)}{asaas.config?.webhook === 'manual' ? <button className="badge sm orange" onClick={async () => { try { setHook(await api.integrations<WebhookInfo>('webhook_info')); } catch (e) { toast((e as Error).message, 'err'); } }}>Aviso de pagamento: configurar à mão</button> : <Badge size="sm">Aviso de pagamento automático</Badge>}</div>
             : <p className="tiny" style={{ margin: '6px 0 0', color: 'var(--ink-3)' }}>Você usa a sua conta Asaas: o dinheiro cai direto nela. Tarifas do Asaas por cobrança paga.</p>,
           action: connectActions('asaas', asaas, <Link className="btn sm" to="/cobrancas">Ver cobranças</Link>),
         },
         {
           id: 'fiscal', name: 'Nota fiscal de serviço (Focus NFe)', icon: <ReceiptText />, status: focus ? 'ativo' : 'conectar',
-          what: 'Emita NFS-e da venda, da cobrança paga ou pelo WhatsApp (“emite a nota da Juliana”). O PDF fica guardado e o cliente recebe por e-mail.',
+          what: 'Emita NFS-e da venda, da cobrança paga ou pelo WhatsApp (“emite a nota da Juliana”). O PDF fica guardado e o paciente recebe por e-mail.',
           extra: focus ? <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>{envBadge(focus)}<Badge size="sm">CNPJ {fmtDoc(String(focus.config?.cnpj ?? ''))}</Badge></div>
             : <p className="tiny" style={{ margin: '6px 0 0', color: 'var(--ink-3)' }}>Precisa de conta na Focus NFe com o certificado digital A1 da empresa. NF-e de produto ainda não.</p>,
           action: connectActions('focusnfe', focus, <Link className="btn sm" to="/cobrancas?aba=notas">Ver notas</Link>),
@@ -63,10 +63,10 @@ export default function Integrations() {
     {
       title: 'Próximas integrações', sub: 'Em desenvolvimento. Diga qual você quer primeiro e ela sobe na fila.',
       items: [
-        { id: 'erp', name: 'ERP', what: 'Sincronizar clientes, produtos, estoque e pedidos com o sistema que você já usa.', icon: <Server />, status: 'em_breve', partners: 'Bling, Tiny (Olist) e Omie' },
+        { id: 'erp', name: 'ERP', what: 'Sincronizar pacientes, produtos, estoque e pedidos com o sistema que você já usa.', icon: <Server />, status: 'em_breve', partners: 'Bling, Tiny (Olist) e Omie' },
         { id: 'nfe', name: 'NF-e de produto', what: 'Nota fiscal de venda de mercadoria, com baixa no estoque.', icon: <ReceiptText />, status: 'em_breve', partners: 'Focus NFe' },
         { id: 'agenda', name: 'Google Agenda', what: 'Os horários marcados pela IA aparecem na agenda do celular da equipe.', icon: <CalendarDays />, status: 'em_breve' },
-        { id: 'api', name: 'API e webhooks', what: 'Avisos automáticos para outros sistemas quando entra cliente, venda ou orçamento.', icon: <Webhook />, status: 'em_breve' },
+        { id: 'api', name: 'API e webhooks', what: 'Avisos automáticos para outros sistemas quando entra paciente, venda ou orçamento.', icon: <Webhook />, status: 'em_breve' },
       ],
     },
   ];
@@ -117,7 +117,7 @@ function AsaasModal({ open, current, onClose, onWebhook }: { open: boolean; curr
       const r = await api.integrations<{ webhook: WebhookInfo | null }>('connect_asaas', { api_key: key.trim(), environment: env });
       inv('company_integrations'); onClose();
       if (r.webhook) { toast('Asaas conectado. Falta só um passo: o aviso de pagamento.'); onWebhook(r.webhook); }
-      else toast('Asaas conectado. Já dá para cobrar os clientes.');
+      else toast('Asaas conectado. Já dá para cobrar os pacientes.');
     } catch (e) { toast((e as Error).message, 'err'); } finally { setBusy(false); }
   };
   return (

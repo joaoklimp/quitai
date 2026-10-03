@@ -182,7 +182,7 @@ export class SupabaseSource implements DataSource {
   /* ---------- empresa ---------- */
   private cid() { if (!this.companyId) throw new AppError('Sessão expirada. Entre de novo.'); return this.companyId; }
   async updateCompany(patch: Partial<Company>) {
-    const allowed: (keyof Company)[] = ['name', 'segment', 'document', 'phone', 'email', 'address', 'city', 'state', 'timezone', 'business_hours', 'slot_minutes', 'capacity_per_slot', 'min_notice_minutes', 'max_days_ahead', 'monthly_goal'];
+    const allowed: (keyof Company)[] = ['name', 'segment', 'document', 'phone', 'email', 'address', 'city', 'state', 'timezone', 'business_hours', 'slot_minutes', 'capacity_per_slot', 'min_notice_minutes', 'max_days_ahead', 'monthly_goal', 'insurances'];
     const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => allowed.includes(k as keyof Company)));
     const { data, error } = await this.sb.from('companies').update(clean).eq('id', this.cid()).select('*').single();
     if (error) throw friendly(error);
@@ -373,7 +373,7 @@ export class SupabaseSource implements DataSource {
     const cid = this.companyId;
     if (!cid) return () => {};
     const ch = this.sb.channel(`empresa-${cid}`);
-    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes', 'waitlist'] as TableName[]) {
+    for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes', 'waitlist', 'professionals'] as TableName[]) {
       ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t, filter: `company_id=eq.${cid}` } as never, () => cb(t));
     }
     ch.subscribe();

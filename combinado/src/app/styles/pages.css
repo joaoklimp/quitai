@@ -560,3 +560,44 @@
 .onb-mod .grow { display: grid; gap: 1px; }
 .onb-mod .om-ic { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue-ink); flex: none; }
 .onb-mod .om-ic svg { width: 17px; height: 17px; }
+
+/* ---------- clínica: profissionais, agenda por profissional e convênios ---------- */
+.pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.pro-card { --pro: var(--c1); display: flex; flex-direction: column; gap: 12px; border-top: 3px solid var(--pro); }
+.pro-card.off { opacity: .6; }
+.pro-top { display: flex; align-items: center; gap: 12px; }
+.pro-av { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-weight: 750; font-size: 15px; color: #fff; background: var(--pro); flex: none; }
+.pro-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--ink-2); }
+.pro-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.pro-meta svg { width: 14px; height: 14px; color: var(--ink-3); }
+.pro-svcs { display: flex; flex-wrap: wrap; gap: 6px; }
+.pro-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pro-stat { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.pro-stat svg { width: 15px; height: 15px; color: var(--pro); }
+.pro-stat:hover { color: var(--ink); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 28px; height: 28px; border-radius: 9px; border: 2px solid transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .5); cursor: pointer; }
+.swatch.on { border-color: var(--ink); }
+.form-sub { margin: 20px 0 6px; font-size: 14px; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 14px; }
+.pro-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.pro-chip { --pro: var(--ink-3); display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.pro-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--pro); }
+.pro-chip svg { width: 15px; height: 15px; }
+.pro-chip:hover { border-color: var(--pro); color: var(--ink); }
+.pro-chip.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.pro-chip.on i { box-shadow: 0 0 0 2px var(--surface); }
+.pro-pending { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12.5px; font-weight: 650; color: var(--orange-ink); background: var(--orange-soft); padding: 6px 11px; border-radius: 999px; }
+.pro-pending svg { width: 14px; height: 14px; }
+.ev.has-pro { border-left-color: var(--pro); }
+.ev.has-pro.confirmado { background: color-mix(in srgb, var(--pro) 13%, var(--surface)); }
+.ev b { display: flex; align-items: center; gap: 3px; }
+.ev-ok { width: 13px; height: 13px; flex: none; color: var(--c3); }
+.leg-ic { width: 14px; height: 14px; color: var(--c3); vertical-align: -2px; }
+.pro-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.ins-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.ins-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 12px; border-radius: 999px; background: var(--blue-soft); color: var(--blue-ink); font-size: 13px; font-weight: 650; }
+.ins-chip button { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
+.ins-chip button:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+.ins-chip svg { width: 13px; height: 13px; }
+@media (max-width: 720px) { .pro-pending { margin-left: 0; } }

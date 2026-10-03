@@ -4,7 +4,7 @@ import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, Fin
 import { audit, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
 import { applyMovement, demoCreateCharge, demoEmitNote } from './demoSource';
-import { isFree, slotsForDate } from '../availability';
+import { isFree, slotsForDate, type SlotOpts } from '../availability';
 import { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime } from '../../../shared/parse';
 export { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime };
 import {
@@ -17,6 +17,17 @@ let instant = false;
 export function setInstant(v = true) { instant = v; }
 const pause = (ms: number) => (instant ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));
 const AI_NAME = () => `${demoDb().ai.assistant_name} (IA)`;
+/** Profissionais na regra de horários livres (a mesma do servidor). */
+const po = (serviceId?: string | null, professionalId?: string | null): SlotOpts => ({ professionals: table('professionals'), serviceId: serviceId ?? null, professionalId: professionalId ?? null });
+const proName = (id?: string | null) => (id ? table('professionals').find((p) => p.id === id)?.name : undefined);
+/** "com a Dra. Marina", "com o Rafael": o profissional citado na mensagem. */
+function matchPro(f: string): string | null {
+  for (const p of table('professionals').filter((x) => x.active)) {
+    const toks = fold(p.name).replace(/^(dra?|prof(a)?)\.?\s+/, '').split(/\s+/);
+    if (toks.some((t) => t.length > 2 && new RegExp(`\\bcom (a |o )?(dra?\\.? |doutora? |dr )?${t}\\b`).test(f))) return p.id;
+  }
+  return null;
+}
 const qn = (n: number) => String(n).padStart(4, '0');
 
 /* extração de dados do texto: src/shared/parse.ts */
@@ -25,7 +36,7 @@ const titleCase = (s: string) => s.split(/\s+/).map((w) => (/^(da|de|do|das|dos|
 
 /** Nome logo depois de um verbo de cadastro. */
 function nameAfterVerb(raw: string): string | null {
-  const m = raw.match(/(?:[Cc]adastr|[Aa]dicion|[Ii]nclu|[Ss]alv|[Rr]egistr|[Aa]not|[Aa]gend|[Mm]arc|[Rr]eserv)\w*\s+(?:(?:[Aa]|[Oo]|um|uma)\s+)?(?:(?:nova|novo)\s+)?(?:cliente\s+)?(?:(?:a|o)\s+)?([A-Za-zÀ-ÿ']+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][A-Za-zÀ-ÿ']+){0,3})/);
+  const m = raw.match(/(?:[Cc]adastr|[Aa]dicion|[Ii]nclu|[Ss]alv|[Rr]egistr|[Aa]not|[Aa]gend|[Mm]arc|[Rr]eserv)\w*\s+(?:(?:[Aa]|[Oo]|um|uma)\s+)?(?:(?:nova|novo)\s+)?(?:paciente\s+)?(?:(?:a|o)\s+)?([A-Za-zÀ-ÿ']+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][A-Za-zÀ-ÿ']+){0,3})/);
   if (!m) return null;
   let name = m[1].replace(/\s+(telefone|tel|fone|celular|numero|número|whats|zap|email|e-mail)\b.*$/i, '').trim();
   if (!name || /^(cliente|venda|orcamento|orçamento)$/i.test(name)) return null;
@@ -35,7 +46,7 @@ function nameAfterVerb(raw: string): string | null {
 }
 /** Nome depois de "para a", "pra", "da", "do", "de"... */
 function nameAfterPrep(raw: string): string | null {
-  const m = raw.match(/(?:^|\s)(?:[Pp]ara|[Pp]ra|[Pp]ro|ao|à|a|da|do|de|com)\s+(?:(?:a|o)\s+)?(?:cliente\s+)?([A-ZÀ-Ý][A-Za-zÀ-ÿ']+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][A-Za-zÀ-ÿ']+){0,3})/);
+  const m = raw.match(/(?:^|\s)(?:[Pp]ara|[Pp]ra|[Pp]ro|ao|à|a|da|do|de|com)\s+(?:(?:a|o)\s+)?(?:paciente\s+)?([A-ZÀ-Ý][A-Za-zÀ-ÿ']+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][A-Za-zÀ-ÿ']+){0,3})/);
   if (m && !/^(Pix|Sim|Não|Nao|Orçamento|Orcamento|Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo|Hoje|Amanhã|R)$/.test(m[1])) return m[1];
   const f = fold(raw).match(/\b(?:para|pra|pro|da|do)\s+(?:a|o)\s+([a-z]+)\b/);
   if (f && !/^(ela|ele|semana|tarde|manha|noite|mes|dia|cliente|venda|agenda)$/.test(f[1])) return titleCase(f[1]);
@@ -51,10 +62,11 @@ export function findContacts(name: string): Contact[] {
 function matchService(f: string): Service | null {
   const svcs = table('services').filter((s) => s.active);
   const rules: [RegExp, string][] = [
-    [/impermeabiliz/, 'Impermeabilização'], [/retratil|reclinavel/, 'Limpeza de sofá retrátil'], [/sofa.*\b2\b|2 lugares|dois lugares/, 'Limpeza de sofá 2'],
-    [/sofa.*\b3\b|3 lugares|tres lugares/, 'Limpeza de sofá 3'], [/colchao.*(solteiro)|solteiro/, 'Higienização de colchão solteiro'], [/colchao|cama/, 'Higienização de colchão casal'],
-    [/tapete/, 'Limpeza de tapete'], [/cadeira/, 'Limpeza de cadeira'], [/poltrona|puff/, 'Limpeza de poltrona'], [/carro|automotiv|banco do carro|veiculo/, 'Higienização de banco'],
-    [/visita|condominio|empresa/, 'Visita técnica'], [/sofa/, 'Limpeza de sofá 3'],
+    [/manutencao.*aparelho|manter o aparelho|ajustar o aparelho/, 'Manutenção de aparelho'], [/colocar aparelho|instal\w* .*aparelho|aparelho fixo|por aparelho/, 'Instalação de aparelho'],
+    [/ortodon|aparelho/, 'Avaliação ortodôntica'], [/clareamento caseiro|moldeira/, 'Clareamento caseiro'], [/clare(ar|amento)|dente(s)? (mais )?branco/, 'Clareamento a laser'],
+    [/implante/, 'Implante'], [/canal|endodon/, 'Tratamento de canal'], [/extra(ir|cao|ção)|tirar (o |um )?dente|siso/, 'Extração'],
+    [/restaura|obtura|carie|dente quebr/, 'Restauração'], [/limpeza|profilax|tartaro/, 'Limpeza'], [/dor|urgencia|inchad|quebrou/, 'Urgência'],
+    [/avaliacao|consulta|check.?up|revisao/, 'Avaliação ('],
   ];
   for (const [re, prefix] of rules) if (re.test(f)) { const s = svcs.find((x) => x.name.startsWith(prefix)); if (s) return s; }
   return null;
@@ -104,10 +116,12 @@ function createQuote(contact: Contact, items: { description: string; qty: number
 function createAppointment(contact: Contact, startsAt: string, service: Service | null, via: Appointment['created_via'], extra: Partial<Appointment> = {}): Appointment {
   const dur = service?.duration_min ?? demoDb().company.slot_minutes;
   const now = new Date().toISOString();
+  const ins = contact.insurance && (demoDb().company.insurances ?? []).includes(contact.insurance) && service && !['Ortodontia', 'Estética', 'Implantes'].includes(service.category ?? '') ? contact.insurance : null;
   const a: Appointment = {
-    id: newId(), company_id: DEMO_COMPANY_ID, contact_id: contact.id, service_id: service?.id ?? null, title: service?.name ?? 'Atendimento', starts_at: startsAt,
+    id: newId(), company_id: DEMO_COMPANY_ID, contact_id: contact.id, service_id: service?.id ?? null, title: service?.name ?? 'Consulta', starts_at: startsAt,
     ends_at: new Date(Date.parse(startsAt) + dur * 60000).toISOString(), status: demoDb().ai.booking_mode === 'confirmar' && via === 'ia_cliente' ? 'pendente' : 'confirmado',
-    address: contact.address, notes: null, price: service && service.price_type !== 'sob_consulta' ? service.price : null, created_via: via, reminder_sent_at: null, created_at: now, updated_at: now, ...extra,
+    address: null, notes: null, price: service && service.price_type !== 'sob_consulta' && !ins ? service.price : null, created_via: via, reminder_sent_at: null, created_at: now, updated_at: now,
+    professional_id: null, payment_kind: ins ? 'convenio' : 'particular', insurance: ins, patient_confirmed_at: null, ...extra,
   };
   table('appointments').push(a);
   emit('appointments');
@@ -144,18 +158,19 @@ function salesSummary(f: string): { text: string } {
   const r = periodRange(f, today);
   const list = table('sales').filter((s) => { const d = localDate(s.paid_at, TZ); return d >= r.from && d <= r.to; });
   const total = list.reduce((s, x) => s + x.amount, 0);
-  if (!list.length) return { text: `Ainda não há vendas registradas ${r.label}.` };
+  if (!list.length) return { text: `Ainda não há pagamentos registrados ${r.label}.` };
   const by = (m: (s: Sale) => boolean) => list.filter(m).reduce((s, x) => s + x.amount, 0);
   const ia = list.filter((s) => s.origin === 'ia');
   return {
-    text: `${r.label[0].toUpperCase() + r.label.slice(1)} você vendeu ${brl(total)} em ${list.length} ${list.length === 1 ? 'venda' : 'vendas'}. 📈\n• Pix: ${brl(by((s) => s.method === 'pix'))}\n• Cartão: ${brl(by((s) => s.method.startsWith('cartao')))}\n• Dinheiro e outros: ${brl(by((s) => !['pix', 'cartao_credito', 'cartao_debito'].includes(s.method)))}\n• Fechadas pela IA: ${ia.length} (${brl(ia.reduce((s, x) => s + x.amount, 0))})`,
+    text: `${r.label[0].toUpperCase() + r.label.slice(1)} a clínica recebeu ${brl(total)} em ${list.length} ${list.length === 1 ? 'pagamento' : 'pagamentos'} particulares. 📈\n• Pix: ${brl(by((s) => s.method === 'pix'))}\n• Cartão: ${brl(by((s) => s.method.startsWith('cartao')))}\n• Dinheiro e outros: ${brl(by((s) => !['pix', 'cartao_credito', 'cartao_debito'].includes(s.method)))}\n• De consultas marcadas pela IA: ${ia.length} (${brl(ia.reduce((s, x) => s + x.amount, 0))})\nRepasses de convênio aparecem no Financeiro.`,
   };
 }
 function agendaOf(date: string): string {
   const list = table('appointments').filter((a) => localDate(a.starts_at, TZ) === date && a.status !== 'cancelado').sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
   const label = date === localDate(new Date(), TZ) ? 'Hoje' : fmtLong(date)[0].toUpperCase() + fmtLong(date).slice(1);
   if (!list.length) return `${label} a agenda está livre. 🙌`;
-  return `${label} você tem ${list.length} ${list.length === 1 ? 'horário' : 'horários'}:\n` + list.map((a) => `• ${localTime(a.starts_at, TZ)} — ${contactById(a.contact_id)?.name ?? 'Cliente'} · ${a.title}${a.status === 'pendente' ? ' (a confirmar)' : a.status === 'concluido' ? ' ✓' : ''}`).join('\n');
+  const pending = list.filter((a) => !a.patient_confirmed_at && a.status !== 'concluido' && a.status !== 'faltou').length;
+  return `${label} são ${list.length} ${list.length === 1 ? 'consulta' : 'consultas'}${pending ? ` (${pending} sem confirmar)` : ''}:\n` + list.map((a) => `• ${localTime(a.starts_at, TZ)} — ${contactById(a.contact_id)?.name ?? 'Paciente'} · ${a.title}${proName(a.professional_id) ? ` · ${proName(a.professional_id)!.split(' ').slice(0, 2).join(' ')}` : ''}${a.status === 'concluido' ? ' · atendido' : a.status === 'faltou' ? ' · faltou' : a.patient_confirmed_at ? ' ✅' : ' · sem confirmar'}`).join('\n');
 }
 
 /* ================= confirmação de ações sensíveis ================= */
@@ -190,7 +205,7 @@ function executePending(p: PendingAction): ActionReceipt {
   }
   if (p.tool === 'criar_orcamento') {
     const c = contactById(a.contact_id);
-    if (!c) return { tool: p.tool, label: 'Cliente não encontrado', status: 'erro' };
+    if (!c) return { tool: p.tool, label: 'Paciente não encontrado', status: 'erro' };
     const q = createQuote(c, a.items, 'ia_dono', a.discount);
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'criar_orcamento', summary: `Criou o orçamento nº ${qn(q.number)} de ${brl(q.total)} com desconto acima do limite — confirmado pelo dono`, target_type: 'quote', target_id: q.id, status: 'ok' });
     return { tool: p.tool, label: `Orçamento nº ${qn(q.number)} criado`, status: 'ok', detail: `${brl(q.total)} · desconto de ${brl(q.discount)}` };
@@ -246,11 +261,11 @@ function handleGestao(ctx: Ctx, clause: string, f: string): boolean {
   // lista de espera
   if (/\blista de espera\b/.test(f) && !/\b(coloca|poe|adiciona|bota)\b/.test(f)) {
     const list = table('waitlist').filter((w) => w.status === 'aguardando' || w.status === 'oferecido');
-    ctx.lines.push(list.length ? `Na lista de espera (${list.length}):\n` + list.map((w) => `• ${contactById(w.contact_id)?.name ?? 'Cliente'} · ${w.desired_date ? fmtDate(w.desired_date).slice(0, 5) : 'qualquer dia'}${w.status === 'oferecido' ? ' · encaixe oferecido, esperando resposta' : ''}`).join('\n') + '\nQuando alguém cancelar, eu ofereço o horário na ordem da lista.' : 'Ninguém na lista de espera agora. 👌');
+    ctx.lines.push(list.length ? `Na lista de espera (${list.length}):\n` + list.map((w) => `• ${contactById(w.contact_id)?.name ?? 'Paciente'} · ${w.desired_date ? fmtDate(w.desired_date).slice(0, 5) : 'qualquer dia'}${w.status === 'oferecido' ? ' · encaixe oferecido, esperando resposta' : ''}`).join('\n') + '\nQuando alguém cancelar, eu ofereço o horário na ordem da lista.' : 'Ninguém na lista de espera agora. 👌');
     ctx.actions.push({ tool: 'lista_espera', label: 'Consultou a lista de espera', status: 'ok', detail: `${list.length} ${list.length === 1 ? 'cliente' : 'clientes'}`, link: '#/agenda?espera=1' });
     return true;
   }
-  // cobrar cliente com Pix/boleto (sensível)
+  // cobrar paciente com Pix/boleto (sensível)
   if (/\bcobr(a|ar|e|ança|anca)\b/.test(f) && parseMoneyIn(clause) && !/\?\s*$/.test(clause) && !/\b(quanto|qual)\b/.test(f)) {
     const amount = parseMoneyIn(clause)!;
     const c = resolveContact(ctx, clause);
@@ -269,7 +284,7 @@ function handleGestao(ctx: Ctx, clause: string, f: string): boolean {
   // emitir nota fiscal de serviço (sensível)
   if (/\b(emit|ger|tir|fa[zc]|solt)\w*\b.*\bnota\b|\bnota fiscal\b.*\b(para|pra|da|do)\b/.test(f)) {
     const c = resolveContact(ctx, clause);
-    if (!c || c === 'ambiguous') { ctx.lines.push('A nota é para qual cliente? Ex.: "emite a nota da Juliana".'); return true; }
+    if (!c || c === 'ambiguous') { ctx.lines.push('A nota é para qual paciente? Ex.: "emite a nota da Juliana".'); return true; }
     const paid = table('charges').find((x) => x.contact_id === c.id && x.status === 'paga' && !table('fiscal_notes').some((n) => n.charge_id === x.id));
     const sale = table('sales').filter((x) => x.contact_id === c.id).sort((x, y) => (x.paid_at < y.paid_at ? 1 : -1))[0];
     const amount = parseMoneyIn(clause) ?? paid?.amount ?? sale?.amount;
@@ -365,7 +380,7 @@ function resolveContact(ctx: Ctx, clause: string): Contact | null | 'ambiguous' 
   return found[0];
 }
 
-const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 350 para ela"\n• "Agenda o João sexta às 14h para limpeza de sofá"\n• "Quanto vendi essa semana?"\n• "O que tenho na agenda amanhã?"\n• "Quais orçamentos estão parados?"\n• "Registra uma venda de R$ 180 no Pix para a Juliana"\n• "Me lembra de ligar para o fornecedor amanhã às 9h"\n• "Lança o aluguel de R$ 2.800 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 removedores de mancha"\n• "O que preciso repor?"\n• "Quem está na lista de espera?"\n• "Cobra R$ 250 da Juliana para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (vendas, cobranças, notas fiscais, baixa de contas, cancelamentos, preços, descontos altos) sempre pedem sua confirmação.`;
+const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 3.500 do implante para ela"\n• "Marca o João sexta às 14h para limpeza com a Dra. Marina"\n• "Quem ainda não confirmou amanhã?"\n• "O que temos na agenda amanhã?"\n• "Quanto recebemos essa semana?"\n• "Quais orçamentos estão parados?"\n• "Registra o pagamento de R$ 280 no Pix da Juliana"\n• "Me lembra de enviar as guias do convênio amanhã às 9h"\n• "Lança o aluguel de R$ 4.200 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 caixas de luvas"\n• "O que preciso repor?"\n• "Quem está na lista de espera?"\n• "Cobra R$ 600 do Ricardo para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (pagamentos, cobranças, notas fiscais, baixa de contas, desmarcações, valores, descontos altos) sempre pedem sua confirmação.`;
 
 function handleClause(ctx: Ctx, clause: string) {
   const f = fold(clause);
@@ -393,16 +408,16 @@ function handleClause(ctx: Ctx, clause: string) {
   }
 
   // resumo de vendas
-  if (/\b(quanto|qual)\b.*\b(vend|fatur)|\bvendas?\b.*\b(hoje|ontem|semana|mes|ano)\b|\bfaturamento\b/.test(f)) {
+  if (/\b(quanto|qual)\b.*\b(vend|fatur|receb|entrou)|\b(vendas?|recebimentos?|pagamentos?)\b.*\b(hoje|ontem|semana|mes|ano)\b|\bfaturamento\b/.test(f)) {
     ctx.lines.push(salesSummary(f).text);
-    ctx.actions.push({ tool: 'resumo_vendas', label: 'Relatório de vendas consultado', status: 'ok' });
+    ctx.actions.push({ tool: 'resumo_vendas', label: 'Recebimentos consultados', status: 'ok' });
     return;
   }
 
   // conversas aguardando
   if (/\b(conversas?|clientes?|quem)\b.*\b(esperando|aguardando|pendentes?|sem resposta|precisa)\b/.test(f)) {
     const list = table('conversations').filter((c) => c.kind === 'cliente' && (c.needs_attention || c.handler === 'humano') && c.status === 'aberta');
-    ctx.lines.push(list.length ? `${list.length} ${list.length === 1 ? 'conversa precisa' : 'conversas precisam'} de você:\n` + list.map((c) => `• ${contactById(c.contact_id)?.name ?? 'Cliente'} — ${c.attention_reason ?? 'atendimento com a equipe'}`).join('\n') : 'Nenhuma conversa esperando por você agora. A IA está dando conta! 🙌');
+    ctx.lines.push(list.length ? `${list.length} ${list.length === 1 ? 'conversa precisa' : 'conversas precisam'} de você:\n` + list.map((c) => `• ${contactById(c.contact_id)?.name ?? 'Paciente'} — ${c.attention_reason ?? 'atendimento com a equipe'}`).join('\n') : 'Nenhuma conversa esperando por você agora. A IA está dando conta! 🙌');
     ctx.actions.push({ tool: 'conversas_pendentes', label: 'Conversas pendentes consultadas', status: 'ok' });
     return;
   }
@@ -412,7 +427,7 @@ function handleClause(ctx: Ctx, clause: string) {
     const cutoff = Date.now() - 2 * 86400000;
     const list = table('quotes').filter((q) => q.status === 'enviado' && Date.parse(q.sent_at ?? q.created_at) < cutoff).slice(0, 6);
     const total = list.reduce((s, q) => s + q.total, 0);
-    ctx.lines.push(list.length ? `Encontrei ${list.length} orçamentos enviados há mais de 2 dias sem resposta (${brl(total)} no total):\n` + list.map((q) => `• nº ${qn(q.number)} — ${contactById(q.contact_id)?.name ?? 'Cliente'} · ${brl(q.total)} · enviado ${fmtDate(q.sent_at ?? q.created_at)}`).join('\n') + '\nQuer que eu mande uma mensagem de acompanhamento para eles?' : 'Nenhum orçamento parado. Todos foram respondidos ou ainda estão no prazo. 👌');
+    ctx.lines.push(list.length ? `Encontrei ${list.length} orçamentos enviados há mais de 2 dias sem resposta (${brl(total)} no total):\n` + list.map((q) => `• nº ${qn(q.number)} — ${contactById(q.contact_id)?.name ?? 'Paciente'} · ${brl(q.total)} · enviado ${fmtDate(q.sent_at ?? q.created_at)}`).join('\n') + '\nQuer que eu mande uma mensagem de acompanhamento para eles?' : 'Nenhum orçamento parado. Todos foram respondidos ou ainda estão no prazo. 👌');
     ctx.actions.push({ tool: 'listar_orcamentos', label: 'Orçamentos parados consultados', status: 'ok' });
     return;
   }
@@ -424,25 +439,25 @@ function handleClause(ctx: Ctx, clause: string) {
     const num = f.match(/\b(?:n|no|numero|nº)?\s*0*(\d{2,6})\b/);
     let q = num ? table('quotes').find((x) => x.number === +num[1]) : undefined;
     if (!q && c && c !== 'ambiguous') q = table('quotes').filter((x) => x.contact_id === c.id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
-    if (!q) { ctx.lines.push('Não encontrei esse orçamento. Me diga o número ou o nome do cliente.'); return; }
+    if (!q) { ctx.lines.push('Não encontrei esse orçamento. Me diga o número ou o nome do paciente.'); return; }
     q.status = status; q.responded_at = new Date().toISOString(); q.updated_at = q.responded_at;
     const ct = contactById(q.contact_id); if (ct) ct.stage = status === 'aprovado' ? 'fechado' : 'perdido';
     emit('quotes'); emit('contacts');
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'atualizar_orcamento', summary: `Marcou o orçamento nº ${qn(q.number)} (${ct?.name ?? ''}) como ${status}`, target_type: 'quote', target_id: q.id, status: 'ok' });
     ctx.actions.push({ tool: 'atualizar_orcamento', label: `Orçamento nº ${qn(q.number)} ${status}`, status: 'ok', detail: `${ct?.name ?? ''} · ${brl(q.total)}` });
-    ctx.lines.push(`Combinado! ✅ O orçamento nº ${qn(q.number)} de ${ct?.name ?? 'cliente'} (${brl(q.total)}) agora está ${status}.${status === 'aprovado' ? ' Quer que eu já agende o serviço?' : ''}`);
+    ctx.lines.push(`Combinado! ✅ O orçamento nº ${qn(q.number)} de ${ct?.name ?? 'paciente'} (${brl(q.total)}) agora está ${status}.${status === 'aprovado' ? ' Quer que eu já agende o serviço?' : ''}`);
     return;
   }
 
   // enviar orçamento
   if (/\b(manda|envia|mande|envie)\w*\b.*\borcamento\b|\b(manda|envia)\s+(sim|ele|pra ela|pra ele)\b|^manda sim$/.test(f)) {
     const q = ctx.lastQuote ?? table('quotes').filter((x) => x.created_via === 'ia_dono' && x.status === 'rascunho').sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
-    if (!q) { ctx.lines.push('Qual orçamento você quer enviar? Me diga o número ou o nome do cliente.'); return; }
+    if (!q) { ctx.lines.push('Qual orçamento você quer enviar? Me diga o número ou o nome do paciente.'); return; }
     q.status = 'enviado'; q.sent_at = new Date().toISOString(); emit('quotes');
     const ct = contactById(q.contact_id);
-    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'enviar_orcamento', summary: `Enviou o orçamento nº ${qn(q.number)} para ${ct?.name ?? 'cliente'}`, target_type: 'quote', target_id: q.id, status: 'ok' });
+    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'enviar_orcamento', summary: `Enviou o orçamento nº ${qn(q.number)} para ${ct?.name ?? 'paciente'}`, target_type: 'quote', target_id: q.id, status: 'ok' });
     ctx.actions.push({ tool: 'enviar_orcamento', label: 'Orçamento enviado no WhatsApp', status: 'ok', detail: `nº ${qn(q.number)} · ${ct?.name ?? ''}` });
-    ctx.lines.push(`Enviado! 📨 ${ct ? firstName(ct.name) : 'O cliente'} recebeu o link do orçamento nº ${qn(q.number)}. Te aviso quando responder.`);
+    ctx.lines.push(`Enviado! 📨 ${ct ? firstName(ct.name) : 'O paciente'} recebeu o link do orçamento nº ${qn(q.number)}. Te aviso quando responder.`);
     return;
   }
 
@@ -452,7 +467,7 @@ function handleClause(ctx: Ctx, clause: string) {
     if (c === 'ambiguous') c = null;
     if (!c) {
       const n = nameAfterPrep(clause);
-      if (n) { const res = createContact(n, parsePhone(clause), 'ia_dono'); c = res.contact; ctx.actions.push({ tool: 'cadastrar_cliente', label: `Cliente ${firstName(n)} cadastrado`, status: 'ok' }); }
+      if (n) { const res = createContact(n, parsePhone(clause), 'ia_dono'); c = res.contact; ctx.actions.push({ tool: 'cadastrar_cliente', label: `Paciente ${firstName(n)} cadastrado`, status: 'ok' }); }
     }
     if (!c) { ctx.lines.push('Para quem é o orçamento? Ex.: "cria um orçamento de R$ 350 para a Maria".'); return; }
     const svc = matchService(f);
@@ -462,7 +477,7 @@ function handleClause(ctx: Ctx, clause: string) {
     if (!amount) { ctx.lines.push(`Qual o valor do orçamento para ${firstName(c.name)}?`); return; }
     const pctMatch = f.match(/(\d{1,2})\s*%\s*de desconto|desconto de (\d{1,2})\s*%/);
     const pct = pctMatch ? +(pctMatch[1] ?? pctMatch[2]) : 0;
-    const items = [{ description: svc ? svc.name : 'Serviço combinado com o cliente', qty: 1, unit_price: amount, service_id: svc?.id ?? null }];
+    const items = [{ description: svc ? svc.name : 'Tratamento combinado com o paciente', qty: 1, unit_price: amount, service_id: svc?.id ?? null }];
     const discount = Math.round(amount * pct) / 100;
     if (pct > ai.max_discount_pct) {
       ctx.pending = createPending(ctx.conv, 'criar_orcamento', { contact_id: c.id, items, discount }, `Orçamento de ${brl(amount - discount)} para ${c.name} com ${pct}% de desconto`);
@@ -478,6 +493,15 @@ function handleClause(ctx: Ctx, clause: string) {
     return;
   }
 
+  // quem ainda não confirmou a consulta
+  if (/\b(nao|ainda nao|falta|faltam)\b.*\bconfirm\w*|\bsem confirm\w*/.test(f)) {
+    const d = parseDate(f, ctx.today) ?? addDays(ctx.today, 1);
+    const list = table('appointments').filter((a) => localDate(a.starts_at, TZ) === d && (a.status === 'confirmado' || a.status === 'pendente') && !a.patient_confirmed_at).sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
+    ctx.lines.push(list.length ? `${list.length} ${list.length === 1 ? 'paciente ainda não confirmou' : 'pacientes ainda não confirmaram'} ${d === addDays(ctx.today, 1) ? 'amanhã' : `em ${fmtDate(d)}`}:\n` + list.map((a) => `• ${localTime(a.starts_at, TZ)} ${contactById(a.contact_id)?.name ?? 'Paciente'} — ${a.title}${proName(a.professional_id) ? ` (${proName(a.professional_id)!.split(' ').slice(0, 2).join(' ')})` : ''}`).join('\n') + '\nO lembrete com pedido de confirmação sai 24 horas antes. Quem não puder vir já remarca pelo WhatsApp.' : `Todos os pacientes ${d === addDays(ctx.today, 1) ? 'de amanhã' : `de ${fmtDate(d)}`} já confirmaram. ✅`);
+    ctx.actions.push({ tool: 'consultar_agenda', label: 'Confirmações consultadas', status: 'ok', detail: `${list.length} sem confirmar`, link: '#/agenda' });
+    return;
+  }
+
   // agenda (consulta)
   if (/\b(agenda|horarios?|compromissos?|servicos?)\b.*\b(hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|\d{1,2}\/\d{1,2})\b|\bo que (eu )?(tenho|temos)\b/.test(f) && !/\b(agend|marc|reserv)\w*\s+(?:a|o)\s/.test(f)) {
     const d = parseDate(f, ctx.today) ?? ctx.today;
@@ -487,9 +511,9 @@ function handleClause(ctx: Ctx, clause: string) {
   }
 
   // cancelar agendamento (sensível)
-  if (/\bcancel\w*\b/.test(f) && /\b(agendamento|horario|visita|servico|limpeza|atendimento)\b/.test(f)) {
+  if (/\b(cancel|desmarc)\w*\b/.test(f) && /\b(agendamento|horario|consulta|limpeza|atendimento|sessao)\b/.test(f)) {
     const c = resolveContact(ctx, clause);
-    if (!c || c === 'ambiguous') { ctx.lines.push('De qual cliente é o horário que você quer cancelar?'); return; }
+    if (!c || c === 'ambiguous') { ctx.lines.push('De qual paciente é a consulta que você quer desmarcar?'); return; }
     const ap = nextAppointmentOf(c);
     if (!ap) { ctx.lines.push(`${firstName(c.name)} não tem horário marcado.`); return; }
     const when = `${fmtLong(ap.starts_at)} às ${localTime(ap.starts_at, TZ)}`;
@@ -502,15 +526,19 @@ function handleClause(ctx: Ctx, clause: string) {
   // remarcar
   if (/\b(remarc|transfer|adi[ae])\w*\b/.test(f)) {
     const c = resolveContact(ctx, clause);
-    if (!c || c === 'ambiguous') { ctx.lines.push('De qual cliente é o horário que você quer remarcar?'); return; }
+    if (!c || c === 'ambiguous') { ctx.lines.push('De qual paciente é a consulta que você quer remarcar?'); return; }
     const ap = nextAppointmentOf(c);
     const d = parseDate(f, ctx.today), t = parseTime(f);
     if (!ap) { ctx.lines.push(`${firstName(c.name)} não tem horário marcado para remarcar.`); return; }
     if (!d || !t) { ctx.lines.push(`Para quando você quer remarcar o horário de ${firstName(c.name)}? Ex.: "segunda às 10h".`); return; }
     const start = fromLocal(d, t, TZ).toISOString();
     const dur = (Date.parse(ap.ends_at) - Date.parse(ap.starts_at)) / 60000;
-    const ok = isFree(start, dur, company, table('appointments').filter((x) => x.id !== ap.id));
-    if (!ok.ok) { const alt = slotsForDate(d, company, table('appointments'), dur).slice(0, 4).map((s) => s.time); ctx.lines.push(`${ok.reason} ${alt.length ? `Livres nesse dia: ${alt.join(', ')}.` : 'Não há horários livres nesse dia.'}`); return; }
+    const others = table('appointments').filter((x) => x.id !== ap.id);
+    let ok = isFree(start, dur, company, others, new Date(), po(ap.service_id, ap.professional_id));
+    if (!ok.ok) ok = isFree(start, dur, company, others, new Date(), po(ap.service_id));
+    if (!ok.ok) { const alt = slotsForDate(d, company, others, dur, new Date(), po(ap.service_id)).slice(0, 4).map((s) => s.time); ctx.lines.push(`${ok.reason} ${alt.length ? `Livres nesse dia: ${alt.join(', ')}.` : 'Não há horários livres nesse dia.'}`); return; }
+    if (ok.professionalId) ap.professional_id = ok.professionalId;
+    ap.patient_confirmed_at = null;
     ap.starts_at = start; ap.ends_at = new Date(Date.parse(start) + dur * 60000).toISOString(); ap.updated_at = new Date().toISOString(); emit('appointments');
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'remarcar', summary: `Remarcou o horário de ${c.name} para ${fmtDate(d)} às ${t}`, target_type: 'appointment', target_id: ap.id, status: 'ok' });
     ctx.actions.push({ tool: 'remarcar', label: 'Agendamento remarcado', status: 'ok', detail: `${c.name} · ${fmtDate(d)} às ${t}` });
@@ -523,18 +551,20 @@ function handleClause(ctx: Ctx, clause: string) {
     let c = resolveContact(ctx, clause);
     if (c === 'ambiguous') c = null;
     if (!c) { const n = nameAfterVerb(clause); if (n) { const found = findContacts(n); c = found[0] ?? createContact(n, parsePhone(clause), 'ia_dono').contact; } }
-    if (!c) { ctx.lines.push('Para qual cliente é o horário?'); return; }
+    if (!c) { ctx.lines.push('Para qual paciente é a consulta?'); return; }
     const d = parseDate(f, ctx.today), t = parseTime(f);
     if (!d || !t) { ctx.lines.push(`Qual dia e horário para ${firstName(c.name)}? Ex.: "sexta às 14h".`); return; }
     const svc = matchService(f);
+    const wantPro = matchPro(f);
     const start = fromLocal(d, t, TZ).toISOString();
-    const ok = isFree(start, svc?.duration_min ?? company.slot_minutes, company, table('appointments'));
-    if (!ok.ok) { const alt = slotsForDate(d, company, table('appointments'), svc?.duration_min ?? 60).slice(0, 5).map((s) => s.time); ctx.lines.push(`${ok.reason} ${alt.length ? `Livres em ${fmtDate(d)}: ${alt.join(', ')}.` : 'Esse dia está sem horários livres.'}`); return; }
-    const ap = createAppointment(c, start, svc, 'ia_dono');
+    const ok = isFree(start, svc?.duration_min ?? company.slot_minutes, company, table('appointments'), new Date(), po(svc?.id, wantPro));
+    if (!ok.ok) { const alt = slotsForDate(d, company, table('appointments'), svc?.duration_min ?? 30, new Date(), po(svc?.id, wantPro)).slice(0, 5).map((s) => s.time); ctx.lines.push(`${ok.reason} ${alt.length ? `Livres em ${fmtDate(d)}: ${alt.join(', ')}.` : 'Esse dia está sem horários livres.'}`); return; }
+    const ap = createAppointment(c, start, svc, 'ia_dono', { professional_id: ok.professionalId ?? wantPro });
     ctx.lastContact = c;
-    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'agendar', summary: `Agendou ${c.name} para ${fmtDate(d)} às ${t}${svc ? ` (${svc.name})` : ''}`, target_type: 'appointment', target_id: ap.id, status: 'ok' });
-    ctx.actions.push({ tool: 'agendar', label: 'Horário reservado na agenda', status: 'ok', detail: `${c.name} · ${WEEKDAYS[weekdayOf(d)]} ${fmtDate(d)} às ${t}`, link: '#/agenda' });
-    ctx.lines.push(`• Agendei ${firstName(c.name)} para ${fmtLong(d)} às ${t}${svc ? ` — ${svc.name}` : ''}`);
+    const who = proName(ap.professional_id);
+    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'agendar', summary: `Marcou ${c.name} para ${fmtDate(d)} às ${t}${svc ? ` (${svc.name}${who ? ` com ${who}` : ''})` : ''}`, target_type: 'appointment', target_id: ap.id, status: 'ok' });
+    ctx.actions.push({ tool: 'agendar', label: 'Consulta marcada', status: 'ok', detail: `${c.name} · ${WEEKDAYS[weekdayOf(d)]} ${fmtDate(d)} às ${t}${who ? ` · ${who}` : ''}`, link: '#/agenda' });
+    ctx.lines.push(`• Marquei ${firstName(c.name)} para ${fmtLong(d)} às ${t}${svc ? ` — ${svc.name}` : ''}${who ? ` com ${who}` : ''}${ap.payment_kind === 'convenio' ? ` (${ap.insurance})` : ''}`);
     return;
   }
 
@@ -569,7 +599,7 @@ function handleClause(ctx: Ctx, clause: string) {
   // pausar / retomar IA numa conversa
   if (/\b(pausa|para|desliga|assum)\w*\b.*\b(ia|robo|assistente|atendimento)\b|\b(volta|retoma|liga)\w*\b.*\b(ia|robo|assistente)\b/.test(f)) {
     const c = resolveContact(ctx, clause);
-    if (!c || c === 'ambiguous') { ctx.lines.push('Em qual conversa? Me diga o nome do cliente.'); return; }
+    if (!c || c === 'ambiguous') { ctx.lines.push('Em qual conversa? Me diga o nome do paciente.'); return; }
     const conv = table('conversations').find((x) => x.contact_id === c.id && x.kind === 'cliente');
     if (!conv) { ctx.lines.push(`Não encontrei conversa com ${c.name}.`); return; }
     const back = /\b(volta|retoma|liga)\w*\b/.test(f);
@@ -585,21 +615,21 @@ function handleClause(ctx: Ctx, clause: string) {
     if (!svc || !price) { ctx.lines.push('Qual serviço e qual o novo preço? Ex.: "muda o preço da limpeza de poltrona para R$ 95".'); return; }
     ctx.pending = createPending(ctx.conv, 'atualizar_servico', { service_id: svc.id, price }, `Mudar o preço de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}`);
     ctx.actions.push({ tool: 'atualizar_servico', label: 'Mudança de preço aguardando confirmação', status: 'aguardando', detail: `${svc.name}: ${brl(svc.price)} → ${brl(price)}`, pending_id: ctx.pending.id });
-    ctx.lines.push(`Vou mudar o preço de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}. A IA passa a usar o novo valor com os clientes na hora. Confirma? Responda SIM ou NÃO.`);
+    ctx.lines.push(`Vou mudar o preço de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}. A IA passa a usar o novo valor com os pacientes na hora. Confirma? Responda SIM ou NÃO.`);
     return;
   }
 
-  // cadastrar cliente
+  // cadastrar paciente
   if (/\b(cadastr|adicion|inclu|salv|registr|anot)\w*\b/.test(f)) {
     const name = nameAfterVerb(clause);
-    if (!name) { ctx.lines.push('Qual o nome do cliente? Ex.: "cadastra a Maria, telefone 61 99999-9999".'); return; }
+    if (!name) { ctx.lines.push('Qual o nome do paciente? Ex.: "cadastra a Maria, telefone 61 99999-9999".'); return; }
     const phone = parsePhone(clause);
     const email = clause.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0] ?? null;
     const { contact, existed } = createContact(name, phone, 'ia_dono', email ? { email } : {});
     ctx.lastContact = contact;
     if (existed) { ctx.lines.push(`• ${contact.name} já estava cadastrada com esse telefone, então usei o cadastro existente`); return; }
     audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'cadastrar_cliente', summary: `Cadastrou ${contact.name}${phone ? ` — ${formatPhone(phone)}` : ''}`, target_type: 'contact', target_id: contact.id, status: 'ok' });
-    ctx.actions.push({ tool: 'cadastrar_cliente', label: `Cliente ${firstName(contact.name)} cadastrad${/a$/i.test(firstName(contact.name)) ? 'a' : 'o'}`, status: 'ok', detail: phone ? formatPhone(phone) : undefined, link: '#/clientes' });
+    ctx.actions.push({ tool: 'cadastrar_cliente', label: `Paciente ${firstName(contact.name)} cadastrad${/a$/i.test(firstName(contact.name)) ? 'a' : 'o'}`, status: 'ok', detail: phone ? formatPhone(phone) : undefined, link: '#/clientes' });
     ctx.lines.push(`• Cadastrei ${contact.name}${phone ? ` — ${formatPhone(phone)}` : ''}`);
     return;
   }
@@ -629,7 +659,7 @@ export async function runOwnerCommand(text: string): Promise<AgentReply> {
   let reply = ctx.lines.join('\n');
   const bullets = ctx.lines.filter((l) => l.startsWith('• '));
   if (bullets.length && bullets.length === ctx.lines.length) {
-    reply = `Combinado! ✅ Fiz assim:\n${bullets.join('\n')}${ctx.lastQuote && ctx.lastQuote.status === 'rascunho' ? `\nQuer que eu mande o link do orçamento para ${firstName(contactById(ctx.lastQuote.contact_id)?.name ?? 'o cliente')} no WhatsApp?` : ''}`;
+    reply = `Combinado! ✅ Fiz assim:\n${bullets.join('\n')}${ctx.lastQuote && ctx.lastQuote.status === 'rascunho' ? `\nQuer que eu mande o link do orçamento para ${firstName(contactById(ctx.lastQuote.contact_id)?.name ?? 'o paciente')} no WhatsApp?` : ''}`;
   }
   const msg = pushMessage(conv, { direction: 'out', sender: 'ia', sender_name: AI_NAME(), body: reply, media: null, wa_status: null, actions: ctx.actions.length ? ctx.actions : null, response_seconds: 1, channel: 'painel' });
   conv.unread = 0;
@@ -665,9 +695,9 @@ export async function resolvePendingDemo(id: string, approve: boolean): Promise<
   return finishPending(conv, p, approve);
 }
 
-/* ================= simulador de cliente (a IA atendendo) ================= */
-interface SimState { convId: string | null; contactId: string | null; service: string | null; date: string | null; time: string | null; askedData: boolean; booked: boolean }
-let sim: SimState = { convId: null, contactId: null, service: null, date: null, time: null, askedData: false, booked: false };
+/* ================= simulador de paciente (a IA atendendo) ================= */
+interface SimState { convId: string | null; contactId: string | null; service: string | null; date: string | null; time: string | null; askedData: boolean; booked: boolean; pro: string | null }
+let sim: SimState = { convId: null, contactId: null, service: null, date: null, time: null, askedData: false, booked: false, pro: null };
 
 function simConversation(name: string): Conversation {
   const convs = table('conversations');
@@ -682,7 +712,7 @@ function simConversation(name: string): Conversation {
   return c;
 }
 
-/** Pergunta do cliente (não é nome nem endereço). */
+/** Pergunta do paciente (não é nome nem endereço). */
 const isQuestion = (text: string, f: string) => text.includes('?') || /^(qual|quais|quanto|quantos|como|onde|quando|porque|por que|voces|vcs|voce|aceita|aceitam|tem|da pra|e possivel|pode|posso|faz|fazem|precisa|preciso|serve|demora|funciona)\b/.test(f);
 const FAQ_STOP = new Set(['qual', 'quais', 'como', 'voces', 'voce', 'para', 'pra', 'esse', 'essa', 'isso', 'tenho', 'quero', 'sobre', 'mais', 'muito', 'fazer', 'fazem', 'pode', 'posso', 'preciso', 'precisa', 'algum', 'alguma', 'quanto', 'tempo', 'serve', 'onde', 'quando', 'tambem', 'aqui']);
 const sig = (t: string) => fold(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !FAQ_STOP.has(w));
@@ -701,13 +731,17 @@ export function faqAnswer(f: string): string | null {
 }
 
 function priceLine(s: Service): string {
-  if (s.price_type === 'sob_consulta') return `${s.name}: o valor depende de uma avaliação, então fazemos uma visita técnica sem custo`;
-  return `${s.name} ${s.price_type === 'a_partir_de' ? 'começa em' : 'sai por'} ${brl(s.price)}`;
+  if (s.price_type === 'sob_consulta') return `${s.name}: o valor depende da avaliação, que é gratuita`;
+  return `${s.name} ${s.price_type === 'a_partir_de' ? 'começa em' : s.price === 0 ? 'é' : 'sai por'} ${s.price === 0 ? 'gratuita' : brl(s.price)}`;
 }
 
+/** Sinais de urgência ou de assunto clínico: a secretária não orienta, encaminha. */
+const URGENT = /\b(falta de ar|desmai|convuls|dor no peito|sangr\w* (muito|forte|sem parar)|nao para de sangrar|inchad\w* .*(olho|pescoco|garganta)|febre alta|nao consigo (respirar|engolir)|me machucar|suicid|me matar)\b/;
+const CLINICAL = /\b(dor|doendo|doi|inchad\w*|inflamad\w*|sangr\w*|febre|pus|remedio|antibiotico|dipirona|ibuprofeno|tomar algum|e normal|resultado do exame|raio.?x|sintoma)\b/;
+
 export async function runSimulator(text: string, opts: { reset?: boolean; name?: string }): Promise<AgentReply> {
-  if (opts.reset) sim = { convId: null, contactId: null, service: null, date: null, time: null, askedData: false, booked: false };
-  const conv = simConversation(opts.name || 'Cliente de teste');
+  if (opts.reset) sim = { convId: null, contactId: null, service: null, date: null, time: null, askedData: false, booked: false, pro: null };
+  const conv = simConversation(opts.name || 'Paciente de teste');
   const contact = contactById(sim.contactId)!;
   pushMessage(conv, { direction: 'in', sender: 'contato', sender_name: contact.name, body: text, media: null, wa_status: null, actions: null, response_seconds: null, channel: 'simulador' });
   const t0 = Date.now();
@@ -717,119 +751,125 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
   const today = localDate(new Date(), TZ);
   const actions: ActionReceipt[] = [];
   let reply = '';
-  let handoff = false;
+  let handoff = '';
 
   const svcFound = matchService(f);
   if (svcFound) sim.service = svcFound.id;
+  const proFound = matchPro(f);
+  if (proFound) sim.pro = proFound;
   const date = parseDate(f, today); const time = parseTime(f);
   if (date) sim.date = date;
   if (time) sim.time = time;
   const service = table('services').find((s) => s.id === sim.service) ?? null;
+  const opts2 = po(service?.id, sim.pro);
+  const insList = company.insurances ?? [];
+  const askedIns = insList.find((x) => f.includes(fold(x).split(' ')[0]));
 
   if (conv.handler === 'humano') {
     reply = '';
+  } else if (URGENT.test(f)) {
+    handoff = 'Possível urgência: orientado a procurar o pronto-socorro';
+    reply = `Isso pode ser uma urgência${emo ? ' ⚠️' : ''}. Por favor, ligue agora para o SAMU (192) ou vá ao pronto-socorro mais próximo. Já avisei a equipe da clínica, que também vai falar com você.`;
+  } else if (CLINICAL.test(f) && !/\b(quanto|valor|preco|horario|marcar|agendar)\b/.test(f)) {
+    handoff = 'Dúvida clínica: precisa de avaliação do profissional';
+    const urg = table('services').find((s) => s.name.startsWith('Urgência'));
+    reply = `Sinto muito${emo ? ' 😔' : ''}. Não consigo avaliar sintomas por aqui: quem pode te orientar é o profissional. Já avisei a equipe, e se quiser eu vejo um horário de ${urg ? 'urgência ainda hoje' : 'consulta o quanto antes'}. Se piorar muito, procure o pronto-socorro.`;
   } else if (/\blista de espera\b|\bme (avisa|coloca)\b.*\b(desmarcar|vaga|lista)\b/.test(f)) {
     const now = new Date().toISOString();
     const open = table('waitlist').find((w) => w.contact_id === contact.id && (w.status === 'aguardando' || w.status === 'oferecido'));
     if (!open) table('waitlist').push({ id: newId(), company_id: DEMO_COMPANY_ID, contact_id: contact.id, service_id: sim.service, desired_date: sim.date, period: 'qualquer', notes: null, status: 'aguardando', offered_at: null, offered_starts_at: null, appointment_id: null, created_via: 'ia_cliente', created_at: now, updated_at: now });
     emit('waitlist');
-    actions.push({ tool: 'entrar_lista_espera', label: 'Cliente na lista de espera', status: 'ok', detail: `${contact.name}${sim.date ? ` · ${fmtDate(sim.date).slice(0, 5)}` : ''}`, link: '#/agenda?espera=1' });
-    reply = `Prontinho! ${emo ? '📝 ' : ''}Você está na lista de espera${sim.date ? ` para ${fmtDate(sim.date).slice(0, 5)}` : ''}. Se abrir um horário, eu te mando uma mensagem aqui na hora.`;
-  } else if (/\b(atendente|humano|pessoa|alguem da equipe|falar com (o|a) (dono|responsavel|gerente))\b/.test(f)) {
-    handoff = true;
-    reply = `Claro! Já chamei uma pessoa da equipe para falar com você. ${emo ? '🙋' : ''} Enquanto isso, se quiser, me conta o que você precisa.`;
-  } else if (/\b(reclama|absurdo|pessimo|horrivel|nao apareceu|atras|estragou|manchou|danific|procon|reembolso|devolv)\w*/.test(f)) {
-    handoff = true;
-    reply = `Sinto muito por isso${emo ? ' 😔' : ''}. Já passei seu caso para uma pessoa da equipe, que vai te responder o quanto antes para resolver.`;
+    actions.push({ tool: 'entrar_lista_espera', label: 'Paciente na lista de espera', status: 'ok', detail: `${contact.name}${sim.date ? ` · ${fmtDate(sim.date).slice(0, 5)}` : ''}`, link: '#/agenda?espera=1' });
+    reply = `Prontinho! ${emo ? '📝 ' : ''}Você está na lista de espera${sim.date ? ` para ${fmtDate(sim.date).slice(0, 5)}` : ''}. Se alguém desmarcar, eu te mando uma mensagem aqui na hora.`;
+  } else if (/\b(atendente|humano|pessoa|alguem da (equipe|recepcao)|falar com (o|a) (dono|responsavel|dentista|doutor|doutora|recepcao))\b/.test(f)) {
+    handoff = 'Paciente pediu para falar com a equipe';
+    reply = `Claro! Já chamei alguém da recepção para falar com você. ${emo ? '🙋' : ''}`;
+  } else if (/\b(reclama|absurdo|pessimo|horrivel|atras|demora|reembolso|devolv|procon)\w*/.test(f)) {
+    handoff = 'Reclamação';
+    reply = `Sinto muito por isso${emo ? ' 😔' : ''}. Já passei seu caso para a responsável da clínica, que vai te responder o quanto antes.`;
+  } else if (/\b(convenio|plano|unimed|amil|bradesco|odontoprev|sulamerica|hapvida|porto)\b/.test(f) && !sim.askedData) {
+    if (askedIns) { reply = `Atendemos ${askedIns}, sim! ${emo ? '😊 ' : ''}Traga a carteirinha e um documento com foto no dia. Quer marcar uma avaliação?`; contact.insurance = askedIns; emit('contacts'); actions.push({ tool: 'atualizar_cadastro', label: 'Ficha do paciente atualizada', status: 'ok', detail: `convênio ${askedIns}` }); }
+    else if (insList.length) reply = `Atendemos estes convênios: ${insList.join(', ')}. Se o seu não estiver na lista, a consulta pode ser particular. Quer marcar?`;
+    else reply = 'Por enquanto a clínica atende só particular. Quer saber os valores?';
   } else if (/\b(desconto|mais barato|faz por|abaixa|negocia|melhor preco)\b/.test(f)) {
     const pct = Number(f.match(/(\d{1,2})\s*%/)?.[1] ?? 0);
-    if (pct > ai.max_discount_pct) { handoff = true; reply = `Entendo! Esse desconto passa do que eu posso autorizar por aqui, então já pedi para o responsável avaliar. Ele te responde em instantes${emo ? ' 🙏' : '.'}`; }
-    else reply = `Consigo sim te ajudar: no Pix tem 5% de desconto${service ? `, então ${service.name.toLowerCase()} sai por ${brl(service.price * 0.95)}` : ''}. Quer que eu reserve um horário?`;
-  } else if (isQuestion(text, f) && faqAnswer(f)) {
+    if (pct > ai.max_discount_pct || !pct) { handoff = `Pediu desconto${pct ? ` de ${pct}%` : ''}`; reply = `Entendo! Condições especiais quem avalia é a responsável da clínica, então já pedi para ela te responder. Os tratamentos acima de R$ 1.000 podem ser parcelados em até 10x sem juros${emo ? ' 🙏' : '.'}`; }
+    else reply = `Consigo sim: ${pct}% de desconto${service ? `, então ${service.name.toLowerCase()} sai por ${brl(service.price * (1 - pct / 100))}` : ''}. Quer que eu marque a consulta?`;
+  } else if (isQuestion(text, f) && !date && !time && !/\b(quanto|valor|preco|custa)\b/.test(f) && faqAnswer(f)) {
     reply = faqAnswer(f)!;
-  } else if (sim.askedData && !sim.booked && sim.date && sim.time && !isQuestion(text, f) && (/^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f) || text.includes(',') || text.trim().split(/\s+/).length >= 3)) {
-    // cliente mandou nome e endereço
+  } else if (sim.askedData && !sim.booked && sim.date && sim.time && !isQuestion(text, f) && (/^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f) || text.trim().split(/\s+/).length >= 2)) {
+    // paciente mandou o nome (ou confirmou)
     const isYes = /^(sim|s|pode|pode sim|isso|confirmo|ok|fechado|claro)\b/.test(f);
     const nameGuess = text.split(/[,\n]/)[0].trim();
     if (!isYes && nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) { contact.name = titleCase(nameGuess); }
-    const addr = !isYes && text.includes(',') ? text.split(',').slice(1).join(',').trim() : null;
-    if (addr) contact.address = addr;
     contact.updated_at = new Date().toISOString(); emit('contacts');
     const start = fromLocal(sim.date, sim.time, TZ).toISOString();
-    const ok = isFree(start, service?.duration_min ?? company.slot_minutes, company, table('appointments'));
+    const ok = isFree(start, service?.duration_min ?? company.slot_minutes, company, table('appointments'), new Date(), opts2);
     if (!ok.ok) {
-      const alt = slotsForDate(sim.date, company, table('appointments'), service?.duration_min ?? 60).slice(0, 4).map((s) => s.time);
+      const alt = slotsForDate(sim.date, company, table('appointments'), service?.duration_min ?? 30, new Date(), opts2).slice(0, 4).map((s) => s.time);
       reply = `Poxa, esse horário acabou de ser ocupado. ${alt.length ? `Ainda tenho ${alt.join(', ')} nesse dia. Qual prefere?` : 'Quer tentar outro dia?'}`;
       sim.time = null;
     } else {
-      const ap = createAppointment(contact, start, service, 'ia_cliente');
+      const ap = createAppointment(contact, start, service, 'ia_cliente', { professional_id: ok.professionalId ?? sim.pro });
       sim.booked = true;
       contact.stage = 'fechado'; contact.temperature = 'quente'; emit('contacts');
-      actions.push({ tool: 'agendar_horario', label: 'Horário reservado na agenda', status: 'ok', detail: `${WEEKDAYS[weekdayOf(sim.date)]} às ${sim.time}${service ? ` · ${service.name}` : ''}` });
-      if (addr) actions.push({ tool: 'atualizar_meus_dados', label: 'Cadastro atualizado', status: 'ok', detail: 'Nome e endereço salvos' });
-      audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_cliente', action: 'agendar_horario', summary: `Reservou ${fmtDate(sim.date)} às ${sim.time} para ${contact.name}${service ? ` (${service.name})` : ''}`, target_type: 'appointment', target_id: ap.id, status: 'ok' });
-      notify({ kind: 'agendamento', title: 'Novo horário reservado pela IA', body: `${contact.name} · ${fmtDate(sim.date)} às ${sim.time}`, link: '#/agenda' });
-      reply = `Combinado, ${firstName(contact.name)}! ${emo ? '✅ ' : ''}Reservei ${fmtLong(sim.date)} às ${sim.time}${service ? ` para ${service.name.toLowerCase()}` : ''}${service && service.price_type !== 'sob_consulta' ? ` (${service.price_type === 'a_partir_de' ? 'a partir de ' : ''}${brl(service.price)})` : ''}. ${ap.status === 'pendente' ? 'A equipe confirma em instantes.' : 'Está tudo certo na agenda.'} Qualquer coisa, é só me chamar por aqui!`;
+      const who = proName(ap.professional_id);
+      actions.push({ tool: 'agendar_horario', label: 'Consulta marcada', status: 'ok', detail: `${WEEKDAYS[weekdayOf(sim.date)]} às ${sim.time}${service ? ` · ${service.name}` : ''}${who ? ` · ${who}` : ''}` });
+      audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_cliente', action: 'agendar', summary: `Marcou ${fmtDate(sim.date)} às ${sim.time} para ${contact.name}${service ? ` (${service.name}${who ? ` com ${who}` : ''})` : ''}`, target_type: 'appointment', target_id: ap.id, status: 'ok' });
+      notify({ kind: 'agendamento', title: 'Nova consulta marcada pela IA', body: `${contact.name} · ${fmtDate(sim.date)} às ${sim.time}${who ? ` · ${who}` : ''}`, link: '#/agenda' });
+      reply = `Prontinho, ${firstName(contact.name)}! ${emo ? '✅ ' : ''}${service ? service.name : 'Consulta'} marcada para ${fmtLong(sim.date)} às ${sim.time}${who ? ` com ${who}` : ''}${ap.payment_kind === 'convenio' ? `, pelo ${ap.insurance} (traga a carteirinha)` : service && service.price > 0 && service.price_type !== 'sob_consulta' ? ` (${service.price_type === 'a_partir_de' ? 'a partir de ' : ''}${brl(service.price)})` : ''}. ${ap.status === 'pendente' ? 'A recepção confirma em instantes.' : 'Na véspera eu te mando um lembrete para confirmar.'}`;
     }
-  } else if (!date && !time && sim.date && !sim.time && !sim.booked && !isQuestion(text, f) && (text.includes(',') || text.trim().split(/\s+/).length >= 3) && !/\b(quanto|valor|preco|horario|atende|pagamento)\b/.test(f)) {
-    // mandou nome e endereço antes de escolher o horário: guarda e pede a escolha
-    const nameGuess = text.split(/[,\n]/)[0].trim();
-    if (nameGuess.split(/\s+/).length >= 2 && nameGuess.length < 60) contact.name = titleCase(nameGuess);
-    if (text.includes(',')) contact.address = text.split(',').slice(1).join(',').trim();
-    contact.updated_at = new Date().toISOString(); emit('contacts');
-    sim.askedData = true;
-    const slots = slotsForDate(sim.date, company, table('appointments'), service?.duration_min ?? company.slot_minutes).slice(0, 4).map((s) => s.time);
-    reply = slots.length ? `Anotado, ${firstName(contact.name)}! ${emo ? '📝 ' : ''}Agora só falta escolher o horário: ${slots.join(', ')}. Qual prefere?` : `Anotado, ${firstName(contact.name)}! Esse dia lotou. Quer ver outro dia? Se preferir, coloco você na lista de espera e te aviso se alguém desmarcar.`;
-  } else if ((date || time) && (sim.service || /\b(horario|agend|marc|pode ser|quero|tem)\b/.test(f) || sim.date)) {
+  } else if ((date || time) && (sim.service || /\b(horario|agend|marc|pode ser|quero|tem|consulta)\b/.test(f) || sim.date)) {
     const day = sim.date ?? today;
     const dur = service?.duration_min ?? company.slot_minutes;
-    const slots = slotsForDate(day, company, table('appointments'), dur);
-    if (!(company.business_hours[String(weekdayOf(day))] ?? []).length) reply = `Não atendemos ${WEEKDAYS[weekdayOf(day)]}. ${emo ? '😕 ' : ''}Que tal outro dia?`;
+    const slots = slotsForDate(day, company, table('appointments'), dur, new Date(), opts2);
+    const proTxt = sim.pro ? ` com ${proName(sim.pro)}` : '';
+    if (!slots.length && !(company.business_hours[String(weekdayOf(day))] ?? []).length) reply = `Não atendemos ${WEEKDAYS[weekdayOf(day)]}. ${emo ? '😕 ' : ''}Que tal outro dia?`;
     else if (sim.time) {
       const startIso = fromLocal(day, sim.time, TZ).toISOString();
-      if (slots.some((s) => s.startsAt === startIso)) {
-        if (sim.askedData && contact.address) reply = `Perfeito! Posso confirmar ${fmtLong(day)} às ${sim.time} no endereço ${contact.address}? Responda "sim" para eu reservar.`;
-        else { reply = `Temos esse horário disponível! Posso reservar ${fmtLong(day)} às ${sim.time} para você? Só preciso do seu nome completo e do endereço.`; sim.askedData = true; }
+      const slot = slots.find((s) => s.startsAt === startIso);
+      if (slot) {
+        const who = proName(sim.pro ?? slot.pros[0]);
+        if (!sim.pro && slot.pros[0]) sim.pro = slot.pros[0];
+        reply = `Tenho sim! ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} às ${sim.time}${who ? ` com ${who}` : ''}. Para eu marcar, me diz o seu nome completo?`;
+        sim.askedData = true;
       }
-      else reply = slots.length ? `Esse horário não está livre. ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} ainda tenho ${slots.slice(0, 4).map((s) => s.time).join(', ')}. Algum desses serve?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} está lotado. Quer ver outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
-    } else reply = slots.length ? `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} tenho ${slots.slice(0, 5).map((s) => s.time).join(', ')}. Qual fica melhor?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} não tenho horários livres. Quer tentar outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
+      else reply = slots.length ? `Esse horário não está livre${proTxt}. ${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} ainda tenho ${slots.slice(0, 4).map((s) => s.time).join(', ')}. Algum desses serve?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} está lotado${proTxt}. Quer ver outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
+    } else reply = slots.length ? `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)}${proTxt} tenho ${slots.slice(0, 5).map((s) => s.time).join(', ')}. Qual fica melhor?` : `${fmtLong(day)[0].toUpperCase() + fmtLong(day).slice(1)} não tenho horários livres${proTxt}. Quer tentar outro dia, ou prefere entrar na lista de espera? Se alguém desmarcar, te aviso na hora.`;
   } else if (/\b(quanto|valor|preco|custa|cobra|orcamento)\b/.test(f) || svcFound) {
-    if (/\bsofa\b/.test(f) && !/\b(2|3|dois|tres|retratil|reclinavel|impermeab)\b/.test(f)) {
-      const s2 = table('services').find((s) => s.name.startsWith('Limpeza de sofá 2'))!, s3 = table('services').find((s) => s.name.startsWith('Limpeza de sofá 3'))!, sr = table('services').find((s) => s.name.startsWith('Limpeza de sofá retrátil'))!;
-      reply = `Olá! ${emo ? '😊 ' : ''}A limpeza de sofá de 3 lugares começa em ${brl(s3.price)}, conforme a tabela cadastrada. O de 2 lugares sai por ${brl(s2.price)} e o retrátil começa em ${brl(sr.price)}. Quer consultar os horários disponíveis?`;
-      sim.service = s3.id;
-    } else if (service) {
-      reply = `${priceLine(service)}${service.description ? `. ${service.description}` : ''} Quer consultar os horários disponíveis?`;
+    if (service) {
+      const who = table('professionals').filter((p) => p.active && (!p.service_ids.length || p.service_ids.includes(service.id))).map((p) => p.name);
+      reply = `${priceLine(service)}${service.description ? `. ${service.description}` : '.'}${who.length === 1 ? ` Quem faz é ${who[0]}.` : ''} Quer ver os horários disponíveis?`;
     } else {
-      reply = `Claro! Me conta qual serviço você precisa (sofá, colchão, tapete, cadeiras, poltrona ou banco de carro) que eu já te passo o valor.`;
+      reply = `Claro! Me conta o que você precisa (limpeza, clareamento, aparelho, restauração, implante...) que eu já te passo o valor. A primeira avaliação é gratuita.`;
     }
-  } else if (/\b(atende|atendem|vai ate|regiao|bairro|cidade)\b/.test(f)) {
-    reply = /\b(valparaiso|aguas lindas|luziania|entorno|goias|go)\b/.test(f) ? 'Atendemos sim! Por ser Entorno, tem uma taxa de deslocamento de R$ 30. Qual serviço você precisa?' : `Atendemos todo o DF${emo ? ' 🙌' : ''}. Qual serviço você precisa?`;
+  } else if (/\b(endereco|onde fica|localiza|estacionamento)\b/.test(f)) {
+    reply = `Ficamos na ${company.address}${company.city ? `, ${company.city}` : ''}. Tem estacionamento rotativo em frente ao prédio.`;
   } else if (/\b(pagamento|pagar|pix|cartao|parcel|dinheiro)\b/.test(f)) {
-    reply = 'Aceitamos Pix (com 5% de desconto), cartão em até 3x sem juros ou dinheiro. O pagamento é feito depois do serviço.';
+    reply = 'Particular: Pix, cartão de débito ou crédito, em até 10x sem juros nos tratamentos acima de R$ 1.000. Também atendemos convênios.';
   } else if (/\b(horario de funcionamento|que horas|abre|fecha|funcionam)\b/.test(f)) {
-    reply = 'Atendemos de segunda a sexta, das 8h às 18h, e aos sábados das 8h às 13h. Domingo não abrimos.';
+    reply = 'Atendemos de segunda a sexta, das 8h às 19h, e aos sábados das 8h às 12h.';
   } else if (/\b(obrigad|valeu|show|perfeito|otimo|maravilh)\w*/.test(f)) {
     reply = `Imagina${emo ? '! 💙' : '!'} Qualquer coisa, é só chamar por aqui.`;
   } else if (/^(oi|ola|bom dia|boa tarde|boa noite|e ai|opa|hello)\b/.test(f)) {
-    reply = ai.greeting || `Oi! Aqui é ${ai.assistant_name}, de ${company.name}. Como posso te ajudar?`;
+    reply = ai.greeting || `Oi! Aqui é ${ai.assistant_name}, da ${company.name}. Como posso te ajudar?`;
   } else {
-    reply = `Posso te ajudar com preços, horários e orçamentos${emo ? ' 😊' : '.'} Qual serviço você precisa?`;
+    reply = `Posso te ajudar com valores, convênios e horários${emo ? ' 😊' : '.'} O que você precisa?`;
   }
 
-  // respondeu uma dúvida no meio do agendamento: lembra o que falta para reservar
-  if (reply && !handoff && !sim.booked && sim.askedData && sim.date && sim.time && isQuestion(text, f) && !/reserv|nome completo/.test(reply)) {
-    reply += ` E para eu reservar ${fmtLong(sim.date)} às ${sim.time}, só preciso do seu nome completo e do endereço.`;
+  // respondeu uma dúvida no meio do agendamento: lembra o que falta para marcar
+  if (reply && !handoff && !sim.booked && sim.askedData && sim.date && sim.time && isQuestion(text, f) && !/marcar|nome completo/.test(reply)) {
+    reply += ` E para eu marcar ${fmtLong(sim.date)} às ${sim.time}, só preciso do seu nome completo.`;
   }
 
   if (handoff) {
-    conv.handler = 'humano'; conv.needs_attention = true; conv.attention_reason = 'Cliente de teste pediu atendimento humano'; emit('conversations');
-    actions.push({ tool: 'chamar_atendente', label: 'Atendimento passado para a equipe', status: 'ok' });
-    notify({ kind: 'atendimento', title: `${contact.name} precisa de você`, body: 'A IA passou o atendimento para a equipe.', link: '#/conversas' });
+    conv.handler = 'humano'; conv.needs_attention = true; conv.attention_reason = handoff; emit('conversations');
+    actions.push({ tool: 'chamar_atendente', label: 'Atendimento passado para a equipe', status: 'ok', detail: handoff });
+    notify({ kind: 'atendimento', title: `${contact.name} precisa de você`, body: handoff, link: '#/conversas' });
   }
   if (reply) pushMessage(conv, { direction: 'out', sender: 'ia', sender_name: AI_NAME(), body: reply, media: null, wa_status: 'lida', actions: actions.length ? actions : null, response_seconds: Math.round((Date.now() - t0) / 1000), channel: 'simulador' });
   conv.unread = 0;
-  return { conversation_id: conv.id, reply, actions, handoff };
+  return { conversation_id: conv.id, reply, actions, handoff: !!handoff };
 }
 
 /* ================= sugestão de resposta (caixa de entrada) ================= */
@@ -839,9 +879,9 @@ export function suggestReplyDemo(convId: string): string {
   const last = table('messages').filter((m) => m.conversation_id === convId && m.direction === 'in').pop();
   const f = fold(last?.body ?? '');
   const name = firstName(contact?.name) || '';
-  if (/atras|nao apareceu|aguardo|alguem/.test(f)) return `Oi, ${name}! Peço desculpas pela demora. Falei agora com o técnico: ele teve um imprevisto no trânsito e chega em até 20 minutos. Como pedido de desculpas, vamos aplicar 10% de desconto no seu serviço. Obrigado pela paciência!`;
-  if (/desconto|faz por|230/.test(f)) return `Oi, ${name}! Consegui uma condição especial: fechando hoje no Pix, a impermeabilização sai por R$ 250. Posso reservar um horário para você?`;
-  if (/sindica|condominio|salao/.test(f)) return `Olá, Helena! Obrigado pelo contato. Podemos fazer uma visita técnica sem custo para avaliar os 12 sofás e as 40 cadeiras. Que dia e horário ficam bons para você esta semana?`;
-  if (/audio/.test(f)) return `Oi, ${name}! Ouvi seu áudio. Temos horário quinta às 15h. Posso confirmar?`;
+  if (/dor|inch|horario ainda hoje|urgencia/.test(f)) return `Oi, ${name}! Conseguimos te encaixar hoje às 16h30 com a Dra. Marina, como urgência. Pode vir? Se o inchaço aumentar muito antes disso, procure o pronto-socorro.`;
+  if (/desconto|faz por|2\.?800|a vista/.test(f)) return `Oi, ${name}! A Dra. Luiza liberou uma condição à vista: o implante sai por R$ 3.150 no Pix (10% de desconto). Quer que eu já reserve a cirurgia?`;
+  if (/siso|sangr/.test(f)) return `Oi, ${name}! Aqui é a Dra. Luiza. Um pouco de sangramento no primeiro dia é esperado. Morda uma gaze por 30 minutos e evite bochechar hoje. Se não parar, me chame aqui ou venha à clínica.`;
+  if (/audio/.test(f)) return `Oi, ${name}! Ouvi seu áudio. Temos horário quinta às 15h com a Dra. Marina. Posso confirmar?`;
   return `Oi, ${name}! Obrigado pela mensagem. Posso te ajudar com mais alguma coisa?`;
 }

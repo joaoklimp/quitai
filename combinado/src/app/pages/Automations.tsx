@@ -1,5 +1,5 @@
 // Automações: o que a IA faz sozinha, no horário certo, sem ninguém lembrar.
-import { AlarmClock, BellRing, CalendarClock, Lock, MessageSquareText, RefreshCcw, Send, Star, Sunset, TrendingUp, Workflow } from 'lucide-react';
+import { AlarmClock, BellRing, CalendarClock, CalendarHeart, Lock, MessageSquareText, RefreshCcw, Send, Star, Sunset, TrendingUp, Workflow } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../data/api';
 import { useInvalidate, useList } from '../data/hooks';
@@ -11,32 +11,35 @@ import { PLANS } from '../../shared/plans';
 
 type Opt = { key: string; label: string; type: 'select' | 'bool' | 'time' | 'text'; options?: [number | string, string][] };
 const META: Record<AutomationKind, { title: string; desc: string; icon: typeof BellRing; bg: string; fg: string; opts: Opt[]; needs: 'all' | 'automations'; example: string }> = {
-  lembrete_agendamento: { title: 'Lembrete de horário', desc: 'Lembra o cliente pelo WhatsApp antes do horário marcado e pede para confirmar. Reduz faltas.', icon: BellRing, bg: 'var(--blue-soft)', fg: 'var(--blue-ink)', needs: 'all',
+  lembrete_agendamento: { title: 'Lembrete e confirmação de consulta', desc: 'Lembra o paciente pelo WhatsApp antes da consulta e pede para confirmar presença. Quem não pode vir já remarca ali mesmo, e o horário vai para a lista de espera. É o que mais reduz faltas.', icon: BellRing, bg: 'var(--blue-soft)', fg: 'var(--blue-ink)', needs: 'all',
     opts: [{ key: 'horas_antes', label: 'Enviar', type: 'select', options: [[2, '2 horas antes'], [12, '12 horas antes'], [24, '1 dia antes'], [48, '2 dias antes']] }, { key: 'pedir_confirmacao', label: 'Pedir confirmação', type: 'bool' }],
-    example: 'Olá, Juliana! Passando para lembrar do seu horário amanhã às 14h (limpeza de sofá). Responda SIM para confirmar ou me chame para remarcar.' },
-  followup_orcamento: { title: 'Acompanhamento de orçamento', desc: 'Quando o cliente não responde um orçamento, a IA manda uma mensagem gentil para retomar a conversa.', icon: Send, bg: 'var(--orange-soft)', fg: 'var(--orange-ink)', needs: 'automations',
+    example: 'Olá, Juliana! Lembrete da sua consulta de limpeza com a Dra. Marina amanhã, às 14:00. Pode confirmar sua presença respondendo SIM? Se não puder vir, me avise que eu remarco.' },
+  followup_orcamento: { title: 'Acompanhamento de orçamento', desc: 'Quando o paciente não responde um orçamento de tratamento, a IA manda uma mensagem gentil para retomar a conversa.', icon: Send, bg: 'var(--orange-soft)', fg: 'var(--orange-ink)', needs: 'automations',
     opts: [{ key: 'dias_depois', label: 'Depois de', type: 'select', options: [[1, '1 dia'], [2, '2 dias'], [3, '3 dias'], [5, '5 dias']] }, { key: 'max_tentativas', label: 'Tentativas', type: 'select', options: [[1, '1 vez'], [2, '2 vezes'], [3, '3 vezes']] }],
-    example: 'Oi, Ricardo! Tudo bem? Seu orçamento nº 0412 (R$ 150,00) ainda está disponível. Quer que eu reserve um horário?' },
-  resumo_diario: { title: 'Resumo do dia no seu WhatsApp', desc: 'Todo dia, no horário que você escolher: vendas, orçamentos esperando, contas que vencem, cobranças atrasadas, quem precisa de resposta e a agenda de amanhã.', icon: Sunset, bg: 'var(--violet-soft)', fg: 'var(--violet-ink)', needs: 'all',
+    example: 'Oi, Ricardo! Tudo bem? Seu orçamento nº 0412 do clareamento (R$ 1.200,00) ainda está disponível. Quer que eu reserve um horário?' },
+  resumo_diario: { title: 'Resumo do dia no seu WhatsApp', desc: 'Todo dia, no horário que você escolher: o que entrou, orçamentos esperando, contas que vencem, quem precisa de resposta e a agenda de amanhã, com quem ainda não confirmou.', icon: Sunset, bg: 'var(--violet-soft)', fg: 'var(--violet-ink)', needs: 'all',
     opts: [{ key: 'horario', label: 'Horário', type: 'time' }, { key: 'incluir_agenda', label: 'Incluir agenda de amanhã', type: 'bool' }],
-    example: 'Resumo de hoje: R$ 1.240 em vendas, 3 orçamentos esperando aprovação, a conta de luz vence amanhã e você tem 5 horários, o primeiro às 8h.' },
-  pos_atendimento: { title: 'Pós-atendimento e avaliação', desc: 'Depois do serviço concluído, agradece o cliente e pede uma avaliação no Google.', icon: Star, bg: 'var(--green-soft)', fg: 'var(--green-ink)', needs: 'automations',
+    example: 'Resumo de hoje: R$ 4.380 recebidos, 3 orçamentos esperando aprovação, a conta de luz vence amanhã. Amanhã: 18 consultas, 3 sem confirmar.' },
+  pos_atendimento: { title: 'Pós-consulta e avaliação', desc: 'Depois da consulta, agradece o paciente e pede uma avaliação no Google.', icon: Star, bg: 'var(--green-soft)', fg: 'var(--green-ink)', needs: 'automations',
     opts: [{ key: 'horas_depois', label: 'Enviar', type: 'select', options: [[1, '1 hora depois'], [3, '3 horas depois'], [24, '1 dia depois']] }, { key: 'pedir_avaliacao', label: 'Pedir avaliação', type: 'bool' }, { key: 'link_avaliacao', label: 'Link da avaliação', type: 'text' }],
-    example: 'Obrigada pela confiança, Aline! 💙 Se puder, deixa uma avaliação pra gente: g.page/brilholar' },
-  reativacao: { title: 'Reativação de clientes', desc: 'Clientes que não compram há muito tempo recebem um convite para voltar, com um desconto se você quiser.', icon: RefreshCcw, bg: 'var(--pink-soft)', fg: 'var(--pink)', needs: 'automations',
-    opts: [{ key: 'dias_sem_compra', label: 'Sem comprar há', type: 'select', options: [[60, '60 dias'], [90, '90 dias'], [120, '120 dias'], [180, '6 meses']] }, { key: 'desconto_pct', label: 'Desconto', type: 'select', options: [[0, 'sem desconto'], [5, '5%'], [10, '10%'], [15, '15%']] }],
-    example: 'Oi, Paulo! Faz um tempinho que a gente não cuida do seu sofá. Esta semana tem 10% de desconto para clientes da casa. Quer agendar?' },
+    example: 'Obrigada pela confiança, Aline! 💙 Se puder, deixe uma avaliação pra gente: g.page/vidaplena' },
+  reativacao: { title: 'Reativação de pacientes', desc: 'Pacientes que não voltam há muito tempo recebem um convite para marcar uma consulta.', icon: RefreshCcw, bg: 'var(--pink-soft)', fg: 'var(--pink)', needs: 'automations',
+    opts: [{ key: 'dias_sem_compra', label: 'Sem vir há', type: 'select', options: [[90, '90 dias'], [180, '6 meses'], [210, '7 meses'], [365, '1 ano']] }, { key: 'desconto_pct', label: 'Desconto', type: 'select', options: [[0, 'sem desconto'], [5, '5%'], [10, '10%'], [15, '15%']] }],
+    example: 'Oi, Paulo! Faz tempo que não te vemos na Vida Plena. Quando quiser marcar uma consulta, é só responder aqui.' },
+  retorno: { title: 'Retorno automático', desc: 'No prazo de retorno de cada procedimento (ex.: limpeza a cada 6 meses, manutenção do aparelho todo mês), a IA convida o paciente a marcar. Só vai para quem ainda não marcou.', icon: CalendarHeart, bg: 'var(--violet-soft)', fg: 'var(--violet-ink)', needs: 'all',
+    opts: [{ key: 'horario', label: 'Enviar a partir de', type: 'time' }],
+    example: 'Olá, Mariana! Está chegando a hora do seu retorno de limpeza na Vida Plena. Quer que eu veja um horário para você? É só responder por aqui.' },
   lembrete_tarefa: { title: 'Lembretes das suas tarefas', desc: 'Você recebe no WhatsApp os lembretes que pediu para a IA (“me lembra de…”).', icon: AlarmClock, bg: 'var(--yellow-soft)', fg: 'var(--yellow-ink)', needs: 'all',
     opts: [{ key: 'minutos_antes', label: 'Avisar', type: 'select', options: [[0, 'na hora'], [15, '15 min antes'], [30, '30 min antes'], [60, '1 hora antes']] }],
-    example: 'Lembrete: ligar para o fornecedor de produtos às 17h.' },
-  relatorio_semanal: { title: 'Relatório da semana', desc: 'Toda semana, no seu WhatsApp e no painel: quantos clientes a IA atendeu, horários marcados, orçamentos, o que entrou de cobrança e o tempo que você economizou.', icon: TrendingUp, bg: 'var(--green-soft)', fg: 'var(--green-ink)', needs: 'all',
+    example: 'Lembrete: enviar as guias do Amil Dental às 10h.' },
+  relatorio_semanal: { title: 'Relatório da semana', desc: 'Toda semana, no seu WhatsApp e no painel: quantos pacientes a IA atendeu, consultas marcadas, confirmações, orçamentos, o que entrou e o tempo que a recepção economizou.', icon: TrendingUp, bg: 'var(--green-soft)', fg: 'var(--green-ink)', needs: 'all',
     opts: [{ key: 'dia', label: 'Dia', type: 'select', options: [[1, 'segunda-feira'], [2, 'terça-feira'], [3, 'quarta-feira'], [4, 'quinta-feira'], [5, 'sexta-feira'], [6, 'sábado'], [0, 'domingo']] }, { key: 'horario', label: 'Horário', type: 'time' }],
-    example: 'Sua semana com a ORBYTA: respondi 46 clientes (18 fora do horário), marquei 12 horários, montei 9 orçamentos e recebi R$ 2.340 por Pix. Tempo que você economizou: 4h 10min.' },
-  encaixe: { title: 'Encaixe automático', desc: 'Quando alguém cancela, a IA oferece o horário para quem está na lista de espera. Horário vazio vira atendimento.', icon: CalendarClock, bg: 'var(--blue-soft)', fg: 'var(--blue-ink)', needs: 'automations',
+    example: 'Sua semana com a ORBYTA: atendi 86 pacientes (31 fora do horário), marquei 42 consultas, 9 encaixes, e as faltas caíram para 4%. Tempo que a recepção economizou: 9h 20min.' },
+  encaixe: { title: 'Encaixe automático', desc: 'Quando um paciente desmarca, a IA oferece o horário para quem está na lista de espera. Cadeira vazia vira consulta.', icon: CalendarClock, bg: 'var(--blue-soft)', fg: 'var(--blue-ink)', needs: 'automations',
     opts: [{ key: 'antecedencia_horas', label: 'Só se faltar pelo menos', type: 'select', options: [[1, '1 hora'], [2, '2 horas'], [4, '4 horas'], [12, '12 horas']] }],
-    example: 'Olá, Fernanda! Boa notícia: abriu um horário amanhã às 15h para limpeza de sofá. Quer ficar com ele? É só responder SIM.' },
+    example: 'Olá, Fernanda! Boa notícia: abriu um horário amanhã às 15h para limpeza com a Dra. Marina. Quer ficar com ele? É só responder SIM.' },
 };
-const ORDER: AutomationKind[] = ['resumo_diario', 'relatorio_semanal', 'lembrete_agendamento', 'encaixe', 'followup_orcamento', 'pos_atendimento', 'reativacao', 'lembrete_tarefa'];
+const ORDER: AutomationKind[] = ['lembrete_agendamento', 'encaixe', 'retorno', 'resumo_diario', 'relatorio_semanal', 'followup_orcamento', 'pos_atendimento', 'reativacao', 'lembrete_tarefa'];
 
 export default function Automations() {
   const { me } = useMeCtx();
@@ -48,7 +51,7 @@ export default function Automations() {
   return (
     <>
       <PageHeader title="Automações" subtitle="Mensagens que saem sozinhas, na hora certa. Você liga, ajusta e acompanha tudo por aqui." />
-      <div className="callout" style={{ marginBottom: 18 }}><MessageSquareText /><span>Para falar com o cliente depois de 24 horas sem conversa, o WhatsApp exige <strong>modelos de mensagem aprovados</strong>. A ORBYTA usa os modelos indicados em cada automação. É só cadastrar uma vez: veja o passo a passo em <Link className="link" to="/configuracoes/whatsapp">Configurações → WhatsApp</Link>.</span></div>
+      <div className="callout" style={{ marginBottom: 18 }}><MessageSquareText /><span>Para falar com o paciente depois de 24 horas sem conversa, o WhatsApp exige <strong>modelos de mensagem aprovados</strong>. A ORBYTA usa os modelos indicados em cada automação. É só cadastrar uma vez: veja o passo a passo em <Link className="link" to="/configuracoes/whatsapp">Configurações → WhatsApp</Link>.</span></div>
       {isLoading ? <Loader /> : (
         <div className="auto-grid">
           {ORDER.map((k) => <AutoCard key={k} kind={k} a={byKind.get(k)} allowed={allowed(k)} canEdit={can(me, 'dono', 'gerente')} runs={runs.filter((r) => r.kind === k).length} />)}
