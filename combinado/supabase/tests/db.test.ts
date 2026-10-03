@@ -261,6 +261,43 @@ describe('clínica: profissionais, convênio e retorno', () => {
   });
 });
 
+describe('equipe e funil (rodízio, foto, meta e motivo de perda)', () => {
+  it('quando a IA passa a conversa para a equipe, ela vai para a recepção em rodízio', async () => {
+    const mk = async (name: string) => {
+      const c = await db.as('service', (q) => q.one<{ id: string }>(`insert into contacts (company_id, name) values ($1, $2) returning id`, [cidA, name]));
+      return (await db.as('service', (q) => q.one<{ id: string }>(`insert into conversations (company_id, contact_id) values ($1, $2) returning id`, [cidA, c.id]))).id;
+    };
+    const c1 = await mk('Rodízio Um'), c2 = await mk('Rodízio Dois');
+    const take = (id: string) => db.as('service', (q) => q.one<{ assigned_to: string | null }>(`update conversations set needs_attention = true, attention_reason = 'Pediu uma pessoa' where id = $1 returning assigned_to`, [id]));
+    expect((await take(c1)).assigned_to).toBe(carla); // a atendente vem antes do dono
+    // a Carla acabou de receber: com só ela na recepção, continua com ela; o dono só entra sem recepção
+    expect((await take(c2)).assigned_to).toBe(carla);
+    // a dona pode passar a conversa para si, mas não para alguém de fora
+    expect(await db.as(user(ana), (q) => q.exec(`update conversations set assigned_to = $2 where id = $1`, [c2, ana]))).toBe(1);
+    await expect(db.as(user(ana), (q) => q.exec(`update conversations set assigned_to = $2 where id = $1`, [c2, beto]))).rejects.toThrow('não faz parte da equipe');
+    // com o rodízio desligado, ninguém é escolhido sozinho
+    await db.as(user(ana), (q) => q.exec(`update companies set auto_assign = false`));
+    const c3 = await mk('Rodízio Três');
+    expect((await take(c3)).assigned_to).toBeNull();
+    await db.as(user(ana), (q) => q.exec(`update companies set auto_assign = true`));
+  });
+
+  it('profissional aceita foto pequena e meta; recusa link estranho', async () => {
+    const png = 'data:image/jpeg;base64,' + 'A'.repeat(2000);
+    expect(await db.as(user(ana), (q) => q.exec(`update professionals set photo_url = $1, monthly_goal = 30000 where name = 'Ana Duarte'`, [png]))).toBe(1);
+    await expect(db.as(user(ana), (q) => q.exec(`update professionals set photo_url = 'javascript:alert(1)' where name = 'Ana Duarte'`))).rejects.toThrow(/check/);
+    await expect(db.as(user(ana), (q) => q.exec(`update professionals set photo_url = $1 where name = 'Ana Duarte'`, ['data:image/png;base64,' + 'A'.repeat(300001)]))).rejects.toThrow(/check/);
+  });
+
+  it('motivo de perda só fica no paciente perdido, e o Google vale como origem', async () => {
+    const r = await db.as(user(ana), (q) => q.one<{ id: string; lost_reason: string | null }>(`insert into contacts (company_id, name, stage, lost_reason, source) values ($1, 'Perdida Preço', 'perdido', 'preco', 'google') returning id, lost_reason`, [cidA]));
+    expect(r.lost_reason).toBe('preco');
+    const back = await db.as(user(ana), (q) => q.one<{ lost_reason: string | null }>(`update contacts set stage = 'conversando' where id = $1 returning lost_reason`, [r.id]));
+    expect(back.lost_reason).toBeNull();
+    await expect(db.as(user(ana), (q) => q.exec(`update contacts set stage = 'perdido', lost_reason = 'qualquer' where id = $1`, [r.id]))).rejects.toThrow(/check/);
+  });
+});
+
 describe('comandos pelo WhatsApp', () => {
   it('o código ATIVAR liga o número a quem gerou e só vale uma vez', async () => {
     const r = await db.as(user(ana), (q) => q.one<{ data: { code: string } }>(`select public.owner_link_code() as data`));

@@ -4,9 +4,9 @@ import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { Columns3, List, Plus, Search, UserPlus, Users, MessageCircle, FilePlus2, CalendarPlus, Trash2, Download, Phone } from 'lucide-react';
 import { api } from '../data/api';
 import { useInvalidate, useList } from '../data/hooks';
-import type { Contact, ContactSource, Stage, Temperature } from '../data/types';
+import type { Contact, ContactSource, LostReason, Stage, Temperature } from '../data/types';
 import { Avatar, Badge, Button, Drawer, Empty, Field, Input, Loader, Modal, PageHeader, PhoneInput, Segmented, Select, Textarea, cx, useConfirm, useDebounced, useToast } from '../ui';
-import { ContactSide, STAGE_LABEL, TEMP_LABEL, TEMP_TONE } from './Inbox';
+import { ContactSide, LOST_LABEL, STAGE_LABEL, TEMP_LABEL, TEMP_TONE } from './Inbox';
 import { brl, brl0, fmtAgo, formatPhone, normalizePhone } from '../../shared/format';
 import { useMeCtx } from '../context';
 
@@ -23,7 +23,7 @@ import { fmtDoc } from './Charges';
 
 const STAGES: Stage[] = ['novo', 'conversando', 'orcamento', 'fechado', 'perdido'];
 const STAGE_COLOR: Record<Stage, string> = { novo: 'var(--violet)', conversando: 'var(--c1)', orcamento: 'var(--c2)', fechado: 'var(--c3)', perdido: 'var(--ink-4)' };
-const SOURCE_LABEL: Record<ContactSource, string> = { whatsapp: 'WhatsApp', manual: 'Cadastro manual', indicacao: 'Indicação', instagram: 'Instagram', site: 'Site', outro: 'Outro' };
+const SOURCE_LABEL: Record<ContactSource, string> = { whatsapp: 'WhatsApp', manual: 'Cadastro manual', indicacao: 'Indicação', instagram: 'Instagram', google: 'Google', site: 'Site', outro: 'Outro' };
 
 export default function Contacts() {
   const { id } = useParams();
@@ -133,15 +133,23 @@ function Board({ contacts }: { contacts: Contact[] }) {
   const [over, setOver] = useState<Stage | null>(null);
   const { data: openQuotes = [] } = useList('quotes', { filters: [{ col: 'status', op: 'eq', value: 'enviado' }], limit: 500 });
   const quoteSum = useMemo(() => { const m = new Map<string, number>(); for (const q of openQuotes) m.set(q.contact_id, (m.get(q.contact_id) ?? 0) + q.total); return m; }, [openQuotes]);
-  const move = async (id: string, stage: Stage) => {
+  const [askLost, setAskLost] = useState<Contact | null>(null);
+  const move = async (id: string, stage: Stage, lost_reason: LostReason | null = null) => {
     const c = contacts.find((x) => x.id === id);
-    if (!c || c.stage === stage) return;
-    await api.update('contacts', id, { stage });
+    if (!c || (c.stage === stage && c.lost_reason === lost_reason)) return;
+    if (stage === 'perdido' && !lost_reason) { setAskLost(c); return; } // pergunta o motivo antes
+    await api.update('contacts', id, { stage, lost_reason });
     inv('contacts');
-    toast(`${c.name.split(' ')[0]} agora está em “${STAGE_LABEL[stage]}”`);
+    toast(`${c.name.split(' ')[0]} agora está em “${STAGE_LABEL[stage]}”${lost_reason ? ` · ${LOST_LABEL[lost_reason].toLowerCase()}` : ''}`);
   };
   return (
     <div className="board-cols">
+      <Modal open={!!askLost} onClose={() => setAskLost(null)} title={`Por que ${askLost?.name.split(' ')[0] ?? 'o paciente'} não seguiu?`}>
+        <p className="muted" style={{ marginTop: 0 }}>O motivo aparece em Análises e mostra onde a clínica perde pacientes.</p>
+        <div className="lost-grid">
+          {(Object.keys(LOST_LABEL) as LostReason[]).map((r) => <button key={r} type="button" className="lost-opt" onClick={() => { const c = askLost!; setAskLost(null); void move(c.id, 'perdido', r); }}>{LOST_LABEL[r]}</button>)}
+        </div>
+      </Modal>
       {STAGES.map((s) => {
         const list = contacts.filter((c) => c.stage === s);
         const value = list.reduce((sum, c) => sum + (s === 'fechado' ? c.total_spent : quoteSum.get(c.id) ?? 0), 0);
@@ -153,6 +161,7 @@ function Board({ contacts }: { contacts: Contact[] }) {
                 <article key={c.id} className="board-card" draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', c.id); setDrag(c.id); }} onDragEnd={() => setDrag(null)} onClick={() => nav(`/clientes/${c.id}`)} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') nav(`/clientes/${c.id}`); }}>
                   <div className="row"><Avatar name={c.name} size="sm" /><b className="truncate grow">{c.name}</b><span className="dot" title={TEMP_LABEL[c.temperature]} style={{ background: c.temperature === 'quente' ? 'var(--orange)' : c.temperature === 'morno' ? 'var(--yellow)' : 'var(--blue)' }} /></div>
                   <div className="muted small" style={{ marginTop: 8 }}>{fmtAgo(c.last_interaction_at)}{quoteSum.get(c.id) ? ` · orçamento ${brl0(quoteSum.get(c.id)!)}` : c.total_spent ? ` · pagou ${brl0(c.total_spent)}` : ''}</div>
+                  {c.stage === 'perdido' && c.lost_reason && <div style={{ marginTop: 8 }}><Badge size="sm">{LOST_LABEL[c.lost_reason]}</Badge></div>}
                   {c.tags.length > 0 && <div className="tag-list" style={{ marginTop: 8 }}>{c.tags.slice(0, 3).map((t) => <Badge key={t} size="sm">{t}</Badge>)}</div>}
                   <Select className="board-move only-mobile" value={c.stage} onClick={(e) => e.stopPropagation()} onChange={(e) => void move(c.id, e.target.value as Stage)} aria-label="Mover para">{STAGES.map((x) => <option key={x} value={x}>{STAGE_LABEL[x]}</option>)}</Select>
                 </article>
@@ -226,7 +235,8 @@ export function ContactForm({ open, contact, onClose }: { open: boolean; contact
         <Field label="Convênio"><Select value={f.insurance ?? ''} onChange={(e) => set('insurance', e.target.value || null)}><option value="">Particular</option>{[...new Set([...(me.company.insurances ?? []), ...(f.insurance ? [f.insurance] : [])])].map((x) => <option key={x} value={x}>{x}</option>)}</Select></Field>
         {f.insurance ? <Field label="Número da carteirinha"><Input value={f.insurance_card ?? ''} onChange={(e) => set('insurance_card', e.target.value)} /></Field> : <span />}
         <Field label="Responsável" hint="Para menores de idade" className="full"><Input value={f.guardian_name ?? ''} onChange={(e) => set('guardian_name', e.target.value)} placeholder="Nome do pai, mãe ou responsável" /></Field>
-        <Field label="Etapa"><Select value={f.stage} onChange={(e) => set('stage', e.target.value)}>{STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
+        <Field label="Etapa"><Select value={f.stage} onChange={(e) => { set('stage', e.target.value); if (e.target.value !== 'perdido') set('lost_reason', null); }}>{STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}</Select></Field>
+        {f.stage === 'perdido' && <Field label="Por que não seguiu"><Select value={f.lost_reason ?? ''} onChange={(e) => set('lost_reason', e.target.value || null)}><option value="">Não informado</option>{(Object.keys(LOST_LABEL) as LostReason[]).map((r) => <option key={r} value={r}>{LOST_LABEL[r]}</option>)}</Select></Field>}
         <Field label="Temperatura"><Select value={f.temperature} onChange={(e) => set('temperature', e.target.value)}>{(['quente', 'morno', 'frio'] as Temperature[]).map((t) => <option key={t} value={t}>{TEMP_LABEL[t]}</option>)}</Select></Field>
         <Field label="Origem"><Select value={f.source} onChange={(e) => set('source', e.target.value)}>{(Object.keys(SOURCE_LABEL) as ContactSource[]).map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}</Select></Field>
         <Field label="Etiquetas" hint="Separe por vírgula. Ex.: ortodontia, recorrente"><Input value={tags} onChange={(e) => setTags(e.target.value)} /></Field>

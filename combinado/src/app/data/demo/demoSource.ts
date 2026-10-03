@@ -355,7 +355,7 @@ export class DemoSource implements DataSource {
     const conv = table('conversations').find((c) => c.id === conversationId);
     if (conv) {
       conv.handler = handler;
-      if (handler === 'ia') { conv.needs_attention = false; conv.attention_reason = null; }
+      if (handler === 'ia') { conv.needs_attention = false; conv.attention_reason = null; } else if (!conv.assigned_to) conv.assigned_to = DEMO_USER_ID; // quem assume fica responsável
       audit({ actor_type: 'usuario', actor_name: 'Você', channel: 'painel', action: handler === 'ia' ? 'devolver_para_ia' : 'assumir_conversa', summary: `${handler === 'ia' ? 'Devolveu para a IA' : 'Assumiu'} a conversa com ${contactById(conv.contact_id)?.name ?? 'cliente'}`, target_type: 'conversation', target_id: conv.id, status: 'ok' });
       emit('conversations');
     }

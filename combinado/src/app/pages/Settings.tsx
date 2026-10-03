@@ -352,7 +352,7 @@ function loadFbSdk(appId: string): Promise<void> {
 const ROLE_LABEL: Record<Role, string> = { dono: 'Dono', gerente: 'Gerente', atendente: 'Atendente' };
 const ROLE_DESC: Record<Role, string> = { dono: 'Tudo, inclusive assinatura e exclusão da conta', gerente: 'Tudo, menos assinatura e exclusão da conta', atendente: 'Conversas, pacientes, orçamentos e agenda (sem vendas e configurações)' };
 function TeamTab() {
-  const { me } = useMeCtx();
+  const { me, refresh } = useMeCtx();
   const { data: members = [], isLoading } = useList('members');
   const inv = useInvalidate();
   const toast = useToast();
@@ -382,6 +382,12 @@ function TeamTab() {
             {owner && m.role !== 'dono' && m.user_id !== me.user_id && <button className="icon-btn xs" aria-label="Remover" onClick={async () => { if (await confirm({ title: `Remover ${m.name}?`, text: 'A pessoa perde o acesso na hora. O histórico do que ela fez continua guardado.', confirm: 'Remover', danger: true })) { await api.removeMember(m.user_id); inv('members'); toast('Pessoa removida'); } }}><Trash2 /></button>}
           </div>
         ))}
+      </section>
+      <section className="card set-section">
+        <div className="opt-row">
+          <div><div className="t">Distribuir conversas em rodízio</div><div className="d">Quando a IA passa um paciente para a equipe, a conversa vai para a próxima pessoa da recepção (atendentes e gerentes; o dono só recebe se não houver mais ninguém). Cada um vê as suas em Conversas → Minhas.</div></div>
+          <Switch checked={me.company.auto_assign !== false} disabled={!owner} label="Distribuir conversas em rodízio" onChange={async (v) => { try { await api.updateCompany({ auto_assign: v }); refresh(); toast(v ? 'Rodízio ligado' : 'Rodízio desligado: as conversas ficam sem responsável até alguém assumir'); } catch (e) { toast((e as Error).message, 'err'); } }} />
+        </div>
       </section>
       <section className="card set-section">
         <div className="card-head"><div><h3>O que cada papel pode fazer</h3></div></div>

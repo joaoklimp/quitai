@@ -7,9 +7,10 @@ import { useMeCtx } from '../context';
 import { Donut, Funnel, Heatmap, HBars, LineChart, PairBars, Sparkline } from '../charts';
 import { Button, Delta, IconButton, Menu, PageHeader, cx } from '../ui';
 import { brl0, brlShort, fmtDuration, fromLocal, num, pct, todayLocal } from '../../shared/format';
-import type { ContactSource, DailyStat } from '../data/types';
+import type { ContactSource, DailyStat, LostReason } from '../data/types';
+import { LOST_LABEL } from './Inbox';
 
-const SRC: Record<ContactSource, string> = { whatsapp: 'WhatsApp', manual: 'Cadastro manual', indicacao: 'Indicação', instagram: 'Instagram', site: 'Site', outro: 'Outro' };
+const SRC: Record<ContactSource, string> = { whatsapp: 'WhatsApp', manual: 'Cadastro manual', indicacao: 'Indicação', instagram: 'Instagram', google: 'Google', site: 'Site', outro: 'Outro' };
 
 export default function Analytics() {
   const { me } = useMeCtx();
@@ -40,8 +41,17 @@ export default function Analytics() {
   const sources = useMemo(() => {
     const m = new Map<ContactSource, number>();
     for (const c of newContacts) m.set(c.source, (m.get(c.source) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ key: k, label: SRC[k], value: v, display: num(v) }));
+    const won = new Map<ContactSource, number>();
+    for (const c of newContacts) if (c.stage === 'fechado') won.set(c.source, (won.get(c.source) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ key: k, label: SRC[k], value: v, display: `${num(v)} · ${pct((won.get(k) ?? 0) / v)}` }));
   }, [newContacts]);
+  const { data: lostContacts = [] } = useList('contacts', { filters: [{ col: 'stage', op: 'eq', value: 'perdido' }], limit: 3000 });
+  const lost = useMemo(() => {
+    const m = new Map<LostReason, number>();
+    for (const c of lostContacts) if (c.lost_reason) m.set(c.lost_reason, (m.get(c.lost_reason) ?? 0) + 1);
+    const total = [...m.values()].reduce((a, b) => a + b, 0);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ key: k, label: LOST_LABEL[k], value: v, display: `${num(v)} · ${pct(v / total)}` }));
+  }, [lostContacts]);
   const { data: quotes = [] } = useList('quotes', { filters: [{ col: 'created_at', op: 'gte', value: since }], limit: 3000 });
   const requested = useMemo(() => {
     const m = new Map<string, number>();
@@ -106,8 +116,11 @@ export default function Analytics() {
             <Heatmap rows={order.map((d) => wd[d])} cols={hourCols} values={order.map((d) => peakVals[d])} unit="mensagens" />
           </section>
           <section className="card">
-            <div className="card-head"><div><h3>De onde vêm os pacientes</h3><div className="sub">Novos cadastros no período</div></div></div>
+            <div className="card-head"><div><h3>De onde vêm os pacientes</h3><div className="sub">Novos cadastros no período · % que virou paciente</div></div></div>
             {sources.length ? <HBars rows={sources} color="var(--c4)" /> : <p className="muted">Sem novos pacientes no período.</p>}
+            <div className="divider" />
+            <div className="card-head" style={{ marginBottom: 10 }}><div><h3>Por que não seguiram</h3><div className="sub">Todos os pacientes em “Não seguiu”, pelo motivo marcado no funil</div></div></div>
+            {lost.length ? <HBars rows={lost} color="var(--ink-4)" /> : <p className="muted">Nenhum motivo marcado ainda. Ao mover um paciente para “Não seguiu”, o painel pergunta o porquê.</p>}
             <div className="divider" />
             <div className="card-head" style={{ marginBottom: 10 }}><div><h3>Mais pedidos</h3><div className="sub">Serviços nos orçamentos</div></div></div>
             {requested.length ? <HBars rows={requested} /> : <p className="muted">Sem orçamentos no período.</p>}

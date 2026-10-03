@@ -10,6 +10,7 @@ import { useMeCtx } from '../context';
 import { slotsForDate } from '../data/availability';
 import { Avatar, Badge, Button, Empty, Field, IconButton, Input, Modal, MoneyInput, PageHeader, Segmented, Select, cx, useToast } from '../ui';
 import { ContactPicker } from '../ui/pickers';
+import { ProAvatar } from '../ui/pro';
 import { WaitlistDrawer, useWaitlistCount } from './agenda/Waitlist';
 import { addDays, brl, fmtDate, fmtDateTime, fmtLong, formatPhone, fromLocal, localDate, localParts, localTime, MONTHS_SHORT, todayLocal, weekdayOf, WEEKDAYS_SHORT } from '../../shared/format';
 
@@ -75,7 +76,7 @@ export default function Agenda() {
       {pros.length > 0 && (
         <div className="pro-filter" role="group" aria-label="Profissional">
           <button type="button" className={cx('pro-chip', !proId && 'on')} onClick={() => setPro(null)}><Stethoscope />Todos</button>
-          {pros.filter((p) => p.active || p.id === proId).map((p) => <button key={p.id} type="button" className={cx('pro-chip', proId === p.id && 'on')} style={{ ['--pro' as string]: p.color }} onClick={() => setPro(proId === p.id ? null : p.id)}><i />{p.name}</button>)}
+          {pros.filter((p) => p.active || p.id === proId).map((p) => <button key={p.id} type="button" className={cx('pro-chip', proId === p.id && 'on')} style={{ ['--pro' as string]: p.color }} onClick={() => setPro(proId === p.id ? null : p.id)}>{p.photo_url ? <img className="pro-chip-av" src={p.photo_url} alt="" /> : <i />}{p.name}</button>)}
           {pending > 0 && <span className="pro-pending" title="Consultas nas próximas 36 horas sem confirmação do paciente"><CalendarClock />{pending} sem confirmar</span>}
         </div>
       )}
@@ -203,7 +204,7 @@ function AppointmentDetail({ appt, contact, pro, onClose }: { appt: Appointment 
         </div>
         <dl className="kv-list">
           <dt><Clock3 />Procedimento</dt><dd>{appt.title}{appt.price && appt.payment_kind !== 'convenio' ? ` · ${brl(appt.price)}` : ''}</dd>
-          <dt><Stethoscope />Profissional</dt><dd>{pro ? <span className="row" style={{ gap: 6 }}><i className="pro-dot" style={{ background: pro.color }} />{pro.name}{pro.council ? <span className="muted small">· {pro.council}</span> : null}</span> : 'Sem profissional definido'}</dd>
+          <dt><Stethoscope />Profissional</dt><dd>{pro ? <span className="row" style={{ gap: 6 }}>{pro.photo_url ? <ProAvatar p={pro} size={22} /> : <i className="pro-dot" style={{ background: pro.color }} />}{pro.name}{pro.council ? <span className="muted small">· {pro.council}</span> : null}</span> : 'Sem profissional definido'}</dd>
           <dt><CreditCard />Pagamento</dt><dd>{appt.payment_kind === 'convenio' ? `Convênio ${appt.insurance ?? ''}${contact?.insurance_card ? ` · carteirinha ${contact.insurance_card}` : ''}` : 'Particular'}</dd>
           {contact?.phone && <><dt><Phone />WhatsApp</dt><dd>{formatPhone(contact.phone)}</dd></>}
           {contact?.guardian_name && <><dt>Responsável</dt><dd>{contact.guardian_name}</dd></>}

@@ -6,7 +6,7 @@ import type {
   PayMethod, ContactSource, AutomationKind, ActionReceipt, PendingAction, Professional,
 } from '../types';
 import { addDays, fromLocal, localDate, localParts, normalizePhone, weekdayOf } from '../../../shared/format';
-import type { Charge, CompanyIntegration, FinanceEntry, FiscalNote, Product, StockMovement, WaitlistEntry } from '../types';
+import type { Charge, LostReason, CompanyIntegration, FinanceEntry, FiscalNote, Product, StockMovement, WaitlistEntry } from '../types';
 import { buildGestao, DEMO_FAQ } from './gestao';
 
 export const DEMO_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
@@ -51,7 +51,7 @@ export interface DemoDB {
   seq: { quote: number; id: number };
 }
 
-export const DEMO_VERSION = 8;
+export const DEMO_VERSION = 9;
 const HISTORY_DAYS = 365;
 const RAW_DAYS = 75;
 const AI_START = 120; // a empresa começou a usar a IA há 120 dias
@@ -102,13 +102,13 @@ function serviceRows(now: string): Service[] {
 
 function professionalRows(now: string, services: Service[]): Professional[] {
   const ids = (...names: string[]) => names.map((n) => services.find((x) => x.name.startsWith(n))!.id);
-  const p = (name: string, specialty: string, council: string, color: string, service_ids: string[], business_hours: Professional['business_hours'], sort: number): Professional => ({
-    id: demoId('9f'), company_id: DEMO_COMPANY_ID, name, specialty, council, color, business_hours, service_ids, member_user_id: null, active: true, sort, created_at: now,
+  const p = (name: string, specialty: string, council: string, color: string, service_ids: string[], business_hours: Professional['business_hours'], sort: number, monthly_goal: number): Professional => ({
+    id: demoId('9f'), company_id: DEMO_COMPANY_ID, name, specialty, council, color, business_hours, service_ids, member_user_id: null, active: true, sort, photo_url: null, monthly_goal, created_at: now,
   });
   return [
-    p('Dra. Marina Costa', 'Clínica geral e estética', 'CRO-DF 8421', '#3D86F0', ids('Avaliação (', 'Limpeza', 'Restauração', 'Tratamento de canal', 'Extração', 'Clareamento a laser', 'Clareamento caseiro', 'Urgência'), null, 1),
-    p('Dr. Rafael Nunes', 'Ortodontia', 'CRO-DF 9137', '#8B5CF6', ids('Avaliação ortodôntica', 'Instalação de aparelho', 'Manutenção de aparelho'), { '1': [['08:00', '12:00'], ['13:00', '18:00']], '3': [['08:00', '12:00'], ['13:00', '18:00']], '5': [['08:00', '12:00'], ['13:00', '18:00']], '6': [['08:00', '12:00']] }, 2),
-    p('Dra. Luiza Prado', 'Implantes e cirurgia', 'CRO-DF 7710', '#10B981', ids('Avaliação (', 'Implante', 'Extração', 'Urgência'), { '2': [['08:00', '18:00']], '4': [['08:00', '18:00']] }, 3),
+    p('Dra. Marina Costa', 'Clínica geral e estética', 'CRO-DF 8421', '#3D86F0', ids('Avaliação (', 'Limpeza', 'Restauração', 'Tratamento de canal', 'Extração', 'Clareamento a laser', 'Clareamento caseiro', 'Urgência'), null, 1, 32000),
+    p('Dr. Rafael Nunes', 'Ortodontia', 'CRO-DF 9137', '#8B5CF6', ids('Avaliação ortodôntica', 'Instalação de aparelho', 'Manutenção de aparelho'), { '1': [['08:00', '12:00'], ['13:00', '18:00']], '3': [['08:00', '12:00'], ['13:00', '18:00']], '5': [['08:00', '12:00'], ['13:00', '18:00']], '6': [['08:00', '12:00']] }, 2, 24000),
+    p('Dra. Luiza Prado', 'Implantes e cirurgia', 'CRO-DF 7710', '#10B981', ids('Avaliação (', 'Implante', 'Extração', 'Urgência'), { '2': [['08:00', '18:00']], '4': [['08:00', '18:00']] }, 3, 28000),
   ];
 }
 
@@ -129,7 +129,7 @@ function companyRow(nowIso: string, today: string): Company {
     capacity_per_slot: 1,
     min_notice_minutes: 60,
     max_days_ahead: 60,
-    monthly_goal: 68000,
+    monthly_goal: 68000, auto_assign: true,
     modules: ['estoque', 'cobrancas'],
     insurances: DEMO_INSURANCES,
     plan: 'profissional',
@@ -355,7 +355,7 @@ export function buildDemo(now = new Date()): DemoDB {
     const c: Contact = {
       id: demoId('c0'), company_id: DEMO_COMPANY_ID, name: opts.name ?? newName(), phone: opts.phone ?? newPhone(), email: null,
       address: null, notes: null, tags: opts.tags ?? [], stage: opts.stage ?? 'novo', temperature: opts.temperature ?? 'frio',
-      score: 0, source: opts.source ?? weighted<ContactSource>([['whatsapp', 72], ['instagram', 12], ['indicacao', 12], ['manual', 4]]), opt_in: true,
+      score: 0, source: opts.source ?? weighted<ContactSource>([['whatsapp', 62], ['instagram', 12], ['google', 10], ['indicacao', 12], ['manual', 4]]), opt_in: true,
       birthday: chance(0.7) ? birthday() : null, last_interaction_at: createdAt, total_spent: 0, created_via: opts.created_via ?? 'ia_cliente', created_at: createdAt, updated_at: createdAt,
       insurance: insured ? pick(DEMO_INSURANCES) : null, insurance_card: insured ? String(int(10000000, 99999999)) : null, guardian_name: null,
     };
@@ -732,6 +732,12 @@ export function buildDemo(now = new Date()): DemoDB {
   const month = today.slice(0, 7);
   const monthAi = Object.entries(msgStats).filter(([d]) => d.startsWith(month)).reduce((s, [, v]) => s + v.msgs_ai, 0);
   const usage_monthly: UsageMonth[] = [{ company_id: DEMO_COMPANY_ID, month, ai_replies: Math.min(1480, Math.round(monthAi * 0.42)), wa_sent: Math.round(monthAi * 0.5), ai_input_tokens: 0, ai_output_tokens: 0 }];
+
+  // funil: por que os pacientes não seguiram; conversas com a equipe distribuídas em rodízio para a recepção
+  for (const c of contacts) if (c.stage === 'perdido') c.lost_reason = weighted<LostReason>([['preco', 34], ['sem_resposta', 22], ['convenio', 16], ['horario', 14], ['concorrente', 8], ['distancia', 6]]);
+  const reception = members.filter((m) => m.role !== 'dono');
+  let turn = 0;
+  for (const cv of conversations) if (cv.kind === 'cliente' && (cv.needs_attention || cv.handler === 'humano')) cv.assigned_to = reception[turn++ % reception.length].user_id;
 
   contacts.sort((a, b) => ((b.last_interaction_at ?? '') > (a.last_interaction_at ?? '') ? 1 : -1));
   const gestao = buildGestao(now, today, contacts);

@@ -182,7 +182,7 @@ export class SupabaseSource implements DataSource {
   /* ---------- empresa ---------- */
   private cid() { if (!this.companyId) throw new AppError('Sessão expirada. Entre de novo.'); return this.companyId; }
   async updateCompany(patch: Partial<Company>) {
-    const allowed: (keyof Company)[] = ['name', 'segment', 'document', 'phone', 'email', 'address', 'city', 'state', 'timezone', 'business_hours', 'slot_minutes', 'capacity_per_slot', 'min_notice_minutes', 'max_days_ahead', 'monthly_goal', 'insurances'];
+    const allowed: (keyof Company)[] = ['name', 'segment', 'document', 'phone', 'email', 'address', 'city', 'state', 'timezone', 'business_hours', 'slot_minutes', 'capacity_per_slot', 'min_notice_minutes', 'max_days_ahead', 'monthly_goal', 'insurances', 'auto_assign'];
     const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => allowed.includes(k as keyof Company)));
     const { data, error } = await this.sb.from('companies').update(clean).eq('id', this.cid()).select('*').single();
     if (error) throw friendly(error);
@@ -299,6 +299,13 @@ export class SupabaseSource implements DataSource {
   }
   async sendMessage(conversationId: string, text: string) { await this.fn('whatsapp', { action: 'send', conversation_id: conversationId, text }); }
   async setHandler(conversationId: string, handler: 'ia' | 'humano') {
+    if (handler === 'humano') {
+      // quem assume fica responsável, se a conversa ainda não tinha ninguém
+      const uid = (await this.sb.auth.getSession()).data.session?.user.id;
+      const r = await this.sb.from('conversations').update({ handler, assigned_to: uid }).eq('id', conversationId).is('assigned_to', null).select('id');
+      if (r.error) throw friendly(r.error);
+      if (r.data?.length) return;
+    }
     const patch = handler === 'ia' ? { handler, needs_attention: false, attention_reason: null } : { handler };
     const { error } = await this.sb.from('conversations').update(patch).eq('id', conversationId);
     if (error) throw friendly(error);

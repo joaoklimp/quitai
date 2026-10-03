@@ -1,14 +1,14 @@
 // Agente local do modo demonstração. Entende comandos comuns em português e executa as mesmas ações
 // que a IA de verdade (Claude + ferramentas) faz no servidor. Serve para experimentar o produto sem chaves.
 import type { ActionReceipt, AgentReply, Appointment, Contact, Conversation, FinanceEntry, PayMethod, PendingAction, Product, Quote, Sale, Service } from '../types';
-import { audit, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
+import { audit, autoAssign, contactById, demoDb, emit, newId, notify, pushMessage, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
 import { applyMovement, demoCreateCharge, demoEmitNote } from './demoSource';
 import { isFree, slotsForDate, type SlotOpts } from '../availability';
 import { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime } from '../../../shared/parse';
 export { parseDate, parseMethod, parseMoneyIn, parsePhone, parseTime };
 import {
-  addDays, brl, firstName, fmtDate, fmtLong, fold, formatPhone, fromLocal, localDate, localTime, normalizePhone, weekdayOf, WEEKDAYS,
+  addDays, brl, firstName, fmtDate, fmtLong, fold, formatPhone, fromLocal, localDate, localTime, normalizePhone, parseMoney, weekdayOf, WEEKDAYS,
 } from '../../../shared/format';
 
 const TZ = 'America/Sao_Paulo';
@@ -200,8 +200,8 @@ function executePending(p: PendingAction): ActionReceipt {
     const s = table('services').find((x) => x.id === a.service_id);
     if (!s) return { tool: p.tool, label: 'Serviço não encontrado', status: 'erro' };
     const old = s.price; s.price = a.price; emit('services');
-    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'atualizar_servico', summary: `Alterou o preço de "${s.name}" de ${brl(old)} para ${brl(s.price)} — confirmado pelo dono`, target_type: 'service', target_id: s.id, status: 'ok' });
-    return { tool: p.tool, label: 'Preço atualizado', status: 'ok', detail: `${s.name}: ${brl(s.price)}` };
+    audit({ actor_type: 'ia', actor_name: AI_NAME(), channel: 'ia_dono', action: 'atualizar_servico', summary: `Alterou o valor de "${s.name}" de ${brl(old)} para ${brl(s.price)} — confirmado pelo dono`, target_type: 'service', target_id: s.id, status: 'ok' });
+    return { tool: p.tool, label: 'Valor atualizado', status: 'ok', detail: `${s.name}: ${brl(s.price)}` };
   }
   if (p.tool === 'criar_orcamento') {
     const c = contactById(a.contact_id);
@@ -240,6 +240,9 @@ function executePending(p: PendingAction): ActionReceipt {
   }
   return { tool: p.tool, label: 'Ação desconhecida', status: 'erro' };
 }
+
+/** "muda o valor da limpeza para R$ 270", "a limpeza agora custa 270", "reajusta o preço do clareamento" */
+const PRICE_CHANGE = /\b(muda|mude|altera|altere|atualiza|atualize|aumenta|aumente|reajusta|reajuste|baixa|baixe|abaixa|coloca|coloque|poe|deixa|deixe|troca|troque)\w*\b.*\b(preco|valor|custo)\b|\b(preco|valor)\b.*\b(passa|vai|fica|agora)\b.*\d|\b(agora|passa a)\s+(custa|custar|e|sai)\b.*\d/;
 
 /* ================= financeiro e estoque (comandos) ================= */
 const STOP = new Set(['para', 'pra', 'com', 'uma', 'umas', 'uns', 'dos', 'das', 'que', 'conta', 'contas', 'estoque', 'produto', 'produtos', 'entrada', 'saida', 'baixa', 'chegou', 'chegaram', 'usei', 'gastei', 'vendi', 'unidades', 'unidade', 'litros', 'galao', 'galoes', 'frasco', 'frascos', 'pacote', 'pacotes', 'caixa', 'caixas', 'mais', 'registra', 'lanca', 'paguei', 'recebi', 'quanto', 'tenho', 'temos', 'ainda', 'hoje']);
@@ -380,7 +383,7 @@ function resolveContact(ctx: Ctx, clause: string): Contact | null | 'ambiguous' 
   return found[0];
 }
 
-const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 3.500 do implante para ela"\n• "Marca o João sexta às 14h para limpeza com a Dra. Marina"\n• "Quem ainda não confirmou amanhã?"\n• "O que temos na agenda amanhã?"\n• "Quanto recebemos essa semana?"\n• "Quais orçamentos estão parados?"\n• "Registra o pagamento de R$ 280 no Pix da Juliana"\n• "Me lembra de enviar as guias do convênio amanhã às 9h"\n• "Lança o aluguel de R$ 4.200 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 caixas de luvas"\n• "O que preciso repor?"\n• "Quem está na lista de espera?"\n• "Cobra R$ 600 do Ricardo para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (pagamentos, cobranças, notas fiscais, baixa de contas, desmarcações, valores, descontos altos) sempre pedem sua confirmação.`;
+const HELP = `Posso fazer muita coisa por você, é só pedir do seu jeito. Por exemplo:\n• "Cadastra a Maria, telefone 61 99999-9999, e cria um orçamento de R$ 3.500 do implante para ela"\n• "Marca o João sexta às 14h para limpeza com a Dra. Marina"\n• "Quem ainda não confirmou amanhã?"\n• "O que temos na agenda amanhã?"\n• "Quanto recebemos essa semana?"\n• "Muda o valor da limpeza para R$ 270"\n• "Quais orçamentos estão parados?"\n• "Registra o pagamento de R$ 280 no Pix da Juliana"\n• "Me lembra de enviar as guias do convênio amanhã às 9h"\n• "Lança o aluguel de R$ 4.200 todo dia 5"\n• "O que vence essa semana?"\n• "Dá baixa de 2 caixas de luvas"\n• "O que preciso repor?"\n• "Quem está na lista de espera?"\n• "Cobra R$ 600 do Ricardo para sexta"\n• "Emite a nota do Bruno"\nAções sensíveis (pagamentos, cobranças, notas fiscais, baixa de contas, desmarcações, valores, descontos altos) sempre pedem sua confirmação.`;
 
 function handleClause(ctx: Ctx, clause: string) {
   const f = fold(clause);
@@ -610,12 +613,14 @@ function handleClause(ctx: Ctx, clause: string) {
   }
 
   // alterar preço (sensível)
-  if (/\b(muda|altera|atualiza|aumenta|reajusta|baixa)\w*\b.*\bpreco\b/.test(f)) {
-    const svc = matchService(f); const price = parseMoneyIn(clause);
-    if (!svc || !price) { ctx.lines.push('Qual serviço e qual o novo preço? Ex.: "muda o preço da limpeza de poltrona para R$ 95".'); return; }
+  if (PRICE_CHANGE.test(f)) {
+    const svc = matchService(f);
+    const price = parseMoneyIn(clause) ?? (() => { const m = f.match(/\b(?:para|pra|por|custar|custando|custa|sai|fica|e)\s+(?:a\s+|de\s+)?(\d{2,6}(?:[.,]\d{1,2})?)\b/); return m ? parseMoney(m[1]) : null; })();
+    if (!svc || !price) { ctx.lines.push(svc ? `Qual o novo valor de "${svc.name}"? Hoje está ${brl(svc.price)}. Ex.: "muda o valor da ${svc.name.split(' (')[0].toLowerCase()} para R$ 270".` : 'Qual procedimento e qual o novo valor? Ex.: "muda o valor da limpeza para R$ 270".'); return; }
+    if (price === svc.price) { ctx.lines.push(`"${svc.name}" já está ${brl(price)}. Nada para mudar. 👍`); return; }
     ctx.pending = createPending(ctx.conv, 'atualizar_servico', { service_id: svc.id, price }, `Mudar o preço de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}`);
     ctx.actions.push({ tool: 'atualizar_servico', label: 'Mudança de preço aguardando confirmação', status: 'aguardando', detail: `${svc.name}: ${brl(svc.price)} → ${brl(price)}`, pending_id: ctx.pending.id });
-    ctx.lines.push(`Vou mudar o preço de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}. A IA passa a usar o novo valor com os pacientes na hora. Confirma? Responda SIM ou NÃO.`);
+    ctx.lines.push(`Vou mudar o valor de "${svc.name}" de ${brl(svc.price)} para ${brl(price)}. A IA passa a usar o novo valor com os pacientes na hora. Confirma? Responda SIM ou NÃO.`);
     return;
   }
 
@@ -863,7 +868,7 @@ export async function runSimulator(text: string, opts: { reset?: boolean; name?:
   }
 
   if (handoff) {
-    conv.handler = 'humano'; conv.needs_attention = true; conv.attention_reason = handoff; emit('conversations');
+    conv.handler = 'humano'; conv.needs_attention = true; conv.attention_reason = handoff; autoAssign(conv); emit('conversations');
     actions.push({ tool: 'chamar_atendente', label: 'Atendimento passado para a equipe', status: 'ok', detail: handoff });
     notify({ kind: 'atendimento', title: `${contact.name} precisa de você`, body: handoff, link: '#/conversas' });
   }

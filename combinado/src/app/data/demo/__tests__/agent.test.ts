@@ -51,6 +51,19 @@ describe('comandos do dono', () => {
     expect(table('sales').length).toBe(before + 1);
     expect(table('sales')[0].amount).toBe(200);
   });
+  it('muda o valor de um procedimento com confirmação (caso do print)', async () => {
+    const original = table('services').map((s) => [s.id, s.price] as const);
+    for (const [cmd, price] of [['Muda o valor da limpeza para R$ 270', 270], ['a limpeza agora custa 280', 280], ['altera o preço do clareamento pra 990', 990]] as const) {
+      const r = await runOwnerCommand(cmd);
+      expect(r.pending, cmd).toBeTruthy();
+      const ok = await runOwnerCommand('sim');
+      expect(ok.actions[0].status).toBe('ok');
+      const svc = table('services').find((s) => s.id === (r.pending!.args as { service_id: string }).service_id)!;
+      expect(svc.price).toBe(price);
+    }
+    expect(table('services').find((s) => /limpeza/i.test(s.name))!.price).toBe(280);
+    for (const [id, price] of original) table('services').find((s) => s.id === id)!.price = price;
+  });
   it('responde quanto a clínica recebeu na semana', async () => {
     const r = await runOwnerCommand('Quanto recebemos essa semana?');
     expect(r.reply).toMatch(/receb/);

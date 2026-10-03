@@ -494,9 +494,11 @@ export const CUSTOMER_TOOLS: T[] = [
     input_schema: obj({ motivo: str('Motivo curto, para a equipe entender sem ler tudo (ex.: "Pediu 20% de desconto").') }, ['motivo']),
     run: async (i, c) => {
       const reason = s(i.motivo, 160) || 'Pediu atendimento humano';
-      await db.from('conversations').update({ handler: 'humano', needs_attention: true, attention_reason: reason }).eq('id', c.conversationId);
-      await log(c, 'chamar_atendente', `Passou o atendimento de ${c.contact?.name ?? 'cliente'} para a equipe: ${reason}`, 'conversation', c.conversationId);
-      if (!sim(c)) await alertTeamOnWhatsApp(c, `🔔 ${firstName(c.contact?.name) || 'Um cliente'} precisa de atendimento: ${reason}.${c.origin ? ` Responda pelo painel: ${c.origin}/app/#/conversas/${c.conversationId}` : ''}`);
+      // o banco escolhe a próxima pessoa da recepção (rodízio), se a clínica usa a distribuição automática
+      const { data: upd } = await db.from('conversations').update({ handler: 'humano', needs_attention: true, attention_reason: reason }).eq('id', c.conversationId).select('assigned_to').maybeSingle();
+      const owner = upd?.assigned_to ? (await db.from('members').select('name').eq('company_id', c.company.id).eq('user_id', upd.assigned_to).maybeSingle()).data?.name : null;
+      await log(c, 'chamar_atendente', `Passou o atendimento de ${c.contact?.name ?? 'paciente'} para a equipe${owner ? ` (${owner})` : ''}: ${reason}`, 'conversation', c.conversationId);
+      if (!sim(c)) await alertTeamOnWhatsApp(c, `🔔 ${firstName(c.contact?.name) || 'Um paciente'} precisa de atendimento: ${reason}.${owner ? ` Ficou com ${firstName(owner)}.` : ''}${c.origin ? ` Responda pelo painel: ${c.origin}/app/#/conversas/${c.conversationId}` : ''}`);
       return ok('Equipe avisada. Diga ao paciente, em uma frase, que alguém da equipe vai continuar o atendimento em breve. Não use mais ferramentas.',
         { tool: 'chamar_atendente', label: 'Atendimento passado para a equipe', detail: reason, status: 'ok', link: `#/conversas/${c.conversationId}` });
     },

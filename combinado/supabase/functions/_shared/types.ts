@@ -33,6 +33,7 @@ export interface Company {
   /** convênios aceitos pela clínica (vazio = só particular) */
   insurances: string[];
   monthly_goal: number;
+  auto_assign?: boolean; // distribui as conversas para a recepção em rodízio
   plan: PlanId;
   billing_status: BillingStatus;
   billing_cycle: Cycle | null;
@@ -87,12 +88,14 @@ export interface Member {
   phone_verified_at: ISO | null;
   active: boolean;
   invited?: boolean;
+  last_assigned_at?: ISO | null; // última conversa recebida no rodízio
   created_at: ISO;
 }
 
 export type Stage = 'novo' | 'conversando' | 'orcamento' | 'fechado' | 'perdido';
 export type Temperature = 'quente' | 'morno' | 'frio';
-export type ContactSource = 'whatsapp' | 'manual' | 'indicacao' | 'instagram' | 'site' | 'outro';
+export type ContactSource = 'whatsapp' | 'manual' | 'indicacao' | 'instagram' | 'google' | 'site' | 'outro';
+export type LostReason = 'preco' | 'convenio' | 'horario' | 'distancia' | 'concorrente' | 'sem_resposta' | 'desistiu' | 'outro';
 
 export interface Contact {
   id: UUID;
@@ -119,6 +122,7 @@ export interface Contact {
   insurance?: string | null; // convênio do paciente (vazio = particular)
   insurance_card?: string | null; // número da carteirinha
   guardian_name?: string | null; // responsável (menores de idade)
+  lost_reason?: LostReason | null; // por que não seguiu (só no paciente perdido)
 }
 
 export type PriceType = 'fixo' | 'a_partir_de' | 'sob_consulta';
@@ -151,6 +155,8 @@ export interface Professional {
   member_user_id: UUID | null;
   active: boolean;
   sort: number;
+  photo_url?: string | null; // foto reduzida (data URL) ou link https
+  monthly_goal?: number | null; // meta de produção do mês
   created_at: ISO;
 }
 
@@ -253,6 +259,7 @@ export interface Conversation {
   kind: ConversationKind;
   channel: 'whatsapp' | 'painel' | 'simulador';
   handler: 'ia' | 'humano';
+  assigned_to?: UUID | null; // quem da equipe cuida quando a IA passa a conversa
   status: 'aberta' | 'resolvida';
   needs_attention: boolean;
   attention_reason: string | null;

@@ -85,6 +85,8 @@ Deno.test({ name: 'paciente: horários por profissional, consulta, conflito, rem
   assert(!r.error);
   const { data: c2 } = await db.from('conversations').select('handler, needs_attention, attention_reason').eq('id', conv.id).single();
   assertEquals(c2, { handler: 'humano', needs_attention: true, attention_reason: 'Dúvida sobre o pós-procedimento' });
+  const { data: owner } = await db.from('conversations').select('assigned_to').eq('id', conv.id).single();
+  assert(owner!.assigned_to, 'a conversa foi distribuída para alguém da equipe');
   const { data: conf } = await db.from('appointments').select('patient_confirmed_at').eq('id', apptId).single();
   assert(conf!.patient_confirmed_at, 'presença confirmada');
   const { data: audits } = await db.from('audit_log').select('action').eq('company_id', CID).eq('channel', 'ia_cliente');

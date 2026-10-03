@@ -2,23 +2,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Bot, CalendarPlus, CheckCircle2, Clock3, FilePlus2, Hand, Info, MessageCircle, MoreVertical, Phone, Search, Send, Smartphone, Sparkles, UserRound, Wand2, AlertTriangle, Undo2,
+  ArrowLeft, Bot, Headset, CalendarPlus, CheckCircle2, Clock3, FilePlus2, Hand, Info, MessageCircle, MoreVertical, Phone, Search, Send, Smartphone, Sparkles, UserRound, Wand2, AlertTriangle, Undo2,
 } from 'lucide-react';
 import { api, isDemo } from '../data/api';
+import { useMeCtx } from '../context';
 import { useInvalidate, useList } from '../data/hooks';
-import type { Contact, Conversation, Stage, Temperature } from '../data/types';
+import type { Contact, Conversation, LostReason, Member, Stage, Temperature } from '../data/types';
 import { Avatar, Badge, Button, Drawer, Empty, IconButton, Loader, Menu, Select, Segmented, cx, useDebounced, useFillHeight, useToast } from '../ui';
 import { Thread } from '../ui/chat';
 import { brl, fmtDate, fmtListTime, fold, formatPhone } from '../../shared/format';
 
-type Filter = 'todas' | 'equipe' | 'ia' | 'nao_lidas';
+type Filter = 'todas' | 'minhas' | 'equipe' | 'ia' | 'nao_lidas';
 export const STAGE_LABEL: Record<Stage, string> = { novo: 'Novo contato', conversando: 'Em conversa', orcamento: 'Orçamento enviado', fechado: 'Paciente', perdido: 'Não seguiu' };
+export const LOST_LABEL: Record<LostReason, string> = { preco: 'Achou caro', convenio: 'Convênio não atende', horario: 'Sem horário que servisse', distancia: 'Longe da clínica', concorrente: 'Foi para outra clínica', sem_resposta: 'Parou de responder', desistiu: 'Desistiu do tratamento', outro: 'Outro motivo' };
 export const TEMP_LABEL: Record<Temperature, string> = { quente: 'Quente', morno: 'Morno', frio: 'Frio' };
 export const TEMP_TONE: Record<Temperature, 'orange' | 'yellow' | 'blue'> = { quente: 'orange', morno: 'yellow', frio: 'blue' };
 
 export default function Inbox() {
   const { id } = useParams();
   const nav = useNavigate();
+  const { me } = useMeCtx();
   const [filter, setFilter] = useState<Filter>('todas');
   const [q, setQ] = useState('');
   const term = useDebounced(q, 200);
@@ -28,13 +31,16 @@ export default function Inbox() {
   const byId = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
 
   const list = useMemo(() => convs.filter((c) => {
+    if (filter === 'minhas' && c.assigned_to !== me.user_id) return false;
     if (filter === 'equipe' && !(c.handler === 'humano' || c.needs_attention)) return false;
     if (filter === 'ia' && c.handler !== 'ia') return false;
     if (filter === 'nao_lidas' && !c.unread) return false;
     if (term.trim()) { const ct = byId.get(c.contact_id ?? ''); const t = fold(term); if (!fold(ct?.name).includes(t) && !(ct?.phone ?? '').includes(term.replace(/\D/g, '') || '¬')) return false; }
     return true;
-  }), [convs, filter, term, byId]);
-  const counts = { equipe: convs.filter((c) => c.handler === 'humano' || c.needs_attention).length, nao_lidas: convs.filter((c) => c.unread > 0).length };
+  }), [convs, filter, term, byId, me.user_id]);
+  const { data: members = [] } = useList('members');
+  const memberName = useMemo(() => new Map(members.map((m) => [m.user_id, m.name.split(' ')[0] || m.email])), [members]);
+  const counts = { minhas: convs.filter((c) => c.assigned_to === me.user_id && c.status === 'aberta').length, equipe: convs.filter((c) => c.handler === 'humano' || c.needs_attention).length, nao_lidas: convs.filter((c) => c.unread > 0).length };
 
   const current = convs.find((c) => c.id === id) ?? null;
   const boxRef = useFillHeight<HTMLElement>();
@@ -52,6 +58,7 @@ export default function Inbox() {
             <div className="input-wrap"><Search /><input className="input" placeholder="Buscar por nome ou telefone" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar conversas" /></div>
             <Segmented label="Filtrar conversas" value={filter} onChange={setFilter} options={[
               { value: 'todas', label: 'Todas' },
+              { value: 'minhas', label: <>Minhas{counts.minhas ? <b> {counts.minhas}</b> : null}</> },
               { value: 'equipe', label: <>Equipe{counts.equipe ? <b style={{ color: 'var(--orange-ink)' }}> {counts.equipe}</b> : null}</> },
               { value: 'ia', label: 'IA' },
               { value: 'nao_lidas', label: <>Não lidas{counts.nao_lidas ? <b> {counts.nao_lidas}</b> : null}</> },
@@ -60,17 +67,17 @@ export default function Inbox() {
           <div className="ib-items" role="list">
             {isLoading && <Loader />}
             {!isLoading && list.length === 0 && <Empty icon={<MessageCircle />} title="Nenhuma conversa aqui">{filter === 'todas' ? 'Quando um paciente chamar no WhatsApp, a conversa aparece aqui.' : 'Tente outro filtro.'}</Empty>}
-            {list.map((c) => <ConvItem key={c.id} c={c} contact={byId.get(c.contact_id ?? '')} active={c.id === id} />)}
+            {list.map((c) => <ConvItem key={c.id} c={c} contact={byId.get(c.contact_id ?? '')} active={c.id === id} owner={c.assigned_to ? memberName.get(c.assigned_to) : undefined} />)}
           </div>
         </aside>
-        {current ? <Chat key={current.id} conv={current} contact={byId.get(current.contact_id ?? '')} /> : <div className="ib-chat" style={{ display: 'grid', placeItems: 'center' }}><Empty icon={<MessageCircle />} title="Escolha uma conversa" /></div>}
+        {current ? <Chat key={current.id} conv={current} contact={byId.get(current.contact_id ?? '')} members={members} /> : <div className="ib-chat" style={{ display: 'grid', placeItems: 'center' }}><Empty icon={<MessageCircle />} title="Escolha uma conversa" /></div>}
         {current && byId.get(current.contact_id ?? '') && <ContactSide contact={byId.get(current.contact_id ?? '')!} />}
       </section>
     </>
   );
 }
 
-function ConvItem({ c, contact, active }: { c: Conversation; contact?: Contact; active: boolean }) {
+function ConvItem({ c, contact, active, owner }: { c: Conversation; contact?: Contact; active: boolean; owner?: string }) {
   const name = contact?.name ?? formatPhone(contact?.phone) ?? 'Paciente';
   return (
     <Link to={`/conversas/${c.id}`} className={cx('ib-item', active && 'active', c.needs_attention && 'attention')} role="listitem">
@@ -82,9 +89,10 @@ function ConvItem({ c, contact, active }: { c: Conversation; contact?: Contact; 
           <span className="truncate">{c.last_message_preview ?? ''}</span>
           {c.unread > 0 && <span className="unread">{c.unread}</span>}
         </div>
-        {(c.needs_attention || c.channel === 'simulador' || contact?.temperature === 'quente') && (
+        {(c.needs_attention || c.channel === 'simulador' || contact?.temperature === 'quente' || (owner && c.handler === 'humano')) && (
           <div className="ib-tags">
             {c.needs_attention && <Badge tone="orange" size="sm" dot>{c.attention_reason ? 'Precisa de você' : 'Atenção'}</Badge>}
+            {owner && (c.handler === 'humano' || c.needs_attention) && <Badge size="sm" tone="violet">{owner}</Badge>}
             {c.channel === 'simulador' && <Badge size="sm">Teste</Badge>}
             {contact?.temperature === 'quente' && !c.needs_attention && <Badge tone="orange" size="sm">Lead quente</Badge>}
           </div>
@@ -94,7 +102,7 @@ function ConvItem({ c, contact, active }: { c: Conversation; contact?: Contact; 
   );
 }
 
-function Chat({ conv, contact }: { conv: Conversation; contact?: Contact }) {
+function Chat({ conv, contact, members }: { conv: Conversation; contact?: Contact; members: Member[] }) {
   const { data: msgs = [], isLoading } = useList('messages', { filters: [{ col: 'conversation_id', op: 'eq', value: conv.id }], order: [{ col: 'created_at', asc: true }], limit: 400 });
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -156,6 +164,18 @@ function Chat({ conv, contact }: { conv: Conversation; contact?: Contact }) {
           </>}
         </Menu>
       </div>
+      {(conv.handler === 'humano' || conv.needs_attention || conv.assigned_to) && members.length > 1 && (
+        <div className="ib-owner">
+          <Headset /><span>Responsável</span>
+          <Select value={conv.assigned_to ?? ''} aria-label="Responsável pela conversa" onChange={async (e) => {
+            const v = e.target.value || null;
+            try { await api.update('conversations', conv.id, { assigned_to: v }); inv('conversations'); toast(v ? `Conversa passada para ${members.find((m) => m.user_id === v)?.name.split(' ')[0] ?? 'a equipe'}` : 'Conversa sem responsável'); } catch (err) { toast((err as Error).message, 'err'); }
+          }}>
+            <option value="">Sem responsável</option>
+            {members.filter((m) => m.active || m.user_id === conv.assigned_to).map((m) => <option key={m.user_id} value={m.user_id}>{m.name || m.email}{m.role === 'atendente' ? ' · recepção' : m.role === 'gerente' ? ' · gerente' : ''}</option>)}
+          </Select>
+        </div>
+      )}
       {conv.needs_attention && conv.attention_reason && <div className="ai-handling" style={{ background: 'var(--orange-soft)' }}><AlertTriangle style={{ color: 'var(--orange-ink)' }} /><span><b>A IA pediu ajuda:</b> {conv.attention_reason}</span></div>}
       <div className="ib-scroll" ref={scroller}>
         {isLoading ? <Loader /> : <Thread messages={msgs} mine={(m) => m.direction === 'out'} />}

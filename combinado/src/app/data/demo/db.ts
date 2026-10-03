@@ -124,6 +124,16 @@ export function pushMessage(conv: Conversation, m: Omit<Message, 'id' | 'company
   emit('messages'); emit('conversations');
   return row;
 }
+/** Igual ao gatilho conversations_assign: quando a conversa vai para a equipe, a recepção recebe em rodízio. */
+export function autoAssign(conv: Conversation) {
+  if (conv.kind !== 'cliente' || conv.assigned_to || demoDb().company.auto_assign === false) return;
+  const pri = (r: string) => (r === 'dono' ? 1 : 0);
+  const next = table('members').filter((m) => m.active && !m.invited)
+    .sort((a, b) => pri(a.role) - pri(b.role) || (a.last_assigned_at ?? '').localeCompare(b.last_assigned_at ?? ''))[0];
+  if (!next) return;
+  conv.assigned_to = next.user_id;
+  next.last_assigned_at = new Date().toISOString();
+}
 export function contactById(id: string | null | undefined): Contact | undefined {
   return id ? table('contacts').find((c) => c.id === id) : undefined;
 }
