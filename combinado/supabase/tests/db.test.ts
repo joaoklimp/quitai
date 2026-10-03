@@ -19,12 +19,12 @@ afterAll(async () => { await db?.stop(); });
 
 describe('primeira configuração', () => {
   it('cria a empresa com dono, IA, automações e serviços do segmento', async () => {
-    cidA = (await db.as(user(ana), (q) => q.one<{ id: string }>(`select public.onboard_company('Brilho Lar Higienização', 'limpeza', '(61) 99999-0000', 'Brasília', true) as id`))).id;
+    cidA = (await db.as(user(ana), (q) => q.one<{ id: string }>(`select public.onboard_company('Brilho Lar Higienização', 'odontologia', '(61) 99999-0000', 'Brasília', true) as id`))).id;
     const info = await db.as(user(ana), (q) => q.one<{ services: number; automations: number; role: string; greeting: string; phone: string; audits: number }>(`
       select (select count(*)::int from services) as services, (select count(*)::int from automations) as automations,
              (select role from members where user_id = auth.uid()) as role, (select greeting from ai_settings) as greeting,
              (select phone from companies) as phone, (select count(*)::int from audit_log) as audits`));
-    expect(info).toEqual({ services: 5, automations: 8, role: 'dono', greeting: 'Olá! Aqui é da Brilho Lar Higienização. Como posso ajudar?', phone: '5561999990000', audits: 1 });
+    expect(info).toEqual({ services: 5, automations: 9, role: 'dono', greeting: 'Olá! Aqui é da Brilho Lar Higienização. Como posso ajudar?', phone: '5561999990000', audits: 1 });
   });
 
   it('não deixa a mesma pessoa criar duas empresas', async () => {
@@ -32,7 +32,7 @@ describe('primeira configuração', () => {
   });
 
   it('segunda empresa e uma atendente na primeira', async () => {
-    cidB = (await db.as(user(beto), (q) => q.one<{ id: string }>(`select public.onboard_company('Oficina do Beto', 'oficina', '11988887777', 'São Paulo', true) as id`))).id;
+    cidB = (await db.as(user(beto), (q) => q.one<{ id: string }>(`select public.onboard_company('Oficina do Beto', 'fisioterapia', '11988887777', 'São Paulo', true) as id`))).id;
     await db.as('service', (q) => q.exec(`insert into members (company_id, user_id, role, name, email) values ($1, $2, 'atendente', 'Carla Souza', 'carla@brilholar.com')`, [cidA, carla]));
     expect(cidB).not.toBe(cidA);
   });
@@ -47,7 +47,7 @@ describe('isolamento entre empresas (RLS)', () => {
     const changed = await db.as(user(beto), (q) => q.exec(`update contacts set name = 'Hackeado' where id = $1`, [contact.id]));
     expect(changed).toBe(0);
     const services = await db.as(user(beto), (q) => q.rows<{ name: string }>(`select name from services order by sort`));
-    expect(services[0].name).toBe('Troca de óleo e filtro'); // só os da oficina
+    expect(services[0].name).toBe('Avaliação fisioterapêutica'); // só os da fisioterapia
   });
 
   it('dados internos (tokens, cobrança, contadores) ficam fora do alcance do painel', async () => {
@@ -215,6 +215,49 @@ describe('agenda', () => {
     expect(n).toBe(1);
     const audit = await db.as(user(ana), (q) => q.one<{ summary: string }>(`select summary from audit_log where action = 'agendar' order by created_at desc limit 1`));
     expect(audit.summary).toBe('Agendou Encaixe para 10/05 às 15:00 (Encaixe)');
+  });
+});
+
+describe('clínica: profissionais, convênio e retorno', () => {
+  it('a clínica nasce com o dono como profissional e procedimentos com retorno', async () => {
+    const r = await db.as(user(ana), (q) => q.one<{ pros: number; owner: string; ret: number; retorno: number }>(`
+      select (select count(*)::int from professionals) as pros, (select name from professionals limit 1) as owner,
+             (select count(*)::int from services where return_days is not null) as ret,
+             (select count(*)::int from automations where kind = 'retorno') as retorno`));
+    expect(r).toEqual({ pros: 1, owner: 'Ana Duarte', ret: 2, retorno: 1 });
+  });
+
+  it('cada profissional tem a própria agenda: a IA não marca dois pacientes com a mesma pessoa', async () => {
+    const [p1, p2] = await db.as(user(ana), async (q) => [
+      (await q.one<{ id: string }>(`select id from professionals limit 1`)).id,
+      (await q.one<{ id: string }>(`insert into professionals (company_id, name, specialty, council) values ($1, 'Dr. Bruno Reis', 'Ortodontia', 'CRO-DF 1234') returning id`, [cidA])).id,
+    ]);
+    const base = `insert into appointments (company_id, title, starts_at, ends_at, created_via, professional_id) values ($1, 'Consulta', '2030-06-10T13:00:00Z', '2030-06-10T13:30:00Z', 'ia_cliente', $2)`;
+    await db.as('service', (q) => q.exec(base, [cidA, p1]));
+    await db.as('service', (q) => q.exec(base, [cidA, p2])); // outro profissional, mesmo horário: pode
+    await expect(db.as('service', (q) => q.exec(base, [cidA, p1]))).rejects.toThrow('horario_ocupado');
+    // profissional de outra clínica não entra
+    const other = await db.as(user(beto), (q) => q.one<{ id: string }>(`select id from professionals limit 1`));
+    await expect(db.as('service', (q) => q.exec(base.replace('2030-06-10T13', '2030-06-11T13'), [cidA, other.id]))).rejects.toThrow('Profissional não encontrado');
+    const audit = await db.as(user(ana), (q) => q.one<{ summary: string }>(`select summary from audit_log where action = 'criar_profissional' order by created_at desc limit 1`));
+    expect(audit.summary).toBe('Cadastrou o profissional Dr. Bruno Reis');
+  });
+
+  it('a atendente vê os profissionais mas não altera; outra clínica não vê', async () => {
+    expect(await db.as(user(carla), (q) => q.rows(`select id from professionals`))).toHaveLength(2);
+    expect(await db.as(user(carla), (q) => q.exec(`update professionals set name = 'Outro nome'`))).toBe(0);
+    expect(await db.as(user(beto), (q) => q.rows(`select id from professionals where company_id = $1`, [cidA]))).toHaveLength(0);
+  });
+
+  it('convênio: a clínica guarda os aceitos, a consulta guarda o convênio e o particular não carrega convênio', async () => {
+    await db.as(user(ana), (q) => q.exec(`update companies set insurances = array['Unimed', 'Amil']`));
+    const c = await db.as(user(ana), (q) => q.one<{ id: string }>(`insert into contacts (company_id, name, phone, insurance, insurance_card) values ($1, 'Paula Lima', '61 98888-1111', 'Unimed', '0001234') returning id`, [cidA]));
+    const rows = await db.as(user(ana), (q) => q.rows<{ payment_kind: string; insurance: string | null }>(`
+      insert into appointments (company_id, contact_id, title, starts_at, ends_at, payment_kind, insurance) values
+        ($1, $2, 'Consulta', '2030-07-01T13:00:00Z', '2030-07-01T13:30:00Z', 'convenio', 'Unimed'),
+        ($1, $2, 'Consulta', '2030-07-02T13:00:00Z', '2030-07-02T13:30:00Z', 'particular', 'Unimed')
+      returning payment_kind, insurance`, [cidA, c.id]));
+    expect(rows).toEqual([{ payment_kind: 'convenio', insurance: 'Unimed' }, { payment_kind: 'particular', insurance: null }]);
   });
 });
 

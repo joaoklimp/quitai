@@ -1,4 +1,4 @@
-// Clientes, conversas e mensagens: encontrar ou criar, montar o histórico para a IA e entregar
+// Pacientes, conversas e mensagens: encontrar ou criar, montar o histórico para a IA e entregar
 // mensagens pelo WhatsApp respeitando a janela de 24 horas (fora dela, só modelo aprovado).
 import { db, check, audit } from './db.ts';
 import { firstName, fmtDate, formatPhone, localTime, normalizePhone, phoneVariants, brl } from './format.ts';
@@ -68,7 +68,7 @@ function receiptsText(actions: ActionReceipt[] | null): string {
 }
 
 /**
- * Histórico da conversa no formato da API: mensagens do cliente (ou da pessoa da equipe, no modo dono)
+ * Histórico da conversa no formato da API: mensagens do paciente (ou da pessoa da equipe, no modo dono)
  * como "user" e as respostas como "assistant". Mensagens seguidas do mesmo lado viram um turno só.
  * A foto mais recente ainda sem resposta vai como imagem, para a IA poder olhar.
  */
@@ -119,11 +119,11 @@ async function loadImage(path: string): Promise<{ b64: string; mime: 'image/jpeg
   } catch { return null; }
 }
 
-/** Manda uma mensagem para o cliente pelo WhatsApp e registra na conversa. Fora das 24h, só com modelo. */
+/** Manda uma mensagem para o paciente pelo WhatsApp e registra na conversa. Fora das 24h, só com modelo. */
 export async function deliverToContact(b: Base, contact: Contact, text: string, o: {
   sender: 'ia' | 'equipe'; senderName: string; template?: { name: string; params: string[] } | null; actions?: ActionReceipt[] | null;
 }): Promise<{ sent: boolean; reason?: string; message?: Message }> {
-  if (!contact.phone) return { sent: false, reason: 'O cliente não tem telefone cadastrado.' };
+  if (!contact.phone) return { sent: false, reason: 'O paciente não tem telefone cadastrado.' };
   const acc = await loadAccount(b.company.id);
   if (!acc) return { sent: false, reason: 'O WhatsApp da empresa não está conectado.' };
   const conv = await findOrCreateConversation({ companyId: b.company.id, kind: 'cliente', channel: 'whatsapp', contactId: contact.id });
@@ -131,7 +131,7 @@ export async function deliverToContact(b: Base, contact: Contact, text: string, 
   try {
     if (withinWindow(conv.last_inbound_at)) waId = await sendText(acc, contact.phone, text);
     else if (o.template && contact.opt_in) waId = await sendTemplate(acc, contact.phone, o.template.name, o.template.params);
-    else return { sent: false, reason: o.template && !contact.opt_in ? 'O cliente pediu para não receber mensagens.' : 'Já passaram 24 horas desde a última mensagem do cliente: o WhatsApp só permite escrever com um modelo aprovado.' };
+    else return { sent: false, reason: o.template && !contact.opt_in ? 'O paciente pediu para não receber mensagens.' : 'Já passaram 24 horas desde a última mensagem do paciente: o WhatsApp só permite escrever com um modelo aprovado.' };
   } catch (e) {
     if (e instanceof WaError) return { sent: false, reason: e.friendly };
     throw e;
@@ -144,7 +144,7 @@ export async function deliverToContact(b: Base, contact: Contact, text: string, 
   return { sent: true, message };
 }
 
-/** Envia o link do orçamento ao cliente (texto na janela de 24h; fora dela, o modelo "orcamento_enviado"). */
+/** Envia o link do orçamento ao paciente (texto na janela de 24h; fora dela, o modelo "orcamento_enviado"). */
 export async function sendQuote(b: Base, quoteId: string, actor: { type: 'usuario' | 'ia'; name: string; userId?: string | null; channel: string }): Promise<{ sent: boolean; link: string; reason?: string }> {
   const { data: q } = await db.from('quotes').select('*').eq('id', quoteId).eq('company_id', b.company.id).maybeSingle();
   if (!q) throw new Error('Orçamento não encontrado.');

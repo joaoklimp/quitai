@@ -1,4 +1,4 @@
-// Turnos do agente: responder um cliente, executar comandos da equipe, resolver confirmações
+// Turnos do agente: responder um paciente, executar comandos da equipe, resolver confirmações
 // e o simulador do painel. Usado pelas funções "agent" (painel) e "whatsapp-webhook".
 import { db, audit } from './db.ts';
 import { runAgent, aiConfigured, aiErrorMessage, CUSTOMER_MODEL } from './ai.ts';
@@ -32,7 +32,7 @@ export async function countUsage(b: Base, usage: { input: number; output: number
   if (error) console.error('uso', error.message);
 }
 
-/** A IA pode responder clientes agora? (ligada, assinatura ativa, horário escolhido e limite do plano) */
+/** A IA pode responder pacientes agora? (ligada, assinatura ativa, horário escolhido e limite do plano) */
 export async function customerGate(b: Base): Promise<string | null> {
   if (!aiConfigured()) return 'A IA não está configurada no servidor.';
   if (!b.ai.enabled) return 'A IA está pausada.';
@@ -55,7 +55,7 @@ async function firstContact(conversationId: string): Promise<boolean> {
   return !count;
 }
 
-/** Responde o cliente (WhatsApp ou simulador). Não envia nada: devolve o texto e as ações. */
+/** Responde o paciente (WhatsApp ou simulador). Não envia nada: devolve o texto e as ações. */
 export async function customerTurn(b: Base, conv: Conversation, contact: Contact, channel: 'whatsapp' | 'simulador'): Promise<TurnResult> {
   const { history, unanswered } = await buildHistory(conv.id, 'cliente', b.tz);
   if (!history.length || history[history.length - 1].role !== 'user') return { reply: '', actions: [], handoff: false, usage: ZERO, skipped: 'Nada novo para responder.' };
@@ -73,7 +73,7 @@ export async function customerTurn(b: Base, conv: Conversation, contact: Contact
     await db.from('conversations').update({ handler: 'humano', needs_attention: true, attention_reason: run.refused ? 'A IA não pôde responder este assunto' : 'A IA não conseguiu responder' }).eq('id', conv.id);
     return { reply: handoff ? 'Vou chamar alguém da equipe para continuar com você, tudo bem? 🙂' : FAIL_REPLY, actions: run.receipts, handoff: true, usage: run.usage };
   } catch (e) {
-    console.error('IA (cliente)', e);
+    console.error('IA (paciente)', e);
     await db.from('conversations').update({ needs_attention: true, attention_reason: 'A IA ficou indisponível e não respondeu' }).eq('id', conv.id);
     return { reply: '', actions: [], handoff: true, usage: ZERO, skipped: aiErrorMessage(e) };
   }

@@ -29,49 +29,64 @@ function fakeClaude(script: { stop_reason: string; content: Record<string, unkno
   return calls;
 }
 
-Deno.test({ name: 'cliente: horários, agendamento, conflito, remarcação, orçamento, cadastro, presença e passagem para a equipe', ...opts, fn: async () => {
+Deno.test({ name: 'paciente: horários por profissional, consulta, conflito, remarcação, orçamento, ficha com convênio, presença e passagem para a equipe', ...opts, fn: async () => {
+  await db.from('companies').update({ insurances: ['Unimed Odonto'] }).eq('id', CID);
+  await db.from('professionals').insert({ company_id: CID, name: 'Dr. Bruno Reis', specialty: 'Ortodontia', council: 'CRO-DF 1234' });
   const b = await loadBase(CID, 'https://combinado.test');
   const { contact } = await findOrCreateContact(CID, '5561912345678', 'Juliana Ribeiro');
   const conv = await findOrCreateConversation({ companyId: CID, kind: 'cliente', channel: 'whatsapp', contactId: contact.id });
   const ctx = { ...b, mode: 'cliente', channel: 'whatsapp', conversationId: conv.id, contact };
-  const sofa = b.services.find((s) => s.name.startsWith('Limpeza de sofá 3'))!;
+  const resto = b.services.find((s) => s.name === 'Restauração')!;
+  const ana = b.professionals.find((p) => p.name === 'Ana Duarte')!, bruno = b.professionals.find((p) => p.name === 'Dr. Bruno Reis')!;
+  assertEquals(b.professionals.length, 2);
 
-  let r = await run(CUSTOMER_TOOLS, 'consultar_horarios', { data: DAY, servico_id: sofa.id }, ctx);
+  let r = await run(CUSTOMER_TOOLS, 'consultar_horarios', { data: DAY, servico_id: resto.id, profissional_id: ana.id }, ctx);
   assertStringIncludes(r.content, '08:00');
-  r = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: sofa.id, data: DAY, hora: '14:00', nome: 'Juliana Ribeiro', endereco: 'SQS 308 Bloco C' }, ctx);
+  assertStringIncludes(r.content, 'com Ana Duarte');
+  r = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: resto.id, data: DAY, hora: '14:00', nome: 'Juliana Ribeiro', profissional_id: ana.id }, ctx);
   assert(!r.error, r.content);
-  assertEquals(r.receipt?.label, 'Horário agendado');
-  r = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: sofa.id, data: DAY, hora: '15:00' }, ctx);
-  assert(r.error, 'deveria recusar horário sobreposto');
-  r = await run(CUSTOMER_TOOLS, 'consultar_horarios', { data: DAY, servico_id: sofa.id }, ctx);
-  assert(!/\b13:00\b|\b14:00\b|\b15:00\b/.test(r.content), r.content); // serviço de 2h: 13h e 15h também colidem
+  assertEquals(r.receipt?.label, 'Consulta marcada');
+  r = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: resto.id, data: DAY, hora: '14:30', profissional_id: ana.id }, ctx);
+  assert(r.error, 'deveria recusar horário sobreposto com a mesma profissional');
+  r = await run(CUSTOMER_TOOLS, 'consultar_horarios', { data: DAY, servico_id: resto.id, profissional_id: ana.id }, ctx);
+  assert(!/\b13:30\b|\b14:00\b|\b14:30\b/.test(r.content), r.content); // procedimento de 1h: 13h30 e 14h30 também colidem
+  r = await run(CUSTOMER_TOOLS, 'consultar_horarios', { data: DAY, servico_id: resto.id }, ctx);
+  assertStringIncludes(r.content, '14:00 (Dr. Bruno)'); // sem preferência: o outro profissional está livre
+  r = await run(CUSTOMER_TOOLS, 'agendar_horario', { servico_id: resto.id, data: DAY, hora: '14:00', convenio: 'Amil' }, ctx);
+  assert(r.error && /não atende pelo convênio/.test(r.content), r.content);
 
   r = await run(CUSTOMER_TOOLS, 'meus_horarios', {}, ctx);
+  assertStringIncludes(r.content, 'com Ana Duarte');
   const apptId = r.content.match(/\[([0-9a-f-]{36})\]/)![1];
   r = await run(CUSTOMER_TOOLS, 'remarcar_horario', { agendamento_id: apptId, data: DAY, hora: '16:00' }, ctx);
   assert(!r.error, r.content);
-  const { data: appt } = await db.from('appointments').select('starts_at, address, created_via, status').eq('id', apptId).single();
+  const { data: appt } = await db.from('appointments').select('starts_at, professional_id, created_via, status, payment_kind').eq('id', apptId).single();
   assertEquals(new Date(appt!.starts_at).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }), '16:00');
-  assertEquals([appt!.address, appt!.created_via, appt!.status], ['SQS 308 Bloco C', 'ia_cliente', 'confirmado']);
+  assertEquals([appt!.professional_id, appt!.created_via, appt!.status, appt!.payment_kind], [ana.id, 'ia_cliente', 'confirmado', 'particular']);
 
-  r = await run(CUSTOMER_TOOLS, 'criar_orcamento', { itens: [{ servico_id: sofa.id }], desconto_percentual: 5 }, ctx);
+  const clar = b.services.find((s) => s.name === 'Clareamento')!;
+  r = await run(CUSTOMER_TOOLS, 'criar_orcamento', { itens: [{ servico_id: clar.id }], desconto_percentual: 5 }, ctx);
   assert(!r.error, r.content);
   assertStringIncludes(r.content, 'https://combinado.test/orcamento/#');
   const { data: quote } = await db.from('quotes').select('number, total, discount, status, created_via').eq('contact_id', contact.id).single();
-  assertEquals([Number(quote!.total), Number(quote!.discount), quote!.status, quote!.created_via], [171, 9, 'enviado', 'ia_cliente']);
-  r = await run(CUSTOMER_TOOLS, 'criar_orcamento', { itens: [{ servico_id: sofa.id }], desconto_percentual: 15 }, ctx);
+  assertEquals([Number(quote!.total), Number(quote!.discount), quote!.status, quote!.created_via], [855, 45, 'enviado', 'ia_cliente']);
+  r = await run(CUSTOMER_TOOLS, 'criar_orcamento', { itens: [{ servico_id: clar.id }], desconto_percentual: 15 }, ctx);
   assert(r.error && /acima do permitido/.test(r.content), r.content);
 
-  r = await run(CUSTOMER_TOOLS, 'atualizar_cadastro', { email: 'ju@exemplo.com' }, ctx);
-  assert(!r.error);
+  r = await run(CUSTOMER_TOOLS, 'atualizar_cadastro', { convenio: 'Amil' }, ctx);
+  assert(r.error, 'convênio não aceito');
+  r = await run(CUSTOMER_TOOLS, 'atualizar_cadastro', { email: 'ju@exemplo.com', convenio: 'unimed', carteirinha: '0012345', nascimento: '1990-04-12' }, ctx);
+  assert(!r.error, r.content);
+  const { data: ficha } = await db.from('contacts').select('email, insurance, insurance_card, birthday').eq('id', contact.id).single();
+  assertEquals(ficha, { email: 'ju@exemplo.com', insurance: 'Unimed Odonto', insurance_card: '0012345', birthday: '1990-04-12' });
   r = await run(CUSTOMER_TOOLS, 'confirmar_presenca', { agendamento_id: apptId }, ctx);
   assert(!r.error, r.content);
-  r = await run(CUSTOMER_TOOLS, 'chamar_atendente', { motivo: 'Quer negociar o preço' }, ctx);
+  r = await run(CUSTOMER_TOOLS, 'chamar_atendente', { motivo: 'Dúvida sobre o pós-procedimento' }, ctx);
   assert(!r.error);
   const { data: c2 } = await db.from('conversations').select('handler, needs_attention, attention_reason').eq('id', conv.id).single();
-  assertEquals(c2, { handler: 'humano', needs_attention: true, attention_reason: 'Quer negociar o preço' });
-  const { data: notes } = await db.from('appointments').select('notes').eq('id', apptId).single();
-  assertStringIncludes(notes!.notes ?? '', 'Cliente confirmou presença');
+  assertEquals(c2, { handler: 'humano', needs_attention: true, attention_reason: 'Dúvida sobre o pós-procedimento' });
+  const { data: conf } = await db.from('appointments').select('patient_confirmed_at').eq('id', apptId).single();
+  assert(conf!.patient_confirmed_at, 'presença confirmada');
   const { data: audits } = await db.from('audit_log').select('action').eq('company_id', CID).eq('channel', 'ia_cliente');
   const actions = (audits ?? []).map((a) => a.action);
   for (const a of ['agendar', 'remarcar', 'criar_orcamento', 'confirmar_presenca', 'chamar_atendente']) assert(actions.includes(a), `faltou ${a} no histórico`);
@@ -84,7 +99,7 @@ Deno.test({ name: 'dono: cadastro, orçamento, confirmações, venda, agenda, ta
 
   let r = await run(OWNER_TOOLS, 'cadastrar_cliente', { nome: 'Maria Souza', telefone: '61 99999-9999' }, ctx);
   assert(!r.error, r.content);
-  assertEquals(r.receipt?.label, 'Cliente Maria cadastrado');
+  assertEquals(r.receipt?.label, 'Paciente Maria cadastrado');
   r = await run(OWNER_TOOLS, 'cadastrar_cliente', { nome: 'Maria S.', telefone: '(61) 99999-9999' }, ctx);
   assertStringIncludes(r.content, 'Já existe');
   r = await run(OWNER_TOOLS, 'buscar_clientes', { busca: 'maria' }, ctx);
@@ -117,10 +132,15 @@ Deno.test({ name: 'dono: cadastro, orçamento, confirmações, venda, agenda, ta
   const { data: still } = await db.from('appointments').select('status').eq('id', apptId).single();
   assertEquals(still!.status, 'confirmado');
 
-  r = await run(OWNER_TOOLS, 'agendar_horario', { cliente_id: maria, titulo: 'Visita técnica', data: DAY, hora: '16:30', duracao_min: 30 }, ctx);
-  assert(r.error, 'deveria avisar do conflito com o horário da Juliana');
-  r = await run(OWNER_TOOLS, 'agendar_horario', { cliente_id: maria, titulo: 'Visita técnica', data: DAY, hora: '16:30', duracao_min: 30, encaixar: true }, ctx);
+  const ana = b.professionals.find((p) => p.name === 'Ana Duarte')!;
+  r = await run(OWNER_TOOLS, 'agendar_horario', { cliente_id: maria, titulo: 'Avaliação', data: DAY, hora: '16:00', duracao_min: 30, profissional_id: ana.id }, ctx);
+  assert(r.error, 'deveria avisar do conflito com a consulta da Juliana');
+  r = await run(OWNER_TOOLS, 'agendar_horario', { cliente_id: maria, titulo: 'Avaliação', data: DAY, hora: '16:00', duracao_min: 30 }, ctx);
+  assert(!r.error && /com Dr\. Bruno Reis/.test(r.content), r.content); // sem preferência: vai para quem está livre
+  r = await run(OWNER_TOOLS, 'agendar_horario', { cliente_id: maria, titulo: 'Encaixe', data: DAY, hora: '16:00', duracao_min: 30, profissional_id: ana.id, encaixar: true }, ctx);
   assert(!r.error, r.content);
+  r = await run(OWNER_TOOLS, 'consultar_agenda', { data_inicio: DAY, profissional_id: ana.id }, ctx);
+  assert(!/Bruno/.test(r.content) && /confirmou presença/.test(r.content), r.content);
 
   r = await run(OWNER_TOOLS, 'listar_orcamentos', {}, ctx);
   assertStringIncludes(r.content, 'Maria Souza');
@@ -153,24 +173,29 @@ Deno.test({ name: 'agente completo: o cliente pede um horário e a IA consulta, 
   const b = await loadBase(CID, 'https://combinado.test');
   const { contact } = await findOrCreateContact(CID, '5561955559991', 'Pedro Lima');
   const conv = await findOrCreateConversation({ companyId: CID, kind: 'cliente', channel: 'whatsapp', contactId: contact.id });
-  await insertMessage({ company_id: CID, conversation_id: conv.id, direction: 'in', sender: 'contato', sender_name: 'Pedro Lima', body: 'Quero limpar meu colchão, pode ser às 10h?', channel: 'whatsapp' });
-  const colchao = b.services.find((s) => s.name.startsWith('Higienização de colchão'))!;
+  await insertMessage({ company_id: CID, conversation_id: conv.id, direction: 'in', sender: 'contato', sender_name: 'Pedro Lima', body: 'Quero marcar uma limpeza nos dentes, pode ser às 10h?', channel: 'whatsapp' });
+  const colchao = b.services.find((s) => s.name.startsWith('Limpeza (profilaxia)'))!;
   const calls = fakeClaude([
     { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'consultar_horarios', input: { data: DAY, servico_id: colchao.id } }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'agendar_horario', input: { servico_id: colchao.id, data: DAY, hora: '10:00', nome: 'Pedro Lima', endereco: 'Rua das Flores, 10' } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'agendar_horario', input: { servico_id: colchao.id, data: DAY, hora: '10:00', nome: 'Pedro Lima' } }] },
     { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Prontinho, Pedro! Agendado às 10h.' }] },
   ]);
   const t = await customerTurn(b, conv, contact, 'whatsapp');
   assertEquals(t.reply, 'Prontinho, Pedro! Agendado às 10h.');
-  assertEquals(t.actions.map((a) => a.label), ['Horário agendado']);
+  assertEquals(t.actions.map((a) => a.label), ['Consulta marcada']);
   const first = calls[0] as { system: { text: string }[]; messages: { role: string }[]; tools: { name: string }[] };
   assertStringIncludes(first.system[0].text, colchao.id);
+  assertStringIncludes(first.system[0].text, 'SAMU 192');
+  assertStringIncludes(first.system[0].text, 'Dr. Bruno Reis — Ortodontia (CRO-DF 1234)');
+  assertStringIncludes(first.system[0].text, 'Convênios aceitos: Unimed Odonto');
   assertStringIncludes(first.system[1].text, 'Pedro Lima');
   assertEquals(first.tools.map((x) => x.name).includes('agendar_horario'), true);
   const second = calls[1] as { messages: { role: string; content: { type: string; content?: string }[] }[] };
   assertStringIncludes(second.messages[second.messages.length - 1].content[0].content ?? '', '10:00');
-  const { data: appts } = await db.from('appointments').select('created_via, address').eq('contact_id', contact.id);
-  assertEquals(appts, [{ created_via: 'ia_cliente', address: 'Rua das Flores, 10' }]);
+  const { data: appts } = await db.from('appointments').select('created_via, professional_id').eq('contact_id', contact.id);
+  assertEquals(appts!.length, 1);
+  assertEquals(appts![0].created_via, 'ia_cliente');
+  assert(appts![0].professional_id, 'a consulta ficou com um profissional');
 }});
 
 Deno.test({ name: 'dono pelo agente: a venda vira confirmação e o recibo da mensagem muda depois', ...opts, fn: async () => {
@@ -337,6 +362,19 @@ Deno.test({ name: 'automações: lembrete de horário sai uma vez, com o modelo 
   assertEquals(again.sent.lembrete_agendamento ?? 0, 0);
   const { data: runs } = await db.from('automation_runs').select('status, target_label').eq('company_id', CID).eq('kind', 'lembrete_agendamento');
   assertEquals(runs, [{ status: 'enviado', target_label: 'Rita Alves' }]);
+
+  // retorno: manutenção de aparelho há 29 dias (retorno em 30) e nada marcado depois: convite uma vez só
+  await db.from('automations').update({ config: { horario: '00:00' } }).eq('company_id', CID).eq('kind', 'retorno');
+  const aparelho = (await loadBase(CID)).services.find((s) => s.name === 'Manutenção de aparelho')!;
+  const { contact: leo } = await findOrCreateContact(CID, '5561944443333', 'Léo Prado');
+  const past = new Date(Date.now() - 29 * 86400_000);
+  await db.from('appointments').insert({ company_id: CID, contact_id: leo.id, service_id: aparelho.id, title: aparelho.name, starts_at: past.toISOString(), ends_at: new Date(past.getTime() + 1800_000).toISOString(), status: 'concluido', created_via: 'painel' });
+  const rt = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(rt.sent.retorno, 1);
+  const rtpl = graph.filter((c) => c.body.type === 'template' && c.body.template.name === 'lembrete_retorno').at(-1)!;
+  assertEquals(rtpl.body.template.components[0].parameters.map((p: { text: string }) => p.text).slice(0, 2), ['Léo', 'Manutenção de aparelho']);
+  const rt2 = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
+  assertEquals(rt2.sent.retorno ?? 0, 0);
 
   // orçamento enviado há 3 dias e sem resposta: acompanhamento automático com o link
   const { data: ju } = await db.from('contacts').select('id').eq('company_id', CID).eq('phone', '5561912345678').single();

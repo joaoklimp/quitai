@@ -1,3 +1,4 @@
+// GERADO por scripts/sync-functions.mjs a partir de src/shared/presets.ts. Não edite aqui: edite o original e rode "npm run sync:functions".
 // Especialidades de clínica e procedimentos de exemplo, usados na primeira configuração
 // (mesma lista da função segment_presets no banco).
 export interface PresetService { name: string; price: number; price_type: 'fixo' | 'a_partir_de' | 'sob_consulta'; duration_min: number; category: string; return_days: number | null }

@@ -29,6 +29,8 @@ export interface Company {
   max_days_ahead: number;
   /** módulos opcionais ligados (o essencial sempre aparece) */
   modules: ModuleKey[];
+  /** convênios aceitos pela clínica (vazio = só particular) */
+  insurances: string[];
   monthly_goal: number;
   plan: PlanId;
   billing_status: BillingStatus;
@@ -113,6 +115,9 @@ export interface Contact {
   created_at: ISO;
   updated_at: ISO;
   document?: string | null; // CPF ou CNPJ, só números
+  insurance?: string | null; // convênio do paciente (vazio = particular)
+  insurance_card?: string | null; // número da carteirinha
+  guardian_name?: string | null; // responsável (menores de idade)
 }
 
 export type PriceType = 'fixo' | 'a_partir_de' | 'sob_consulta';
@@ -125,6 +130,24 @@ export interface Service {
   price_type: PriceType;
   duration_min: number;
   category: string | null;
+  active: boolean;
+  sort: number;
+  /** dias até o retorno (a ORBYTA convida o paciente a remarcar); vazio = sem retorno */
+  return_days?: number | null;
+  created_at: ISO;
+}
+
+/** Profissional da clínica: cada um tem a própria agenda. */
+export interface Professional {
+  id: UUID;
+  company_id: UUID;
+  name: string;
+  specialty: string | null;
+  council: string | null; // registro no conselho, ex.: CRM-SP 123456
+  color: string;
+  business_hours: BusinessHours | null; // vazio = horário da clínica
+  service_ids: UUID[]; // vazio = atende todos os procedimentos
+  member_user_id: UUID | null;
   active: boolean;
   sort: number;
   created_at: ISO;
@@ -178,9 +201,15 @@ export interface Appointment {
   price: number | null;
   created_via: Channel;
   reminder_sent_at: ISO | null;
+  professional_id?: UUID | null;
+  payment_kind?: PaymentKind;
+  insurance?: string | null;
+  /** quando o paciente confirmou presença (respondendo ao lembrete) */
+  patient_confirmed_at?: ISO | null;
   created_at: ISO;
   updated_at: ISO;
 }
+export type PaymentKind = 'particular' | 'convenio';
 
 export type PayMethod = 'pix' | 'dinheiro' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'outro';
 export type SaleOrigin = 'ia' | 'equipe' | 'balcao';
@@ -295,7 +324,7 @@ export interface AuditEntry {
   created_at: ISO;
 }
 
-export type AutomationKind = 'lembrete_agendamento' | 'followup_orcamento' | 'resumo_diario' | 'pos_atendimento' | 'reativacao' | 'lembrete_tarefa' | 'relatorio_semanal' | 'encaixe';
+export type AutomationKind = 'lembrete_agendamento' | 'followup_orcamento' | 'resumo_diario' | 'pos_atendimento' | 'reativacao' | 'lembrete_tarefa' | 'relatorio_semanal' | 'encaixe' | 'retorno';
 export interface Automation {
   id: UUID;
   company_id: UUID;
@@ -507,7 +536,7 @@ export type TableName =
   | 'contacts' | 'services' | 'quotes' | 'quote_items' | 'appointments' | 'sales' | 'tasks'
   | 'conversations' | 'messages' | 'pending_actions' | 'audit_log' | 'automations' | 'automation_runs'
   | 'notifications' | 'members' | 'invoices' | 'usage_monthly' | 'finance_entries' | 'products' | 'stock_movements'
-  | 'charges' | 'fiscal_notes' | 'company_integrations' | 'waitlist';
+  | 'charges' | 'fiscal_notes' | 'company_integrations' | 'waitlist' | 'professionals';
 
 export interface RowMap {
   contacts: Contact; services: Service; quotes: Quote; quote_items: QuoteItem; appointments: Appointment;
@@ -516,6 +545,7 @@ export interface RowMap {
   members: Member; invoices: Invoice; usage_monthly: UsageMonth;
   finance_entries: FinanceEntry; products: Product; stock_movements: StockMovement;
   charges: Charge; fiscal_notes: FiscalNote; company_integrations: CompanyIntegration; waitlist: WaitlistEntry;
+  professionals: Professional;
 }
 
 export type Filter =

@@ -1,7 +1,7 @@
 // Automações agendadas (a função "cron" chama runCron a cada 5 minutos).
-// Roda as automações ligadas em cada empresa: lembrete de horário, acompanhamento de orçamento, resumo do dia,
-// pós-atendimento, reativação de clientes, lembretes de tarefas, relatório semanal de valor e encaixe de
-// clientes da lista de espera em horários cancelados. Cada envio é registrado uma vez só.
+// Roda as automações ligadas em cada clínica: lembrete com confirmação de presença, acompanhamento de orçamento,
+// resumo do dia, pós-consulta, reativação de pacientes, lembretes de tarefas, relatório semanal de valor, encaixe de
+// pacientes da lista de espera em horários desmarcados e convite para o retorno. Cada envio é registrado uma vez só.
 import { db, notify } from '../_shared/db.ts';
 import { syncNote } from '../_shared/fiscal.ts';
 import type { FiscalNote } from '../_shared/types.ts';
@@ -50,7 +50,7 @@ export async function runCron(req: Request): Promise<Response> {
 }
 
 /** Mesma regra da tela de Automações: o que mostra valor todo dia vale em todos os planos; o resto, do Profissional em diante. */
-export const ALL_PLANS: AutomationKind[] = ['lembrete_tarefa', 'lembrete_agendamento', 'resumo_diario', 'relatorio_semanal'];
+export const ALL_PLANS: AutomationKind[] = ['lembrete_tarefa', 'lembrete_agendamento', 'resumo_diario', 'relatorio_semanal', 'retorno'];
 function allowed(b: Base, kind: AutomationKind): boolean {
   if (ALL_PLANS.includes(kind) || b.plan.id === 'teste') return true;
   return b.plan.automations;
@@ -88,8 +88,10 @@ const RUN: Record<AutomationKind, Runner> = {
       const run = await claim(b, a, ap.id, c.name);
       if (!run) continue;
       const quando = dayName(b, ap.starts_at), hora = localTime(ap.starts_at, b.tz);
-      const text = `Olá, ${firstName(c.name)}! Passando para lembrar do seu horário de ${ap.title} ${quando}, às ${hora}.${a.config.pedir_confirmacao ? ' Pode confirmar respondendo *SIM*? Se precisar remarcar, é só me avisar por aqui.' : ''}`;
-      const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Lembrete automático', template: { name: a.template_name || TEMPLATES.lembrete.name, params: [firstName(c.name), ap.title, quando, hora] } });
+      const pro = ap.professional_id ? b.professionals.find((p) => p.id === ap.professional_id)?.name : null;
+      const what = `${ap.title}${pro ? ` com ${pro}` : ''}`;
+      const text = `Olá, ${firstName(c.name)}! Lembrete da sua consulta de ${what} ${quando}, às ${hora}${b.company.address ? `, na ${b.company.address}` : ''}.${a.config.pedir_confirmacao ? ' Pode confirmar sua presença respondendo *SIM*? Se não puder vir, me avise por aqui que eu remarco.' : ''}`;
+      const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Lembrete automático', template: { name: a.template_name || TEMPLATES.lembrete.name, params: [firstName(c.name), what, quando, hora] } });
       await settle(run, r.sent, r.sent ? `Horário ${quando} às ${hora}` : r.reason ?? 'não enviado');
       await db.from('appointments').update({ reminder_sent_at: new Date().toISOString() }).eq('id', ap.id);
       if (r.sent) { sent++; budget--; }
@@ -140,14 +142,16 @@ const RUN: Record<AutomationKind, Runner> = {
       db.from('sales').select('amount').eq('company_id', id).gte('paid_at', from).lt('paid_at', to),
       db.from('quotes').select('status').eq('company_id', id).gte('created_at', from).lt('created_at', to),
       db.from('conversations').select('id', { count: 'exact', head: true }).eq('company_id', id).eq('needs_attention', true).eq('status', 'aberta'),
-      db.from('appointments').select('starts_at, title, contact:contacts(name)').eq('company_id', id).gte('starts_at', to).lt('starts_at', to2).neq('status', 'cancelado').order('starts_at').limit(12),
+      db.from('appointments').select('starts_at, title, professional_id, patient_confirmed_at, contact:contacts(name)').eq('company_id', id).gte('starts_at', to).lt('starts_at', to2).neq('status', 'cancelado').order('starts_at').limit(30),
       db.from('finance_entries').select('kind, amount, due_date').eq('company_id', id).is('paid_at', null).lte('due_date', tomorrowDate),
       db.from('charges').select('amount').eq('company_id', id).eq('status', 'vencida'),
       db.from('waitlist').select('id', { count: 'exact', head: true }).eq('company_id', id).in('status', ['aguardando', 'oferecido']),
       db.from('quotes').select('total').eq('company_id', id).eq('status', 'enviado'),
     ]);
     const total = (sales.data ?? []).reduce((t, x) => t + Number(x.amount), 0);
-    const agenda = (tomorrow.data ?? []) as unknown as { starts_at: string; title: string; contact: { name: string } | null }[];
+    const agenda = (tomorrow.data ?? []) as unknown as { starts_at: string; title: string; professional_id: string | null; patient_confirmed_at: string | null; contact: { name: string } | null }[];
+    const unconfirmed = agenda.filter((x) => !x.patient_confirmed_at).length;
+    const proFirst = (pid: string | null) => (pid && b.professionals.length > 1 ? ` (${firstName(b.professionals.find((p) => p.id === pid)?.name)})` : '');
     const fin = (money.data ?? []) as { kind: string; amount: number; due_date: string }[];
     const sum = (l: { amount: number }[]) => l.reduce((t, x) => t + Number(x.amount), 0);
     const payTomorrow = fin.filter((x) => x.kind === 'pagar' && x.due_date === tomorrowDate);
@@ -156,15 +160,15 @@ const RUN: Record<AutomationKind, Runner> = {
     const open = (quotesOpen.data ?? []) as { total: number }[];
     const lines = [
       `*Resumo de hoje na ${b.company.name}*`,
-      `💰 Vendas: ${(sales.data ?? []).length} · ${brl(total)}`,
+      `💰 Recebido hoje: ${brl(total)} (${(sales.data ?? []).length} ${(sales.data ?? []).length === 1 ? 'pagamento' : 'pagamentos'})`,
       `📄 Orçamentos criados: ${(quotes.data ?? []).length}${open.length ? ` · ${open.length} esperando o cliente aprovar (${brl(open.reduce((t, x) => t + Number(x.total), 0))})` : ''}`,
       `💬 Esperando resposta: ${waiting.count ?? 0}`,
       payLate.length ? `⚠️ Contas a pagar vencidas: ${payLate.length} (${brl(sum(payLate))})` : '',
       payTomorrow.length ? `📤 Vencem amanhã: ${payTomorrow.length} ${payTomorrow.length === 1 ? 'conta' : 'contas'} (${brl(sum(payTomorrow))})` : '',
       receive.length ? `📥 A receber até amanhã: ${brl(sum(receive))}` : '',
       (overdue.data ?? []).length ? `🔴 Cobranças vencidas: ${(overdue.data ?? []).length} (${brl(sum(overdue.data as { amount: number }[]))})` : '',
-      waitlist.count ? `⏳ Lista de espera: ${waitlist.count} ${waitlist.count === 1 ? 'cliente' : 'clientes'}` : '',
-      a.config.incluir_agenda !== false ? (agenda.length ? `📅 Amanhã:\n${agenda.map((x) => `• ${localTime(x.starts_at, b.tz)} ${x.contact?.name ?? ''} — ${x.title}`).join('\n')}` : '📅 Amanhã: agenda livre') : '',
+      waitlist.count ? `⏳ Lista de espera: ${waitlist.count} ${waitlist.count === 1 ? 'paciente' : 'pacientes'}` : '',
+      a.config.incluir_agenda !== false ? (agenda.length ? `📅 Amanhã: ${agenda.length} ${agenda.length === 1 ? 'consulta' : 'consultas'}${unconfirmed ? ` · ${unconfirmed} sem confirmar` : ' · todas confirmadas'}\n${agenda.slice(0, 12).map((x) => `• ${localTime(x.starts_at, b.tz)} ${x.contact?.name ?? ''} — ${x.title}${proFirst(x.professional_id)}${x.patient_confirmed_at ? ' ✅' : ''}`).join('\n')}` : '📅 Amanhã: agenda livre') : '',
     ].filter(Boolean).join('\n');
     let sent = 0;
     for (const p of people) {
@@ -174,7 +178,7 @@ const RUN: Record<AutomationKind, Runner> = {
       let ok = false, detail = 'Resumo do dia';
       try {
         if (withinWindow(await lastOwnerWhatsApp(b.company.id, p.user_id))) { await sendText(acc, p.phone, lines); ok = true; }
-        else { await sendTemplate(acc, p.phone, a.template_name || TEMPLATES.resumo.name, [b.company.name, `${(sales.data ?? []).length} vendas (${brl(total)}), ${(quotes.data ?? []).length} orçamentos, ${waiting.count ?? 0} esperando resposta`]); ok = true; }
+        else { await sendTemplate(acc, p.phone, a.template_name || TEMPLATES.resumo.name, [b.company.name, `${brl(total)} recebidos, ${agenda.length} consultas amanhã (${unconfirmed} sem confirmar), ${waiting.count ?? 0} esperando resposta`]); ok = true; }
       } catch (e) { detail = (e as Error).message; }
       await settle(run, ok, detail);
       if (ok) { sent++; budget--; await db.rpc('bump_usage', { p_company: b.company.id, p_wa: 1 }); }
@@ -196,7 +200,7 @@ const RUN: Record<AutomationKind, Runner> = {
       const run = await claim(b, a, ap.id, c.name);
       if (!run) continue;
       const review = a.config.pedir_avaliacao && a.config.link_avaliacao ? ` Se puder, deixe uma avaliação: ${String(a.config.link_avaliacao).startsWith('http') ? '' : 'https://'}${a.config.link_avaliacao}` : '';
-      const text = `Olá, ${firstName(c.name)}! Obrigado por escolher a ${b.company.name}. Esperamos que tenha gostado do serviço!${review}`;
+      const text = `Olá, ${firstName(c.name)}! Obrigado pela confiança na ${b.company.name}. Esperamos que tenha sido bem atendido(a)!${review}`;
       const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Pós-atendimento', template: { name: a.template_name || TEMPLATES.posAtendimento.name, params: [firstName(c.name), b.company.name, review.trim() || 'Qualquer coisa, é só chamar por aqui.'] } });
       await settle(run, r.sent, r.sent ? 'Agradecimento enviado' : r.reason ?? 'não enviado');
       if (r.sent) { sent++; budget--; }
@@ -218,8 +222,8 @@ const RUN: Record<AutomationKind, Runner> = {
       if (recent?.length) continue;
       const run = await claim(b, a, `${c.id}:${month}`, c.name);
       if (!run) continue;
-      const offer = pct ? `Para você voltar, preparamos ${pct}% de desconto no próximo serviço.` : 'Quando quiser agendar de novo, é só responder aqui.';
-      const r = await deliverToContact(b, c, `Olá, ${firstName(c.name)}! Sentimos sua falta na ${b.company.name}. ${offer}`, { sender: 'ia', senderName: 'Reativação', template: { name: a.template_name || TEMPLATES.reativacao.name, params: [firstName(c.name), b.company.name, offer] } });
+      const offer = pct ? `Para você voltar, preparamos ${pct}% de desconto na próxima consulta.` : 'Quando quiser marcar uma consulta, é só responder aqui.';
+      const r = await deliverToContact(b, c, `Olá, ${firstName(c.name)}! Faz tempo que não te vemos na ${b.company.name}. ${offer}`, { sender: 'ia', senderName: 'Reativação', template: { name: a.template_name || TEMPLATES.reativacao.name, params: [firstName(c.name), b.company.name, offer] } });
       await settle(run, r.sent, r.sent ? `Sem comprar há mais de ${days} dias` : r.reason ?? 'não enviado');
       if (r.sent) { sent++; budget--; }
     }
@@ -318,7 +322,8 @@ const RUN: Record<AutomationKind, Runner> = {
       const duration = Math.round((Date.parse(ap.ends_at) - Date.parse(ap.starts_at)) / 60000);
       const dayStart = fromLocal(date, '00:00', b.tz).toISOString(), dayEnd = fromLocal(addDays(date, 1), '00:00', b.tz).toISOString();
       const { data: dayAppts } = await db.from('appointments').select('*').eq('company_id', b.company.id).lt('starts_at', dayEnd).gt('ends_at', dayStart).not('status', 'in', '(cancelado,faltou)');
-      if (!isFree(ap.starts_at, duration, b.company, (dayAppts ?? []) as Appointment[]).ok) continue; // alguém já ocupou
+      const opts = { professionals: b.professionals, serviceId: ap.service_id, professionalId: ap.professional_id && b.professionals.some((p) => p.id === ap.professional_id) ? ap.professional_id : null };
+      if (!isFree(ap.starts_at, duration, b.company, (dayAppts ?? []) as Appointment[], new Date(), opts).ok) continue; // alguém já ocupou
       const offeredBefore = new Set((prev ?? []).map((x) => x.target_key.split(':')[2]));
       const idx = queue.findIndex((w) => !offeredBefore.has(w.contact_id) && (!w.desired_date || w.desired_date === date) && (w.period === 'qualquer' || w.period === period) && (!w.service_id || !ap.service_id || w.service_id === ap.service_id) && w.contact_id !== ap.contact_id);
       if (idx < 0) continue;
@@ -328,7 +333,8 @@ const RUN: Record<AutomationKind, Runner> = {
       if (!run) continue;
       const quando = dayName(b, ap.starts_at), hora = localTime(ap.starts_at, b.tz);
       const servico = b.services.find((x) => x.id === (w.service_id ?? ap.service_id))?.name ?? ap.title ?? 'o atendimento';
-      const text = `Olá, ${firstName(c.name)}! Boa notícia: abriu um horário ${quando} às ${hora} para ${servico}. Quer ficar com ele? É só responder *SIM* por aqui.`;
+      const pro = opts.professionalId ? b.professionals.find((p) => p.id === opts.professionalId)?.name : null;
+      const text = `Olá, ${firstName(c.name)}! Boa notícia: abriu um horário ${quando} às ${hora} para ${servico}${pro ? ` com ${pro}` : ''}. Quer ficar com ele? É só responder *SIM* por aqui.`;
       const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Encaixe automático', template: { name: a.template_name || TEMPLATES.encaixe.name, params: [firstName(c.name), quando, hora, servico] } });
       await settle(run, r.sent, r.sent ? `Horário ${quando} às ${hora} oferecido` : r.reason ?? 'não enviado');
       if (r.sent) {
@@ -339,6 +345,39 @@ const RUN: Record<AutomationKind, Runner> = {
     }
     // ofertas sem resposta há mais de 2 horas voltam para a fila
     await db.from('waitlist').update({ status: 'aguardando', offered_at: null, offered_starts_at: null }).eq('company_id', b.company.id).eq('status', 'oferecido').lt('offered_at', new Date(now - 2 * 3600000).toISOString());
+    return sent;
+  },
+
+  /* retorno: quem fez um procedimento com prazo de retorno e ainda não marcou recebe o convite no dia certo */
+  async retorno(b, a) {
+    const hhmm = /^\d{2}:\d{2}$/.test(String(a.config.horario)) ? String(a.config.horario) : '10:00';
+    if (localTime(new Date(), b.tz) < hhmm) return 0;
+    const withReturn = b.services.filter((x) => Number(x.return_days) > 0);
+    if (!withReturn.length) return 0;
+    const now = Date.now();
+    const oldest = Math.max(...withReturn.map((x) => Number(x.return_days))) + 7;
+    const { data } = await db.from('appointments').select('*, contact:contacts(*)').eq('company_id', b.company.id).eq('status', 'concluido')
+      .in('service_id', withReturn.map((x) => x.id)).gt('starts_at', new Date(now - oldest * 86400000).toISOString()).order('starts_at', { ascending: false }).limit(200);
+    let sent = 0;
+    const seen = new Set<string>();
+    for (const ap of (data ?? []) as (Appointment & { contact: Contact | null })[]) {
+      if (budget <= 0) break;
+      const c = ap.contact;
+      if (!c?.phone || !c.opt_in || seen.has(c.id)) continue;
+      seen.add(c.id); // só o atendimento mais recente de cada paciente conta
+      const svc = withReturn.find((x) => x.id === ap.service_id)!;
+      const due = Date.parse(ap.starts_at) + Number(svc.return_days) * 86400000;
+      // convida a partir de 3 dias antes do prazo, por até 7 dias depois
+      if (now < due - 3 * 86400000 || now > due + 7 * 86400000) continue;
+      const { data: next } = await db.from('appointments').select('id').eq('contact_id', c.id).gt('starts_at', ap.ends_at).not('status', 'in', '(cancelado,faltou)').limit(1);
+      if (next?.length) continue; // já marcou
+      const run = await claim(b, a, ap.id, c.name);
+      if (!run) continue;
+      const text = `Olá, ${firstName(c.name)}! Está chegando a hora do seu retorno de ${svc.name} na ${b.company.name}. Quer que eu veja um horário para você? É só responder por aqui.`;
+      const r = await deliverToContact(b, c, text, { sender: 'ia', senderName: 'Retorno automático', template: { name: a.template_name || TEMPLATES.retorno.name, params: [firstName(c.name), svc.name, b.company.name] } });
+      await settle(run, r.sent, r.sent ? `Retorno de ${svc.name} (${svc.return_days} dias)` : r.reason ?? 'não enviado');
+      if (r.sent) { sent++; budget--; }
+    }
     return sent;
   },
 };

@@ -1,4 +1,4 @@
-// Ferramentas da IA. Cada uma valida a entrada, confere o que a pessoa (ou o cliente) pode fazer,
+// Ferramentas da IA. Cada uma valida a entrada, confere o que a pessoa (ou o paciente) pode fazer,
 // age no banco, registra no histórico e devolve um recibo para o painel e para o WhatsApp.
 // Ações sensíveis do modo dono não executam na hora: viram um pedido de confirmação (pending_actions).
 import { db, audit, notify } from './db.ts';
@@ -11,13 +11,13 @@ import { loadAccount, sendTemplate, sendText, withinWindow } from './whatsapp.ts
 import { TEMPLATES } from './templates.ts';
 import { createCharge, ProviderError, type Actor } from './payments.ts';
 import { emitNote } from './fiscal.ts';
-import type { ActionReceipt, Appointment, Contact, PayMethod, Role, Service } from './types.ts';
+import type { ActionReceipt, Appointment, Contact, PayMethod, Professional, Role, Service } from './types.ts';
 
 export interface AgentCtx extends Base {
   mode: 'cliente' | 'dono';
   channel: 'whatsapp' | 'painel' | 'simulador';
   conversationId: string;
-  contact?: Contact; // modo cliente
+  contact?: Contact; // modo paciente
   member?: { userId: string; name: string; role: Role }; // modo dono
 }
 
@@ -58,13 +58,25 @@ async function dayAppointments(c: AgentCtx, date: string): Promise<Appointment[]
   return (data ?? []) as Appointment[];
 }
 const service = (c: AgentCtx, id: unknown) => c.services.find((x) => x.id === s(id));
+const professional = (c: AgentCtx, id: unknown) => c.professionals.find((x) => x.id === s(id));
+const proName = (c: AgentCtx, id?: string | null) => (id ? c.professionals.find((p) => p.id === id)?.name : undefined);
+/** "Dr. Bruno Reis" → "Dr. Bruno"; "Ana Duarte" → "Ana". */
+const shortPro = (name?: string) => { const t = (name ?? '').trim().split(/\s+/); return /^(dra?|prof(a|ª)?|enf)\.?$/i.test(t[0] ?? '') ? t.slice(0, 2).join(' ') : t[0] ?? ''; };
+const slotOpts = (c: AgentCtx, serviceId?: string | null, professionalId?: string | null) => ({ professionals: c.professionals, serviceId: serviceId ?? null, professionalId: professionalId ?? null });
+/** Convênio pedido: precisa estar na lista aceita pela clínica. Devolve o nome oficial, null (particular) ou um erro. */
+function insuranceOf(c: AgentCtx, raw: unknown): { name: string | null; error?: string } {
+  const want = s(raw, 80);
+  if (!want || /^particular$/i.test(want)) return { name: null };
+  const found = (c.company.insurances ?? []).find((x) => fold(x) === fold(want) || fold(x).includes(fold(want)) || fold(want).includes(fold(x)));
+  return found ? { name: found } : { name: null, error: `A clínica não atende pelo convênio "${want}". Convênios aceitos: ${(c.company.insurances ?? []).join(', ') || 'nenhum (só particular)'}. Ofereça a consulta particular.` };
+}
 async function contactById(c: AgentCtx, id: unknown): Promise<Contact | null> {
   const { data } = await db.from('contacts').select('*').eq('company_id', c.company.id).eq('id', s(id)).maybeSingle();
   return (data as Contact | null) ?? null;
 }
 async function appointmentFor(c: AgentCtx, id: unknown): Promise<Appointment | null> {
   let q = db.from('appointments').select('*').eq('company_id', c.company.id).eq('id', s(id));
-  if (c.mode === 'cliente') q = q.eq('contact_id', c.contact!.id); // o cliente só mexe nos próprios horários
+  if (c.mode === 'cliente') q = q.eq('contact_id', c.contact!.id); // o paciente só mexe nos próprios horários
   const { data } = await q.maybeSingle();
   return (data as Appointment | null) ?? null;
 }
@@ -87,16 +99,20 @@ async function freeSlots(c: AgentCtx, input: Record<string, unknown>): Promise<T
   const date = s(input.data);
   if (!DATE.test(date)) return err('Informe a data no formato AAAA-MM-DD.');
   const svc = input.servico_id ? service(c, input.servico_id) : undefined;
-  if (input.servico_id && !svc) return err('Serviço não encontrado: use um id da lista de serviços.');
+  if (input.servico_id && !svc) return err('Procedimento não encontrado: use um id da lista de procedimentos.');
+  const pro = input.profissional_id ? professional(c, input.profissional_id) : undefined;
+  if (input.profissional_id && !pro) return err('Profissional não encontrado: use um id da lista de profissionais.');
   const duration = svc?.duration_min ?? c.company.slot_minutes;
   const intervals = c.company.business_hours?.[String(new Date(date + 'T12:00:00Z').getUTCDay())] ?? [];
   const today = localDate(new Date(), c.tz);
   if (date < today) return err('Essa data já passou.');
   if (date > addDays(today, c.company.max_days_ahead)) return ok(`A agenda só está aberta até ${fmtDate(addDays(today, c.company.max_days_ahead) + 'T12:00:00Z', c.tz)}.`);
-  if (!intervals.length) return ok(`A empresa não atende em ${WEEKDAYS_SHORT[new Date(date + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(date + 'T12:00:00Z', c.tz)}.`);
-  const slots = slotsForDate(date, c.company, await dayAppointments(c, date), duration);
-  if (!slots.length) return ok(`Não há horários livres em ${fmtDate(date + 'T12:00:00Z', c.tz)} para ${svc?.name ?? 'esse atendimento'} (${duration} min). Sugira outro dia.`);
-  return ok(`Horários livres em ${WEEKDAYS_SHORT[new Date(date + 'T12:00:00Z').getUTCDay()]} ${fmtDate(date + 'T12:00:00Z', c.tz)} para ${svc?.name ?? 'atendimento'} (${duration} min): ${slots.map((x) => x.time).join(', ')}.`);
+  if (!intervals.length && !c.professionals.some((p) => (p.business_hours?.[String(new Date(date + 'T12:00:00Z').getUTCDay())] ?? []).length)) return ok(`A clínica não atende em ${WEEKDAYS_SHORT[new Date(date + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(date + 'T12:00:00Z', c.tz)}.`);
+  const slots = slotsForDate(date, c.company, await dayAppointments(c, date), duration, new Date(), slotOpts(c, svc?.id, pro?.id));
+  const label = `${svc?.name ?? 'consulta'} (${duration} min)${pro ? ` com ${pro.name}` : ''}`;
+  if (!slots.length) return ok(`Não há horários livres em ${fmtDate(date + 'T12:00:00Z', c.tz)} para ${label}. Sugira outro dia${pro ? ' ou outro profissional' : ''}.`);
+  const who = (x: { pros: string[] }) => (c.professionals.length > 1 && !pro ? ` (${x.pros.map((id) => shortPro(proName(c, id))).join('/')})` : '');
+  return ok(`Horários livres em ${WEEKDAYS_SHORT[new Date(date + 'T12:00:00Z').getUTCDay()]} ${fmtDate(date + 'T12:00:00Z', c.tz)} para ${label}: ${slots.map((x) => `${x.time}${who(x)}`).join(', ')}.`);
 }
 
 async function book(c: AgentCtx, input: Record<string, unknown>): Promise<ToolResult> {
@@ -109,44 +125,53 @@ async function book(c: AgentCtx, input: Record<string, unknown>): Promise<ToolRe
     if (input.cliente_id && !contact) return err('Cliente não encontrado. Use buscar_clientes para achar o id.');
   }
   const svc = input.servico_id ? service(c, input.servico_id) : undefined;
-  if (c.mode === 'cliente' && !svc) return err('Escolha um serviço da lista (servico_id).');
-  if (input.servico_id && !svc) return err('Serviço não encontrado: use um id da lista.');
+  if (c.mode === 'cliente' && !svc) return err('Escolha um procedimento da lista (servico_id).');
+  if (input.servico_id && !svc) return err('Procedimento não encontrado: use um id da lista.');
+  const pro = input.profissional_id ? professional(c, input.profissional_id) : undefined;
+  if (input.profissional_id && !pro) return err('Profissional não encontrado: use um id da lista de profissionais.');
+  const ins = insuranceOf(c, input.convenio);
+  if (ins.error) return err(ins.error);
   const duration = Math.max(10, Number(input.duracao_min) || svc?.duration_min || c.company.slot_minutes);
   const start = at(c, date, time);
   const end = new Date(start.getTime() + duration * 60000);
   const force = c.mode === 'dono' && input.encaixar === true;
+  let proId: string | null = pro?.id ?? null;
   if (!force) {
-    const free = isFree(start.toISOString(), duration, c.company, await dayAppointments(c, date));
+    const free = isFree(start.toISOString(), duration, c.company, await dayAppointments(c, date), new Date(), slotOpts(c, svc?.id, pro?.id));
     if (!free.ok) return err(`${free.reason} Consulte os horários livres e ofereça outra opção${c.mode === 'dono' ? ' (ou use encaixar: true se a pessoa quiser marcar mesmo assim)' : ''}.`);
-  }
+    proId = free.professionalId ?? proId;
+  } else if (!proId && c.professionals.length === 1) proId = c.professionals[0].id;
   if (c.mode === 'cliente' && contact) {
     const patch: Record<string, unknown> = {};
     const name = s(input.nome, 120), address = s(input.endereco, 300);
     if (name && fold(name) !== fold(contact.name)) patch.name = name;
     if (address) patch.address = address;
+    if (ins.name && contact.insurance !== ins.name) patch.insurance = ins.name;
+    if (s(input.carteirinha, 40)) patch.insurance_card = s(input.carteirinha, 40);
     if (Object.keys(patch).length) { await db.from('contacts').update(patch).eq('id', contact.id); Object.assign(contact, patch); }
   }
   const pending = c.mode === 'cliente' && c.ai.booking_mode === 'confirmar';
   const { data: appt, error } = await db.from('appointments').insert({
     company_id: c.company.id, contact_id: contact?.id ?? null, service_id: svc?.id ?? null, title: svc?.name ?? (s(input.titulo, 120) || 'Atendimento'),
     starts_at: start.toISOString(), ends_at: end.toISOString(), status: pending ? 'pendente' : 'confirmado',
-    address: s(input.endereco, 300) || contact?.address || null, notes: s(input.observacoes, 1000) || null,
-    price: svc && svc.price_type !== 'sob_consulta' ? svc.price : null, created_via: via(c),
+    address: s(input.endereco, 300) || null, notes: s(input.observacoes, 1000) || null,
+    price: svc && svc.price_type !== 'sob_consulta' && !ins.name ? svc.price : null, created_via: via(c),
+    professional_id: proId, payment_kind: ins.name ? 'convenio' : 'particular', insurance: ins.name,
   }).select('*').single();
   if (error) return err(/horario_ocupado/.test(error.message) ? 'Esse horário acabou de ser ocupado. Consulte de novo e ofereça outro.' : `Não consegui agendar: ${error.message}`);
-  const label = `${when(c, appt.starts_at)} · ${appt.title}`;
+  const label = `${when(c, appt.starts_at)} · ${appt.title}${proId ? ` com ${proName(c, proId)}` : ''}${ins.name ? ` · ${ins.name}` : ''}`;
   // quem estava na lista de espera e conseguiu o horário sai da lista (encaixe concluído)
   if (contact && !sim(c)) await db.from('waitlist').update({ status: 'agendado', appointment_id: appt.id }).eq('company_id', c.company.id).eq('contact_id', contact.id).in('status', ['aguardando', 'oferecido']);
   await log(c, 'agendar', `Agendou ${contact?.name ?? appt.title} para ${fmtDate(appt.starts_at, c.tz).slice(0, 5)} às ${localTime(appt.starts_at, c.tz)} (${appt.title})${pending ? ', aguardando confirmação da equipe' : ''}`, 'appointment', appt.id);
   if (c.mode === 'cliente') await alert(c, 'agendamento', pending ? `Confirmar horário de ${firstName(contact?.name)}` : `${firstName(contact?.name)} marcou um horário`, label, '#/agenda');
-  return ok(`Agendado (${pending ? 'pendente de confirmação da equipe' : 'confirmado'}): ${label}${appt.address ? ` · ${appt.address}` : ''}. Id ${appt.id}.`,
-    { tool: 'agendar_horario', label: pending ? 'Horário reservado (aguardando a equipe)' : 'Horário agendado', detail: label, status: 'ok', link: '#/agenda' });
+  return ok(`Consulta marcada (${pending ? 'pendente de confirmação da equipe' : 'confirmada'}): ${label}. Id ${appt.id}.`,
+    { tool: 'agendar_horario', label: pending ? 'Consulta reservada (aguardando a equipe)' : 'Consulta marcada', detail: label, status: 'ok', link: '#/agenda' });
 }
 
 async function myAppointments(c: AgentCtx): Promise<ToolResult> {
   const { data } = await db.from('appointments').select('*').eq('contact_id', c.contact!.id).gte('ends_at', new Date().toISOString()).not('status', 'in', '(cancelado,faltou)').order('starts_at').limit(10);
   const list = (data ?? []) as Appointment[];
-  return ok(list.length ? list.map((a) => `[${a.id}] ${when(c, a.starts_at)} — ${a.title} (${a.status})`).join('\n') : 'O cliente não tem horários marcados.');
+  return ok(list.length ? list.map((a) => `[${a.id}] ${when(c, a.starts_at)} — ${a.title}${a.professional_id ? ` com ${proName(c, a.professional_id) ?? 'profissional'}` : ''} (${a.status}${a.patient_confirmed_at ? ', presença confirmada' : ''})`).join('\n') : 'O paciente não tem consultas marcadas.');
 }
 
 async function reschedule(c: AgentCtx, input: Record<string, unknown>): Promise<ToolResult> {
@@ -159,13 +184,19 @@ async function reschedule(c: AgentCtx, input: Record<string, unknown>): Promise<
   const duration = Math.round((Date.parse(appt.ends_at) - Date.parse(appt.starts_at)) / 60000);
   const start = at(c, date, time);
   const others = (await dayAppointments(c, date)).filter((a) => a.id !== appt.id);
+  const pro = input.profissional_id ? professional(c, input.profissional_id) : undefined;
+  if (input.profissional_id && !pro) return err('Profissional não encontrado.');
+  let proId = pro?.id ?? appt.professional_id ?? null;
   if (!(c.mode === 'dono' && input.encaixar === true)) {
-    const free = isFree(start.toISOString(), duration, c.company, others);
+    // tenta manter o mesmo profissional; se ele não puder, qualquer um que faça o procedimento
+    let free = isFree(start.toISOString(), duration, c.company, others, new Date(), slotOpts(c, appt.service_id, proId));
+    if (!free.ok && !pro && proId) free = isFree(start.toISOString(), duration, c.company, others, new Date(), slotOpts(c, appt.service_id, null));
     if (!free.ok) return err(`${free.reason} Ofereça outra opção.`);
+    proId = free.professionalId ?? proId;
   }
-  const { error } = await db.from('appointments').update({ starts_at: start.toISOString(), ends_at: new Date(start.getTime() + duration * 60000).toISOString(), reminder_sent_at: null }).eq('id', appt.id);
+  const { error } = await db.from('appointments').update({ starts_at: start.toISOString(), ends_at: new Date(start.getTime() + duration * 60000).toISOString(), reminder_sent_at: null, patient_confirmed_at: null, professional_id: proId }).eq('id', appt.id);
   if (error) return err(/horario_ocupado/.test(error.message) ? 'Esse horário acabou de ser ocupado.' : error.message);
-  const label = `${when(c, start.toISOString())} · ${appt.title}`;
+  const label = `${when(c, start.toISOString())} · ${appt.title}${proId ? ` com ${proName(c, proId)}` : ''}`;
   await log(c, 'remarcar', `Remarcou ${appt.title} de ${fmtDate(appt.starts_at, c.tz).slice(0, 5)} ${localTime(appt.starts_at, c.tz)} para ${fmtDate(start, c.tz).slice(0, 5)} ${localTime(start, c.tz)}`, 'appointment', appt.id);
   if (c.mode === 'cliente') await alert(c, 'agendamento', `${firstName(c.contact?.name)} remarcou o horário`, label, '#/agenda');
   return ok(`Remarcado para ${label}.`, { tool: 'remarcar_horario', label: 'Horário remarcado', detail: label, status: 'ok', link: '#/agenda' });
@@ -219,7 +250,7 @@ async function createQuote(c: AgentCtx, input: Record<string, unknown>, confirme
     const qty = Math.min(1000, Math.max(0.01, Number(it.quantidade) || 1));
     let price: number;
     if (c.mode === 'cliente') {
-      if (!svc) return err('Para o cliente, use só serviços da tabela (servico_id).');
+      if (!svc) return err('Para o paciente, use só serviços da tabela (servico_id).');
       if (svc.price_type === 'sob_consulta') return err(`${svc.name} é sob consulta: não dá para orçar sem avaliação. Chame a equipe.`);
       price = svc.price;
     } else {
@@ -248,7 +279,7 @@ async function createQuote(c: AgentCtx, input: Record<string, unknown>, confirme
   if (error) return err(`Não consegui criar o orçamento: ${error.message}`);
   const { error: ie } = await db.from('quote_items').insert(items.map((i, idx) => ({ ...i, quote_id: q.id, company_id: c.company.id, sort: idx })));
   if (ie) { await db.from('quotes').delete().eq('id', q.id); return err(`Não consegui salvar os itens: ${ie.message}`); }
-  // aplica o desconto depois dos itens (o banco recalcula subtotal e total) e marca como enviado no modo cliente
+  // aplica o desconto depois dos itens (o banco recalcula subtotal e total) e marca como enviado no modo paciente
   const { data: full } = await db.from('quotes').update({ discount, status: c.mode === 'cliente' ? 'enviado' : 'rascunho' }).eq('id', q.id).select('*').single();
   const link = quoteLink(c, full);
   const label = `nº ${quoteNo(full.number)} · ${brl(full.total)}`;
@@ -257,10 +288,10 @@ async function createQuote(c: AgentCtx, input: Record<string, unknown>, confirme
   const receipt: ActionReceipt = { tool: 'criar_orcamento', label: `Orçamento nº ${quoteNo(full.number)} de ${brl(full.total)} criado`, detail: `${contact.name}${discount ? ` · desconto de ${brl(discount)}` : ''}`, status: 'ok', link: `#/orcamentos/${full.id}` };
   if (c.mode === 'dono' && input.enviar === true) {
     const r = await sendQuote(c, full.id, { type: 'ia', name: actor(c).actor_name, userId: c.member?.userId, channel: 'ia_dono' });
-    return ok(`Orçamento ${label} criado para ${contact.name}. ${r.sent ? 'Enviado ao cliente pelo WhatsApp.' : `Não foi enviado: ${r.reason} Link para mandar manualmente: ${link}`}`,
+    return ok(`Orçamento ${label} criado para ${contact.name}. ${r.sent ? 'Enviado ao paciente pelo WhatsApp.' : `Não foi enviado: ${r.reason} Link para mandar manualmente: ${link}`}`,
       { ...receipt, label: `${receipt.label}${r.sent ? ' e enviado' : ''}` });
   }
-  return ok(`Orçamento ${label} criado para ${contact.name}. Validade: ${days} dias. Link para o cliente aprovar: ${link}${c.mode === 'dono' ? ' (use enviar_orcamento para mandar pelo WhatsApp)' : ' — mande este link ao cliente.'}`, receipt);
+  return ok(`Orçamento ${label} criado para ${contact.name}. Validade: ${days} dias. Link para o paciente aprovar: ${link}${c.mode === 'dono' ? ' (use enviar_orcamento para mandar pelo WhatsApp)' : ' — mande este link ao paciente.'}`, receipt);
 }
 
 /* ---------- vendas, serviços e mensagens (executam depois da confirmação) ---------- */
@@ -296,7 +327,7 @@ export const EXECUTORS: Record<string, (c: AgentCtx, a: Record<string, unknown>)
       const contact = await contactById(c, appt.contact_id);
       if (contact) {
         const sent = await deliverToContact(c, contact, `Olá, ${firstName(contact.name)}! Precisamos cancelar o seu horário de ${when(c, appt.starts_at)} (${appt.title}). Se quiser, me responda aqui que remarcamos.`, { sender: 'ia', senderName: c.ai.assistant_name || 'IA', template: null });
-        r.content += sent.sent ? ' Cliente avisado pelo WhatsApp.' : ` O cliente não foi avisado: ${sent.reason}`;
+        r.content += sent.sent ? ' Paciente avisado pelo WhatsApp.' : ` O paciente não foi avisado: ${sent.reason}`;
       }
     }
     return r;
@@ -332,7 +363,7 @@ export const EXECUTORS: Record<string, (c: AgentCtx, a: Record<string, unknown>)
     try {
       const r = await createCharge(c, { contactId: s(a.cliente_id), amount: money(a.valor), description: s(a.descricao, 300) || 'Serviço', dueDate: DATE.test(s(a.vencimento)) ? s(a.vencimento) : addDays(localDate(new Date().toISOString(), c.tz), 3), method: (['pix', 'boleto'].includes(String(a.forma)) ? a.forma : 'pix_boleto') as 'pix', document: s(a.cpf_cnpj, 20) || null, send: a.enviar !== false && !sim(c) }, iaActor(c));
       const ch = r.charge;
-      return ok(`Cobrança de ${brl(ch.amount)} criada. Link: ${ch.invoice_url}.${r.sent ? ' Enviada ao cliente pelo WhatsApp.' : r.reason ? ` Não enviei pelo WhatsApp: ${r.reason}` : ''}`,
+      return ok(`Cobrança de ${brl(ch.amount)} criada. Link: ${ch.invoice_url}.${r.sent ? ' Enviada ao paciente pelo WhatsApp.' : r.reason ? ` Não enviei pelo WhatsApp: ${r.reason}` : ''}`,
         { tool: 'cobrar_cliente', label: `Cobrança de ${brl(ch.amount)} criada`, detail: `${ch.description}${r.sent ? ' · enviada no WhatsApp' : ''}`, status: 'ok', link: '#/cobrancas' });
     } catch (e) { return err(e instanceof ProviderError ? e.friendly : (e as Error).message); }
   },
@@ -368,8 +399,8 @@ const hour = str('Hora no formato HH:MM (24h).');
 
 const consultarHorarios: T = {
   name: 'consultar_horarios',
-  description: 'Lista os horários livres de um dia, respeitando o horário de funcionamento, a duração do serviço e a agenda. Use sempre antes de oferecer ou marcar um horário.',
-  input_schema: obj({ data: date, servico_id: str('Id do serviço (para usar a duração certa). Opcional.') }, ['data']),
+  description: 'Lista os horários livres de um dia, respeitando o horário da clínica, a agenda de cada profissional e a duração do procedimento. Use sempre antes de oferecer ou marcar uma consulta.',
+  input_schema: obj({ data: date, servico_id: str('Id do procedimento (para a duração e os profissionais certos). Opcional.'), profissional_id: str('Id do profissional, se o paciente pediu alguém. Opcional.') }, ['data']),
   run: (i, c) => freeSlots(c, i),
 };
 
@@ -377,91 +408,96 @@ export const CUSTOMER_TOOLS: T[] = [
   consultarHorarios,
   {
     name: 'agendar_horario',
-    description: 'Marca um horário para o cliente desta conversa. Antes, confirme com o cliente o serviço, a data e a hora e tenha o nome (e o endereço, se o serviço for no local do cliente).',
-    input_schema: obj({ servico_id: str('Id do serviço da tabela.'), data: date, hora: hour, nome: str('Nome do cliente, se ele informou.'), endereco: str('Endereço completo do atendimento, se for no local do cliente.'), observacoes: str('Detalhes úteis para a equipe (ex.: tamanho do sofá).') }, ['servico_id', 'data', 'hora']),
+    description: 'Marca uma consulta para o paciente desta conversa. Antes, confirme com ele o procedimento, a data e a hora e tenha o nome. Sem profissional_id, a agenda escolhe quem estiver livre.',
+    input_schema: obj({ servico_id: str('Id do procedimento da tabela.'), data: date, hora: hour, profissional_id: str('Id do profissional, se o paciente escolheu.'), convenio: str('Nome do convênio, se for por convênio (vazio = particular).'), carteirinha: str('Número da carteirinha do convênio, se informado.'), nome: str('Nome do paciente, se ele informou.'), observacoes: str('Detalhes administrativos para a equipe (ex.: "consulta para o filho, Pedro, 8 anos"). Nada de sintomas.') }, ['servico_id', 'data', 'hora']),
     run: (i, c) => book(c, i),
   },
   {
     name: 'meus_horarios',
-    description: 'Lista os próximos horários marcados pelo cliente desta conversa (com os ids).',
+    description: 'Lista as próximas consultas do paciente desta conversa (com os ids).',
     input_schema: obj({}),
     run: (_i, c) => myAppointments(c),
   },
   {
     name: 'remarcar_horario',
-    description: 'Muda a data e a hora de um horário do cliente desta conversa. Consulte os horários livres antes.',
-    input_schema: obj({ agendamento_id: str('Id do horário (de meus_horarios).'), data: date, hora: hour }, ['agendamento_id', 'data', 'hora']),
+    description: 'Muda a data e a hora de uma consulta do paciente desta conversa (mantém o profissional quando possível). Consulte os horários livres antes.',
+    input_schema: obj({ agendamento_id: str('Id da consulta (de meus_horarios).'), data: date, hora: hour, profissional_id: str('Outro profissional, se o paciente pediu.') }, ['agendamento_id', 'data', 'hora']),
     run: (i, c) => reschedule(c, i),
   },
   {
     name: 'cancelar_horario',
-    description: 'Cancela um horário do cliente desta conversa, quando ele pedir.',
-    input_schema: obj({ agendamento_id: str('Id do horário.'), motivo: str('Motivo informado pelo cliente.') }, ['agendamento_id']),
+    description: 'Desmarca uma consulta do paciente desta conversa, quando ele pedir. O horário vai para a lista de espera.',
+    input_schema: obj({ agendamento_id: str('Id do horário.'), motivo: str('Motivo informado pelo paciente.') }, ['agendamento_id']),
     run: async (i, c) => {
       const blocked = canWrite(c); if (blocked) return blocked;
       const appt = await appointmentFor(c, i.agendamento_id);
-      if (!appt) return err('Horário não encontrado entre os do cliente.');
+      if (!appt) return err('Horário não encontrado entre os do paciente.');
       if (appt.status !== 'confirmado' && appt.status !== 'pendente') return err(`Esse horário está ${appt.status}.`);
       return cancelAppointmentNow(c, appt, s(i.motivo, 200));
     },
   },
   {
     name: 'confirmar_presenca',
-    description: 'Registra que o cliente confirmou que vai comparecer a um horário (por exemplo, respondendo SIM ao lembrete).',
+    description: 'Registra que o paciente confirmou que vai comparecer a uma consulta (por exemplo, respondendo SIM ao lembrete).',
     input_schema: obj({ agendamento_id: str('Id do horário confirmado.') }, ['agendamento_id']),
     run: async (i, c) => {
       const appt = await appointmentFor(c, i.agendamento_id);
-      if (!appt) return err('Horário não encontrado entre os do cliente.');
+      if (!appt) return err('Horário não encontrado entre os do paciente.');
       if (appt.status === 'cancelado') return err('Esse horário foi cancelado.');
-      const note = `Cliente confirmou presença em ${fmtDate(new Date(), c.tz)} às ${localTime(new Date(), c.tz)}.`;
-      await db.from('appointments').update({ status: appt.status === 'pendente' && c.ai.booking_mode !== 'confirmar' ? 'confirmado' : appt.status, notes: [appt.notes, note].filter(Boolean).join('\n') }).eq('id', appt.id);
+      await db.from('appointments').update({ status: appt.status === 'pendente' && c.ai.booking_mode !== 'confirmar' ? 'confirmado' : appt.status, patient_confirmed_at: new Date().toISOString() }).eq('id', appt.id);
       const label = `${when(c, appt.starts_at)} · ${appt.title}`;
-      await log(c, 'confirmar_presenca', `${c.contact?.name ?? 'O cliente'} confirmou presença em ${label}`, 'appointment', appt.id);
-      return ok(`Presença confirmada: ${label}.`, { tool: 'confirmar_presenca', label: 'Cliente confirmou presença', detail: label, status: 'ok', link: '#/agenda' });
+      await log(c, 'confirmar_presenca', `${c.contact?.name ?? 'O paciente'} confirmou presença em ${label}`, 'appointment', appt.id);
+      return ok(`Presença confirmada: ${label}.`, { tool: 'confirmar_presenca', label: 'Paciente confirmou presença', detail: label, status: 'ok', link: '#/agenda' });
     },
   },
   {
     name: 'criar_orcamento',
-    description: 'Cria um orçamento para o cliente desta conversa com serviços da tabela (preço da tabela) e devolve o link para ele aprovar. Mande o link na resposta.',
+    description: 'Cria um orçamento para o paciente desta conversa com serviços da tabela (preço da tabela) e devolve o link para ele aprovar. Mande o link na resposta.',
     input_schema: obj({
       itens: { type: 'array', description: 'Serviços do orçamento.', items: obj({ servico_id: str('Id do serviço da tabela.'), quantidade: { type: 'number', description: 'Quantidade (padrão 1).' }, descricao: str('Detalhe do item, opcional.') }, ['servico_id']) },
-      desconto_percentual: { type: 'number', description: 'Desconto em %, só se o cliente pediu e dentro do limite da empresa.' },
+      desconto_percentual: { type: 'number', description: 'Desconto em %, só se o paciente pediu e dentro do limite da empresa.' },
       observacoes: str('Observações que aparecem no orçamento.'),
     }, ['itens']),
     run: (i, c) => createQuote(c, i),
   },
   {
     name: 'atualizar_cadastro',
-    description: 'Atualiza o cadastro do cliente desta conversa (nome, e-mail, endereço) ou anota uma observação para a equipe.',
-    input_schema: obj({ nome: str('Nome completo.'), email: str('E-mail.'), endereco: str('Endereço.'), observacao: str('Observação para a equipe.') }),
+    description: 'Atualiza a ficha do paciente desta conversa (nome, e-mail, CPF, nascimento, convênio, carteirinha, responsável, endereço) ou anota uma observação administrativa para a equipe. Nunca anote sintomas.',
+    input_schema: obj({ nome: str('Nome completo.'), email: str('E-mail.'), cpf: str('CPF (só números ou com pontos).'), nascimento: str('Data de nascimento AAAA-MM-DD.'), convenio: str('Convênio (vazio = particular).'), carteirinha: str('Número da carteirinha.'), responsavel: str('Nome do responsável, se o paciente é menor de idade.'), endereco: str('Endereço.'), observacao: str('Observação administrativa para a equipe.') }),
     run: async (i, c) => {
       const patch: Record<string, unknown> = {};
       if (s(i.nome)) patch.name = s(i.nome, 120);
       if (s(i.email)) patch.email = s(i.email, 200);
+      const cpf = s(i.cpf).replace(/\D/g, '');
+      if (cpf) { if (cpf.length !== 11) return err('CPF precisa ter 11 números.'); patch.document = cpf; }
+      if (s(i.nascimento)) { if (!DATE.test(s(i.nascimento))) return err('Data de nascimento no formato AAAA-MM-DD.'); patch.birthday = s(i.nascimento); }
+      if (s(i.convenio)) { const ins = insuranceOf(c, i.convenio); if (ins.error) return err(ins.error); patch.insurance = ins.name; }
+      if (s(i.carteirinha)) patch.insurance_card = s(i.carteirinha, 40);
+      if (s(i.responsavel)) patch.guardian_name = s(i.responsavel, 120);
       if (s(i.endereco)) patch.address = s(i.endereco, 300);
       if (s(i.observacao)) patch.notes = [c.contact!.notes, `${fmtDate(new Date(), c.tz)}: ${s(i.observacao, 500)}`].filter(Boolean).join('\n');
       if (!Object.keys(patch).length) return err('Nada para atualizar.');
       await db.from('contacts').update(patch).eq('id', c.contact!.id);
       Object.assign(c.contact!, patch);
-      return ok('Cadastro atualizado.', { tool: 'atualizar_cadastro', label: 'Cadastro do cliente atualizado', detail: Object.keys(patch).map((k) => ({ name: 'nome', email: 'e-mail', address: 'endereço', notes: 'observação' }[k] ?? k)).join(', '), status: 'ok' });
+      return ok('Ficha atualizada.', { tool: 'atualizar_cadastro', label: 'Ficha do paciente atualizada', detail: Object.keys(patch).map((k) => ({ name: 'nome', email: 'e-mail', address: 'endereço', notes: 'observação', document: 'CPF', birthday: 'nascimento', insurance: 'convênio', insurance_card: 'carteirinha', guardian_name: 'responsável' }[k] ?? k)).join(', '), status: 'ok' });
     },
   },
   {
     name: 'entrar_lista_espera',
-    description: 'Coloca o cliente desta conversa na lista de espera quando não há horário que sirva para ele. Se abrir um horário (por cancelamento), a empresa oferece para ele pelo WhatsApp.',
+    description: 'Coloca o paciente desta conversa na lista de espera quando não há horário que sirva. Se alguém desmarcar, a clínica oferece o horário pelo WhatsApp.',
     input_schema: obj({ data: str('Dia desejado AAAA-MM-DD (vazio = o primeiro horário que abrir).'), periodo: { type: 'string', enum: PERIODS, description: 'Período preferido.' }, servico_id: str('Id do serviço, se já escolheu.'), observacoes: str('Detalhes (ex.: "pode ir depois das 17h").') }),
     run: (i, c) => joinWaitlist(c, c.contact!, i),
   },
   {
     name: 'chamar_atendente',
-    description: 'Passa a conversa para uma pessoa da equipe e para de responder. Use quando o cliente pedir, reclamar, pedir desconto acima do limite, ou quando você não tiver certeza.',
+    description: 'Passa a conversa para uma pessoa da equipe e para de responder. Use quando o paciente pedir, reclamar, trouxer assunto clínico ou urgência, pedir desconto acima do limite, ou quando você não tiver certeza.',
     input_schema: obj({ motivo: str('Motivo curto, para a equipe entender sem ler tudo (ex.: "Pediu 20% de desconto").') }, ['motivo']),
     run: async (i, c) => {
       const reason = s(i.motivo, 160) || 'Pediu atendimento humano';
       await db.from('conversations').update({ handler: 'humano', needs_attention: true, attention_reason: reason }).eq('id', c.conversationId);
       await log(c, 'chamar_atendente', `Passou o atendimento de ${c.contact?.name ?? 'cliente'} para a equipe: ${reason}`, 'conversation', c.conversationId);
       if (!sim(c)) await alertTeamOnWhatsApp(c, `🔔 ${firstName(c.contact?.name) || 'Um cliente'} precisa de atendimento: ${reason}.${c.origin ? ` Responda pelo painel: ${c.origin}/app/#/conversas/${c.conversationId}` : ''}`);
-      return ok('Equipe avisada. Diga ao cliente, em uma frase, que alguém da equipe vai continuar o atendimento em breve. Não use mais ferramentas.',
+      return ok('Equipe avisada. Diga ao paciente, em uma frase, que alguém da equipe vai continuar o atendimento em breve. Não use mais ferramentas.',
         { tool: 'chamar_atendente', label: 'Atendimento passado para a equipe', detail: reason, status: 'ok', link: `#/conversas/${c.conversationId}` });
     },
   },
@@ -494,7 +530,7 @@ async function alertTeamOnWhatsApp(c: AgentCtx, text: string) {
 export const OWNER_TOOLS: T[] = [
   {
     name: 'buscar_clientes',
-    description: 'Procura clientes pelo nome, telefone ou e-mail. Devolve id, nome, telefone e etapa.',
+    description: 'Procura pacientes pelo nome, telefone ou e-mail. Devolve id, nome, telefone, convênio e nascimento.',
     input_schema: obj({ busca: str('Nome, parte do nome ou telefone.') }, ['busca']),
     run: async (i, c) => {
       const term = s(i.busca, 80).replace(/[%,()]/g, ' ').trim();
@@ -502,72 +538,82 @@ export const OWNER_TOOLS: T[] = [
       const digits = term.replace(/\D/g, '');
       const ors = [`name.ilike.%${term}%`, `email.ilike.%${term}%`];
       if (digits.length >= 4) ors.push(`phone.ilike.%${digits}%`);
-      const { data } = await db.from('contacts').select('id, name, phone, stage, address, total_spent').eq('company_id', c.company.id).or(ors.join(',')).order('last_interaction_at', { ascending: false, nullsFirst: false }).limit(8);
+      const { data } = await db.from('contacts').select('id, name, phone, stage, insurance, birthday, total_spent').eq('company_id', c.company.id).or(ors.join(',')).order('last_interaction_at', { ascending: false, nullsFirst: false }).limit(8);
       const list = (data ?? []) as Contact[];
-      return ok(list.length ? list.map((x) => `[${x.id}] ${x.name}${x.phone ? ` · ${formatPhone(x.phone)}` : ''} · ${x.stage}${x.address ? ` · ${x.address}` : ''}`).join('\n') : `Nenhum cliente encontrado para "${term}".`);
+      return ok(list.length ? list.map((x) => `[${x.id}] ${x.name}${x.phone ? ` · ${formatPhone(x.phone)}` : ''}${x.insurance ? ` · ${x.insurance}` : ' · particular'}${x.birthday ? ` · nasc. ${fmtDate(x.birthday + 'T12:00:00Z', c.tz)}` : ''}`).join('\n') : `Nenhum paciente encontrado para "${term}".`);
     },
   },
   {
     name: 'cadastrar_cliente',
-    description: 'Cadastra um cliente novo. Se já existir alguém com o mesmo telefone, devolve esse cadastro.',
-    input_schema: obj({ nome: str('Nome do cliente.'), telefone: str('Telefone com DDD.'), email: str('E-mail.'), endereco: str('Endereço.'), observacoes: str('Anotações.') }, ['nome']),
+    description: 'Cadastra um paciente novo. Se já existir alguém com o mesmo telefone, devolve esse cadastro.',
+    input_schema: obj({ nome: str('Nome do paciente.'), telefone: str('Telefone com DDD.'), email: str('E-mail.'), nascimento: str('Data de nascimento AAAA-MM-DD.'), convenio: str('Convênio (vazio = particular).'), carteirinha: str('Número da carteirinha.'), responsavel: str('Responsável, se menor de idade.'), observacoes: str('Anotações administrativas.') }, ['nome']),
     run: async (i, c) => {
       const blocked = canWrite(c); if (blocked) return blocked;
       const name = s(i.nome, 120);
-      if (name.length < 2) return err('Informe o nome do cliente.');
+      if (name.length < 2) return err('Informe o nome do paciente.');
+      const ins = insuranceOf(c, i.convenio);
+      if (ins.error) return err(ins.error);
+      if (s(i.nascimento) && !DATE.test(s(i.nascimento))) return err('Data de nascimento no formato AAAA-MM-DD.');
       const phone = normalizePhone(s(i.telefone, 40)) || null;
       if (phone) {
         const { data: dup } = await db.from('contacts').select('id, name').eq('company_id', c.company.id).eq('phone', phone).maybeSingle();
-        if (dup) return ok(`Já existe um cliente com esse telefone: [${dup.id}] ${dup.name}. Use esse cadastro.`);
+        if (dup) return ok(`Já existe um paciente com esse telefone: [${dup.id}] ${dup.name}. Use esse cadastro.`);
       }
       const { data, error } = await db.from('contacts').insert({
-        company_id: c.company.id, name, phone, email: s(i.email, 200) || null, address: s(i.endereco, 300) || null, notes: s(i.observacoes, 1000) || null, source: 'manual', created_via: 'ia_dono',
+        company_id: c.company.id, name, phone, email: s(i.email, 200) || null, notes: s(i.observacoes, 1000) || null, source: 'manual', created_via: 'ia_dono',
+        birthday: s(i.nascimento) || null, insurance: ins.name, insurance_card: s(i.carteirinha, 40) || null, guardian_name: s(i.responsavel, 120) || null,
       }).select('id, name').single();
       if (error) return err(error.message);
-      await log(c, 'cadastrar_cliente', `Cadastrou o cliente ${name}${phone ? ` (${formatPhone(phone)})` : ''}`, 'contact', data.id);
-      return ok(`Cliente cadastrado: [${data.id}] ${name}.`, { tool: 'cadastrar_cliente', label: `Cliente ${firstName(name)} cadastrado`, detail: phone ? formatPhone(phone) : undefined, status: 'ok', link: `#/clientes/${data.id}` });
+      await log(c, 'cadastrar_cliente', `Cadastrou o paciente ${name}${phone ? ` (${formatPhone(phone)})` : ''}`, 'contact', data.id);
+      return ok(`Paciente cadastrado: [${data.id}] ${name}.`, { tool: 'cadastrar_cliente', label: `Paciente ${firstName(name)} cadastrado`, detail: phone ? formatPhone(phone) : undefined, status: 'ok', link: `#/clientes/${data.id}` });
     },
   },
   {
     name: 'atualizar_cliente',
-    description: 'Atualiza dados de um cliente: nome, telefone, e-mail, endereço, anotações, etapa do funil ou temperatura.',
+    description: 'Atualiza a ficha de um paciente: nome, telefone, e-mail, CPF, nascimento, convênio, carteirinha, responsável, endereço, anotações administrativas, etapa ou temperatura.',
     input_schema: obj({
-      cliente_id: str('Id do cliente.'), nome: str('Nome.'), telefone: str('Telefone.'), email: str('E-mail.'), endereco: str('Endereço.'), observacoes: str('Anotações (substitui as atuais).'),
+      cliente_id: str('Id do paciente.'), nome: str('Nome.'), telefone: str('Telefone.'), email: str('E-mail.'), cpf: str('CPF.'), nascimento: str('Nascimento AAAA-MM-DD.'), convenio: str('Convênio ("particular" para tirar).'), carteirinha: str('Carteirinha.'), responsavel: str('Responsável.'), endereco: str('Endereço.'), observacoes: str('Anotações administrativas (substitui as atuais).'),
       etapa: { type: 'string', enum: ['novo', 'conversando', 'orcamento', 'fechado', 'perdido'] }, temperatura: { type: 'string', enum: ['quente', 'morno', 'frio'] },
     }, ['cliente_id']),
     run: async (i, c) => {
       const blocked = canWrite(c); if (blocked) return blocked;
       const contact = await contactById(c, i.cliente_id);
-      if (!contact) return err('Cliente não encontrado.');
+      if (!contact) return err('Paciente não encontrado.');
       const patch: Record<string, unknown> = {};
       if (s(i.nome)) patch.name = s(i.nome, 120);
       if (s(i.telefone)) patch.phone = normalizePhone(s(i.telefone, 40));
       if (s(i.email)) patch.email = s(i.email, 200);
       if (s(i.endereco)) patch.address = s(i.endereco, 300);
+      const cpf = s(i.cpf).replace(/\D/g, '');
+      if (cpf) { if (cpf.length !== 11) return err('CPF precisa ter 11 números.'); patch.document = cpf; }
+      if (s(i.nascimento)) { if (!DATE.test(s(i.nascimento))) return err('Nascimento no formato AAAA-MM-DD.'); patch.birthday = s(i.nascimento); }
+      if (s(i.convenio)) { const ins = insuranceOf(c, i.convenio); if (ins.error) return err(ins.error); patch.insurance = ins.name; }
+      if (s(i.carteirinha)) patch.insurance_card = s(i.carteirinha, 40);
+      if (s(i.responsavel)) patch.guardian_name = s(i.responsavel, 120);
       if (s(i.observacoes)) patch.notes = s(i.observacoes, 2000);
       if (i.etapa) patch.stage = i.etapa;
       if (i.temperatura) patch.temperature = i.temperatura;
       if (!Object.keys(patch).length) return err('Nada para atualizar.');
       const { error } = await db.from('contacts').update(patch).eq('id', contact.id);
-      if (error) return err(/contacts_phone_uq/.test(error.message) ? 'Outro cliente já usa esse telefone.' : error.message);
+      if (error) return err(/contacts_phone_uq/.test(error.message) ? 'Outro paciente já usa esse telefone.' : error.message);
       await log(c, 'atualizar_cliente', `Atualizou o cadastro de ${contact.name}`, 'contact', contact.id);
       return ok(`Cadastro de ${contact.name} atualizado.`, { tool: 'atualizar_cliente', label: `Cadastro de ${firstName(contact.name)} atualizado`, status: 'ok', link: `#/clientes/${contact.id}` });
     },
   },
   {
     name: 'criar_orcamento',
-    description: 'Cria um orçamento para um cliente. Itens podem ser da tabela (servico_id, usa o preço da tabela) ou avulsos (descricao + valor_unitario). Use enviar: true para mandar ao cliente pelo WhatsApp na hora.',
+    description: 'Cria um orçamento para um paciente. Itens podem ser da tabela (servico_id, usa o preço da tabela) ou avulsos (descricao + valor_unitario). Use enviar: true para mandar ao paciente pelo WhatsApp na hora.',
     input_schema: obj({
-      cliente_id: str('Id do cliente.'),
+      cliente_id: str('Id do paciente.'),
       itens: { type: 'array', description: 'Itens do orçamento.', items: obj({ servico_id: str('Id do serviço (opcional).'), descricao: str('Descrição do item.'), quantidade: { type: 'number' }, valor_unitario: { type: 'number', description: 'Valor por unidade em reais (obrigatório se o item não é da tabela ou é sob consulta).' } }) },
       desconto_valor: { type: 'number', description: 'Desconto em reais.' }, desconto_percentual: { type: 'number', description: 'Desconto em %.' },
-      validade_dias: { type: 'number', description: 'Validade em dias (padrão 7).' }, observacoes: str('Observações.'), enviar: { type: 'boolean', description: 'Enviar ao cliente pelo WhatsApp agora.' },
+      validade_dias: { type: 'number', description: 'Validade em dias (padrão 7).' }, observacoes: str('Observações.'), enviar: { type: 'boolean', description: 'Enviar ao paciente pelo WhatsApp agora.' },
     }, ['cliente_id', 'itens']),
     run: (i, c) => createQuote(c, i),
   },
   {
     name: 'enviar_orcamento',
-    description: 'Envia um orçamento existente ao cliente pelo WhatsApp (pelo número do orçamento ou id).',
+    description: 'Envia um orçamento existente ao paciente pelo WhatsApp (pelo número do orçamento ou id).',
     input_schema: obj({ numero: { type: 'number', description: 'Número do orçamento (ex.: 412).' }, orcamento_id: str('Id do orçamento.') }),
     run: async (i, c) => {
       let q = db.from('quotes').select('id, number, status').eq('company_id', c.company.id);
@@ -583,8 +629,8 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'listar_orcamentos',
-    description: 'Lista orçamentos recentes, com filtro opcional por situação ou cliente.',
-    input_schema: obj({ status: { type: 'string', enum: ['rascunho', 'enviado', 'aprovado', 'recusado', 'expirado'] }, cliente_id: str('Id do cliente.') }),
+    description: 'Lista orçamentos recentes, com filtro opcional por situação ou paciente.',
+    input_schema: obj({ status: { type: 'string', enum: ['rascunho', 'enviado', 'aprovado', 'recusado', 'expirado'] }, cliente_id: str('Id do paciente.') }),
     run: async (i, c) => {
       let q = db.from('quotes').select('id, number, title, status, total, sent_at, created_at, contact:contacts(name)').eq('company_id', c.company.id).order('created_at', { ascending: false }).limit(12);
       if (i.status) q = q.eq('status', s(i.status));
@@ -596,22 +642,22 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'consultar_agenda',
-    description: 'Mostra os horários marcados num período (padrão: o dia informado).',
-    input_schema: obj({ data_inicio: date, data_fim: str('Data final AAAA-MM-DD (opcional).') }, ['data_inicio']),
+    description: 'Mostra as consultas marcadas num período (padrão: o dia informado), com profissional, convênio e se o paciente já confirmou. Filtre por profissional se pedirem.',
+    input_schema: obj({ data_inicio: date, data_fim: str('Data final AAAA-MM-DD (opcional).'), profissional_id: str('Só a agenda deste profissional (opcional).') }, ['data_inicio']),
     run: async (i, c) => {
       const d0 = s(i.data_inicio), d1 = s(i.data_fim) || d0;
       if (!DATE.test(d0) || !DATE.test(d1)) return err('Use datas no formato AAAA-MM-DD.');
       const { data } = await db.from('appointments').select('*, contact:contacts(name, phone)').eq('company_id', c.company.id)
-        .gte('starts_at', at(c, d0, '00:00').toISOString()).lt('starts_at', at(c, addDays(d1, 1), '00:00').toISOString()).neq('status', 'cancelado').order('starts_at').limit(60);
-      const list = (data ?? []) as unknown as (Appointment & { contact: { name: string } | null })[];
-      return ok(list.length ? list.map((a) => `[${a.id}] ${when(c, a.starts_at)} — ${a.contact?.name ?? '(sem cliente)'} · ${a.title} · ${a.status}${a.address ? ` · ${a.address}` : ''}`).join('\n') : 'Nenhum horário marcado nesse período.');
+        .gte('starts_at', at(c, d0, '00:00').toISOString()).lt('starts_at', at(c, addDays(d1, 1), '00:00').toISOString()).neq('status', 'cancelado').order('starts_at').limit(80);
+      const list = ((data ?? []) as unknown as (Appointment & { contact: { name: string } | null })[]).filter((a) => !i.profissional_id || a.professional_id === s(i.profissional_id));
+      return ok(list.length ? list.map((a) => `[${a.id}] ${when(c, a.starts_at)} — ${a.contact?.name ?? '(sem paciente)'} · ${a.title}${a.professional_id ? ` · ${proName(c, a.professional_id) ?? ''}` : ''}${a.payment_kind === 'convenio' ? ` · ${a.insurance}` : ' · particular'} · ${a.status}${a.patient_confirmed_at ? ' · confirmou presença' : a.status === 'confirmado' || a.status === 'pendente' ? ' · ainda não confirmou' : ''}`).join('\n') : 'Nenhuma consulta marcada nesse período.');
     },
   },
   consultarHorarios,
   {
     name: 'lista_espera',
-    description: 'Sem cliente_id: mostra quem está na lista de espera. Com cliente_id: coloca esse cliente na lista (avisamos quando abrir um horário).',
-    input_schema: obj({ cliente_id: str('Id do cliente para adicionar (opcional).'), data: str('Dia desejado AAAA-MM-DD (opcional).'), periodo: { type: 'string', enum: PERIODS }, servico_id: str('Id do serviço (opcional).'), observacoes: str('Observações.') }),
+    description: 'Sem cliente_id: mostra quem está na lista de espera. Com cliente_id: coloca esse paciente na lista (avisamos quando abrir um horário).',
+    input_schema: obj({ cliente_id: str('Id do paciente para adicionar (opcional).'), data: str('Dia desejado AAAA-MM-DD (opcional).'), periodo: { type: 'string', enum: PERIODS }, servico_id: str('Id do serviço (opcional).'), observacoes: str('Observações.') }),
     run: async (i, c) => {
       if (i.cliente_id) {
         const contact = await contactById(c, i.cliente_id);
@@ -625,20 +671,20 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'agendar_horario',
-    description: 'Marca um horário. Confere conflitos; use encaixar: true só se a pessoa quiser marcar mesmo com a agenda ocupada.',
-    input_schema: obj({ cliente_id: str('Id do cliente (opcional).'), servico_id: str('Id do serviço (opcional).'), titulo: str('Título, se não for um serviço da tabela.'), data: date, hora: hour, duracao_min: { type: 'number' }, endereco: str('Endereço.'), observacoes: str('Observações.'), encaixar: { type: 'boolean' } }, ['data', 'hora']),
+    description: 'Marca uma consulta. Confere a agenda do profissional; use encaixar: true só se a pessoa quiser marcar mesmo com a agenda ocupada.',
+    input_schema: obj({ cliente_id: str('Id do paciente (opcional).'), servico_id: str('Id do procedimento (opcional).'), profissional_id: str('Id do profissional (opcional: sem ele, quem estiver livre).'), convenio: str('Convênio (vazio = particular).'), titulo: str('Título, se não for um procedimento da tabela.'), data: date, hora: hour, duracao_min: { type: 'number' }, observacoes: str('Observações administrativas.'), encaixar: { type: 'boolean' } }, ['data', 'hora']),
     run: (i, c) => book(c, i),
   },
   {
     name: 'remarcar_horario',
-    description: 'Muda data e hora de um horário marcado.',
-    input_schema: obj({ agendamento_id: str('Id do horário.'), data: date, hora: hour, encaixar: { type: 'boolean' } }, ['agendamento_id', 'data', 'hora']),
+    description: 'Muda data e hora de uma consulta (e, se pedirem, o profissional).',
+    input_schema: obj({ agendamento_id: str('Id da consulta.'), data: date, hora: hour, profissional_id: str('Novo profissional (opcional).'), encaixar: { type: 'boolean' } }, ['agendamento_id', 'data', 'hora']),
     run: (i, c) => reschedule(c, i),
   },
   {
     name: 'cancelar_horario',
-    description: 'Cancela um horário (pede confirmação antes). Pode avisar o cliente pelo WhatsApp.',
-    input_schema: obj({ agendamento_id: str('Id do horário.'), motivo: str('Motivo.'), avisar_cliente: { type: 'boolean', description: 'Mandar aviso ao cliente.' } }, ['agendamento_id']),
+    description: 'Cancela um horário (pede confirmação antes). Pode avisar o paciente pelo WhatsApp.',
+    input_schema: obj({ agendamento_id: str('Id do horário.'), motivo: str('Motivo.'), avisar_cliente: { type: 'boolean', description: 'Mandar aviso ao paciente.' } }, ['agendamento_id']),
     run: async (i, c) => {
       const appt = await appointmentFor(c, i.agendamento_id);
       if (!appt) return err('Horário não encontrado.');
@@ -648,7 +694,7 @@ export const OWNER_TOOLS: T[] = [
   {
     name: 'registrar_venda',
     description: 'Registra uma venda recebida (pede confirmação antes).',
-    input_schema: obj({ valor: { type: 'number', description: 'Valor em reais.' }, metodo: { type: 'string', enum: METHODS }, cliente_id: str('Id do cliente (opcional).'), descricao: str('O que foi vendido.'), orcamento_id: str('Id do orçamento pago (opcional).') }, ['valor']),
+    input_schema: obj({ valor: { type: 'number', description: 'Valor em reais.' }, metodo: { type: 'string', enum: METHODS }, cliente_id: str('Id do paciente (opcional).'), descricao: str('O que foi vendido.'), orcamento_id: str('Id do orçamento pago (opcional).') }, ['valor']),
     run: async (i, c) => {
       const blocked = canWrite(c); if (blocked) return blocked;
       const amount = money(i.valor);
@@ -725,7 +771,7 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'resumo',
-    description: 'Números do período: vendas, orçamentos, horários, clientes novos e conversas esperando resposta.',
+    description: 'Números do período: vendas, orçamentos, horários, pacientes novos e conversas esperando resposta.',
     input_schema: obj({ periodo: { type: 'string', enum: ['hoje', 'ontem', 'semana', 'mes', 'mes_passado'] } }, ['periodo']),
     run: async (i, c) => {
       const today = localDate(new Date(), c.tz);
@@ -755,7 +801,7 @@ export const OWNER_TOOLS: T[] = [
         `${label} (${fmtDate(d0 + 'T12:00:00Z', c.tz)}${d0 !== d1 ? ` a ${fmtDate(d1 + 'T12:00:00Z', c.tz)}` : ''}):`,
         `Vendas: ${sl.length} · ${brl(total)} (${brl(byIa)} fechadas pela IA)`,
         `Orçamentos criados: ${qs.length} (${brl(qs.reduce((t, x) => t + Number(x.total), 0))}) · aprovados: ${qa.length} (${brl(qa.reduce((t, x) => t + Number(x.total), 0))})`,
-        `Horários marcados: ${appts.count ?? 0} · clientes novos: ${contacts.count ?? 0}`,
+        `Horários marcados: ${appts.count ?? 0} · pacientes novos: ${contacts.count ?? 0}`,
         `Conversas esperando resposta agora: ${waiting.count ?? 0}`,
         p === 'mes' && goal > 0 ? `Meta do mês: ${brl(goal)} (${Math.round((total / goal) * 100)}% atingido)` : '',
       ].filter(Boolean).join('\n'));
@@ -763,7 +809,7 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'conversas_pendentes',
-    description: 'Lista as conversas de clientes que estão esperando alguém da equipe.',
+    description: 'Lista as conversas de pacientes que estão esperando alguém da equipe.',
     input_schema: obj({}),
     run: async (_i, c) => {
       const { data } = await db.from('conversations').select('id, attention_reason, last_inbound_at, contact:contacts(name)').eq('company_id', c.company.id).eq('needs_attention', true).eq('status', 'aberta').order('last_inbound_at').limit(15);
@@ -773,8 +819,8 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'mensagem_para_cliente',
-    description: 'Manda uma mensagem de texto para um cliente pelo WhatsApp, em nome da equipe (pede confirmação antes). Só funciona se o cliente escreveu nas últimas 24 horas.',
-    input_schema: obj({ cliente_id: str('Id do cliente.'), mensagem: str('Texto exato a enviar.') }, ['cliente_id', 'mensagem']),
+    description: 'Manda uma mensagem de texto para um paciente pelo WhatsApp, em nome da equipe (pede confirmação antes). Só funciona se o paciente escreveu nas últimas 24 horas.',
+    input_schema: obj({ cliente_id: str('Id do paciente.'), mensagem: str('Texto exato a enviar.') }, ['cliente_id', 'mensagem']),
     run: async (i, c) => {
       const contact = await contactById(c, i.cliente_id);
       if (!contact) return err('Cliente não encontrado.');
@@ -785,7 +831,7 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'lancar_conta',
-    description: 'Lança uma conta a pagar (aluguel, fornecedor, salário, imposto) ou um valor a receber (contrato, boleto de cliente) no financeiro.',
+    description: 'Lança uma conta a pagar (aluguel, fornecedor, salário, imposto) ou um valor a receber (contrato, boleto de paciente) no financeiro.',
     input_schema: obj({
       tipo: { type: 'string', enum: ['pagar', 'receber'] }, descricao: str('O que é a conta.'), valor: { type: 'number', description: 'Valor em reais.' },
       vencimento: str('Data de vencimento AAAA-MM-DD. Sem data, use hoje.'), categoria: str('Ex.: Fornecedores, Aluguel, Pessoal, Impostos, Contas da casa, Serviços, Contratos.'),
@@ -894,8 +940,8 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'cobrar_cliente',
-    description: 'Gera uma cobrança (Pix, boleto ou os dois) no Asaas da empresa para um cliente e manda o link pelo WhatsApp (pede confirmação antes). Precisa do CPF ou CNPJ do cliente: se não estiver no cadastro, pergunte.',
-    input_schema: obj({ cliente_id: str('Id do cliente.'), valor: { type: 'number', description: 'Valor em reais (mínimo R$ 5).' }, descricao: str('A que se refere.'), vencimento: str('AAAA-MM-DD. Sem data, 3 dias a partir de hoje.'), forma: { type: 'string', enum: ['pix', 'boleto', 'pix_boleto'] }, cpf_cnpj: str('CPF ou CNPJ, se não estiver no cadastro.'), enviar: { type: 'boolean', description: 'Mandar o link no WhatsApp (padrão: sim).' } }, ['cliente_id', 'valor', 'descricao']),
+    description: 'Gera uma cobrança (Pix, boleto ou os dois) no Asaas da empresa para um paciente e manda o link pelo WhatsApp (pede confirmação antes). Precisa do CPF ou CNPJ do paciente: se não estiver no cadastro, pergunte.',
+    input_schema: obj({ cliente_id: str('Id do paciente.'), valor: { type: 'number', description: 'Valor em reais (mínimo R$ 5).' }, descricao: str('A que se refere.'), vencimento: str('AAAA-MM-DD. Sem data, 3 dias a partir de hoje.'), forma: { type: 'string', enum: ['pix', 'boleto', 'pix_boleto'] }, cpf_cnpj: str('CPF ou CNPJ, se não estiver no cadastro.'), enviar: { type: 'boolean', description: 'Mandar o link no WhatsApp (padrão: sim).' } }, ['cliente_id', 'valor', 'descricao']),
     run: async (i, c) => {
       const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
       const contact = await contactById(c, i.cliente_id);
@@ -905,14 +951,14 @@ export const OWNER_TOOLS: T[] = [
       const doc = s(i.cpf_cnpj, 20).replace(/\D/g, '') || contact.document || '';
       if (!/^(\d{11}|\d{14})$/.test(doc)) return err(`Preciso do CPF ou CNPJ de ${contact.name} para gerar a cobrança. Pergunte e chame de novo com cpf_cnpj.`);
       const { data: integ } = await db.from('company_integrations').select('status').eq('company_id', c.company.id).eq('provider', 'asaas').maybeSingle();
-      if (integ?.status !== 'conectado') return err('O Asaas da empresa não está conectado. Conecte em Integrações para cobrar clientes.');
+      if (integ?.status !== 'conectado') return err('O Asaas da empresa não está conectado. Conecte em Integrações para cobrar pacientes.');
       return askConfirmation(c, 'cobrar_cliente', { ...i, cpf_cnpj: doc }, `Cobrar ${brl(amount)} de ${contact.name} (${s(i.descricao, 80)})${i.enviar === false ? '' : ' e enviar o link no WhatsApp'}`);
     },
   },
   {
     name: 'emitir_nota',
-    description: 'Emite a nota fiscal de serviço (NFS-e) para um cliente (pede confirmação antes). Use o valor e a descrição do serviço; com venda_id, liga a nota à venda.',
-    input_schema: obj({ cliente_id: str('Id do cliente (tomador).'), valor: { type: 'number' }, descricao: str('Descrição do serviço na nota.'), venda_id: str('Venda relacionada (opcional).'), cpf_cnpj: str('CPF ou CNPJ do cliente (opcional, mas recomendado).') }, ['cliente_id', 'valor', 'descricao']),
+    description: 'Emite a nota fiscal de serviço (NFS-e) para um paciente (pede confirmação antes). Use o valor e a descrição do serviço; com venda_id, liga a nota à venda.',
+    input_schema: obj({ cliente_id: str('Id do paciente (tomador).'), valor: { type: 'number' }, descricao: str('Descrição do serviço na nota.'), venda_id: str('Venda relacionada (opcional).'), cpf_cnpj: str('CPF ou CNPJ do paciente (opcional, mas recomendado).') }, ['cliente_id', 'valor', 'descricao']),
     run: async (i, c) => {
       const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
       const contact = await contactById(c, i.cliente_id);
@@ -924,7 +970,7 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'consultar_cobrancas',
-    description: 'Lista as cobranças da empresa (em aberto, vencidas ou pagas) com valor, cliente e link.',
+    description: 'Lista as cobranças da empresa (em aberto, vencidas ou pagas) com valor, paciente e link.',
     input_schema: obj({ situacao: { type: 'string', enum: ['pendente', 'vencida', 'paga', 'todas'] } }),
     run: async (i, c) => {
       const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
@@ -940,7 +986,7 @@ export const OWNER_TOOLS: T[] = [
   },
   {
     name: 'pausar_ia',
-    description: 'Liga ou desliga o atendimento automático da IA com os clientes.',
+    description: 'Liga ou desliga o atendimento automático da IA com os pacientes.',
     input_schema: obj({ pausar: { type: 'boolean', description: 'true para pausar, false para voltar a atender.' } }, ['pausar']),
     run: async (i, c) => {
       const denied = needRole(c, 'dono', 'gerente'); if (denied) return denied;
@@ -948,7 +994,7 @@ export const OWNER_TOOLS: T[] = [
       await db.from('ai_settings').update({ enabled }).eq('company_id', c.company.id);
       c.ai.enabled = enabled;
       await log(c, enabled ? 'reativar_ia' : 'pausar_ia', enabled ? 'Voltou a deixar a IA atender os clientes' : 'Pausou o atendimento da IA');
-      return ok(enabled ? 'A IA voltou a atender os clientes.' : 'A IA está pausada: as mensagens dos clientes ficam para a equipe responder.', { tool: 'pausar_ia', label: enabled ? 'IA reativada' : 'IA pausada', status: 'ok', link: '#/configuracoes/assistente' });
+      return ok(enabled ? 'A IA voltou a atender os pacientes.' : 'A IA está pausada: as mensagens dos pacientes ficam para a equipe responder.', { tool: 'pausar_ia', label: enabled ? 'IA reativada' : 'IA pausada', status: 'ok', link: '#/configuracoes/assistente' });
     },
   },
 ];

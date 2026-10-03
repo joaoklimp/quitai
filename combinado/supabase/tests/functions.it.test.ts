@@ -61,7 +61,7 @@ describe.skipIf(!hasPgrst)('ferramentas da IA contra o banco (PostgREST)', () =>
 
     // empresa de teste: atende todos os dias das 8h às 18h, sem antecedência mínima
     userId = await db.createUser('ana@brilholar.com', 'Ana Duarte');
-    companyId = (await db.as({ user: userId }, (q) => q.one<{ id: string }>(`select public.onboard_company('Brilho Lar Higienização', 'limpeza', '61999990000', 'Brasília', true) as id`))).id;
+    companyId = (await db.as({ user: userId }, (q) => q.one<{ id: string }>(`select public.onboard_company('Brilho Lar Higienização', 'odontologia', '61999990000', 'Brasília', true) as id`))).id;
     const hours = JSON.stringify(Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [String(d), [['08:00', '18:00']]])));
     await db.sql(`update companies set business_hours = $1::jsonb, slot_minutes = 60, min_notice_minutes = 0, max_days_ahead = 60 where id = $2`, [hours, companyId]);
   }, 240_000);
