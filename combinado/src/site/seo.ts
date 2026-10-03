@@ -39,7 +39,7 @@ function orgAndSite(site: string) {
       '@type': 'Organization', '@id': `${site}/#org`, name: 'ORBYTA', url: `${site}/`,
       logo: { '@type': 'ImageObject', url: `${site}/icon-512.png`, width: 512, height: 512 },
       email: CONTACT,
-      description: 'Plataforma brasileira de gestão empresarial com inteligência artificial que trabalha pelo WhatsApp.',
+      description: 'Software brasileiro para clínicas e consultórios, com uma secretária de inteligência artificial que atende e agenda pacientes pelo WhatsApp.',
       contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: CONTACT, availableLanguage: 'Portuguese' },
     },
     { '@type': 'WebSite', '@id': `${site}/#site`, name: 'ORBYTA', url: `${site}/`, inLanguage: 'pt-BR', publisher: { '@id': `${site}/#org` } },
@@ -62,13 +62,14 @@ export function jsonLd(site: string, page: SeoPage, html: string): string {
   if (page.path === '/') {
     graph.push({
       '@type': 'SoftwareApplication', '@id': `${site}/#app`, name: 'ORBYTA', url: `${site}/`,
-      applicationCategory: 'BusinessApplication', applicationSubCategory: 'Atendimento e gestão pelo WhatsApp com IA',
+      applicationCategory: 'BusinessApplication', applicationSubCategory: 'Software para clínicas: secretária com IA no WhatsApp e agenda',
       operatingSystem: 'Web', inLanguage: 'pt-BR', image: `${site}/img/og.png`, publisher: { '@id': `${site}/#org` },
       description,
       featureList: [
-        'Atendimento 24h no WhatsApp com inteligência artificial', 'Entende áudios e responde por texto', 'Agenda com lembretes automáticos',
-        'Orçamentos com link para aprovação', 'Cobrança por Pix, boleto e cartão', 'Encaixe automático com lista de espera',
-        'Resumo diário e relatório semanal no WhatsApp', 'Comandos do dono por mensagem, com confirmação antes de ações sensíveis',
+        'Secretária com inteligência artificial que atende pacientes 24h no WhatsApp', 'Agenda por profissional, sem conflito de horário',
+        'Convênios e carteirinha no cadastro do paciente', 'Lembrete na véspera com confirmação de presença', 'Encaixe automático com lista de espera',
+        'Convite de retorno no prazo de cada procedimento', 'Entende áudios e responde por texto', 'Cobrança por Pix, boleto e cartão',
+        'Resumo diário e relatório semanal no WhatsApp', 'Regras de segurança em saúde: sem diagnóstico e encaminhamento de urgências',
       ],
       offers: [
         { '@type': 'Offer', name: `Teste grátis (${TRIAL_DAYS} dias)`, price: '0', priceCurrency: 'BRL', url: `${site}/#precos`, availability: 'https://schema.org/InStock' },
@@ -111,7 +112,7 @@ export function robotsTxt(site: string): string {
     '# ORBYTA: páginas públicas liberadas para buscadores e assistentes de IA.',
     'User-agent: *',
     'Allow: /',
-    '# painel (exige login) e orçamentos enviados a clientes (links privados)',
+    '# painel (exige login) e orçamentos enviados a pacientes (links privados)',
     'Disallow: /app/',
     'Disallow: /orcamento/',
     '',
@@ -132,11 +133,13 @@ export function llmsTxt(site: string, metas: Map<string, { title: string; descri
   const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR')}`;
   return `# ORBYTA
 
-> ORBYTA é uma plataforma brasileira de gestão empresarial com inteligência artificial que trabalha pelo WhatsApp oficial (API da Meta). A IA atende os clientes da empresa 24 horas, entende áudios, marca horários, monta orçamentos, cobra por Pix, boleto ou cartão e encaixa quem está na lista de espera quando alguém desmarca. O dono administra tudo por mensagens e por um painel web, e confirma antes de qualquer ação que mexa com dinheiro ou cancele algo.
+> ORBYTA é um software brasileiro para clínicas e consultórios, com uma secretária de inteligência artificial que trabalha pelo WhatsApp oficial (API da Meta). A IA atende os pacientes 24 horas, entende áudios, responde sobre convênios, marca consultas na agenda de cada profissional, pede confirmação de presença na véspera, encaixa quem está na lista de espera quando alguém desmarca e chama os pacientes para o retorno. A clínica administra tudo por mensagens e por um painel web, e confirma antes de qualquer ação que mexa com dinheiro ou cancele algo.
 
-- Público: pequenas e médias empresas de serviços e comércio no Brasil (salões, clínicas, oficinas, higienização, assistência técnica, lojas, entre outras).
+- Público: clínicas e consultórios no Brasil (odontologia, clínica médica, estética e dermatologia, fisioterapia, psicologia, nutrição e clínicas multiprofissionais).
 - Idioma: português do Brasil.
-- Diferença para assistentes de IA genéricos: a ORBYTA executa o trabalho dentro da empresa (agenda, orçamentos, cobranças, estoque, financeiro e equipe), com regras, permissões e histórico de cada ação, em vez de só responder perguntas.
+- Diferença para chatbots e assistentes de IA genéricos: a ORBYTA executa o trabalho da recepção dentro da clínica (agenda por profissional, convênios, confirmação de presença, retornos, cobranças, estoque de materiais e financeiro), com regras, permissões e histórico de cada ação.
+- Segurança em saúde: a IA não dá diagnóstico nem orientação de tratamento; dúvidas clínicas vão para a equipe e sinais de urgência são encaminhados ao pronto-socorro ou ao SAMU (192). Dados de saúde são tratados como dados sensíveis (LGPD).
+- Ainda não inclui prontuário eletrônico.
 - Teste grátis: ${TRIAL_DAYS} dias, sem cartão.
 - Contato: ${CONTACT}
 

@@ -12,33 +12,32 @@ interface Scene { av: string; avLogo?: boolean; title: string; subtitle: string;
 
 const SCENES: Scene[] = [
   {
-    av: 'BL', title: 'Brilho Lar Higienização', subtitle: 'online', link: '/app/?demo#/simulador', linkText: 'Conversar com a IA na demonstração',
+    av: 'VP', title: 'Vida Plena Odontologia', subtitle: 'online', link: '/app/?demo#/simulador', linkText: 'Conversar com a secretária na demonstração',
     steps: [
-      { k: 'audio', secs: '0:09', sat: { icon: 'audio-lines', title: 'Áudio entendido', text: '“Tem horário amanhã à tarde?”', tone: 'violet' } },
-      { k: 'them', text: 'Oi, Juliana! 😊 Amanhã à tarde tenho <b>14h</b> ou <b>16h</b> para a limpeza do sofá. Qual prefere?', sat: { icon: 'calendar-search', title: 'Consultou a agenda', text: '14h e 16h livres amanhã', tone: 'blue' } },
-      { k: 'me', text: '16h, por favor 🙏' },
-      { k: 'them', text: 'Prontinho! ✅ Reservei <b>amanhã às 16h</b>. Na véspera eu te mando um lembrete.', sat: { icon: 'calendar-check', title: 'Horário marcado', text: 'Agenda atualizada sozinha' } },
+      { k: 'audio', secs: '0:08', sat: { icon: 'audio-lines', title: 'Áudio entendido', text: '“Limpeza na sexta à tarde, tenho Unimed”', tone: 'violet' } },
+      { k: 'them', text: 'Oi, Juliana! 😊 Atendemos Unimed, sim. Na sexta a <b>Dra. Marina</b> tem <b>14h</b> ou <b>16h30</b>. Qual prefere?', sat: { icon: 'calendar-search', title: 'Agenda da Dra. Marina', text: 'Convênio conferido · 2 horários', tone: 'blue' } },
+      { k: 'me', text: '14h, por favor 🙏' },
+      { k: 'them', text: 'Prontinho! ✅ Limpeza na <b>sexta às 14h</b> com a Dra. Marina. Traga a carteirinha. Na véspera eu peço sua confirmação.', sat: { icon: 'calendar-check', title: 'Consulta marcada', text: 'Ficha e agenda atualizadas' } },
     ],
   },
   {
-    av: '', avLogo: true, title: 'ORBYTA', subtitle: 'sua assistente · conta verificada', link: '/app/?demo#/cobrancas', linkText: 'Ver cobranças na demonstração',
+    av: 'VP', title: 'Vida Plena Odontologia', subtitle: 'online', link: '/app/?demo#/agenda', linkText: 'Ver as confirmações na agenda',
     steps: [
-      { k: 'me', text: 'Cobra R$ 250 da Juliana pra sexta' },
-      { k: 'them', who: 'ORBYTA', text: 'Gero Pix e boleto de <b>R$ 250,00</b>, vencendo sexta, e mando no WhatsApp dela. Confirma?', buttons: ['Confirmar', 'Cancelar'], sat: { icon: 'qr-code', title: 'Cobrança preparada', text: 'Pix + boleto · vence sexta', tone: 'blue' } },
-      { k: 'me', text: 'Confirmar' },
-      { k: 'them', who: 'ORBYTA', text: 'Feito! Link de pagamento enviado para a Juliana. 📨' },
-      { k: 'sys', text: '💰 Juliana pagou R$ 250,00 no Pix', sat: { icon: 'banknote', title: 'Pagamento recebido', text: 'R$ 250,00 · Pix', tone: 'orange' }, wait: 1700 },
-      { k: 'them', who: 'ORBYTA', text: 'Recebido! Dei baixa no financeiro e registrei a venda. ✅', sat: { icon: 'check', title: 'Baixa automática', text: 'Venda registrada no painel' } },
+      { k: 'them', text: 'Olá, Marcos! Lembrete da sua consulta com o <b>Dr. Rafael amanhã às 15h</b>. Pode confirmar sua presença respondendo <b>SIM</b>?', sat: { icon: 'bell', title: 'Lembrete na véspera', text: 'Pedido de confirmação', tone: 'blue' } },
+      { k: 'me', text: 'Não vou conseguir amanhã 😕 pode ser quinta?' },
+      { k: 'them', text: 'Sem problema! Quinta o Dr. Rafael tem <b>10h</b> e <b>16h</b>. Qual fica melhor?' },
+      { k: 'me', text: '16h' },
+      { k: 'them', text: 'Remarcado para <b>quinta às 16h</b>. ✅ Obrigada por avisar!', sat: { icon: 'calendar-check', title: 'Falta evitada', text: 'Remarcado pelo próprio paciente' } },
     ],
   },
   {
-    av: 'BL', title: 'Brilho Lar Higienização', subtitle: 'online', link: '/app/?demo#/agenda?espera=1', linkText: 'Ver a lista de espera na demonstração',
+    av: 'VP', title: 'Vida Plena Odontologia', subtitle: 'online', link: '/app/?demo#/agenda?espera=1', linkText: 'Ver a lista de espera na demonstração',
     steps: [
       { k: 'sat', sat: { icon: 'user-x', title: 'Marcos desmarcou', text: 'Amanhã 15h ficaria vazio', tone: 'orange' }, wait: 1300 },
       { k: 'sat', sat: { icon: 'list-ordered', title: 'Lista de espera', text: 'Fernanda é a próxima', tone: 'violet' }, wait: 900 },
-      { k: 'them', text: 'Olá, Fernanda! Boa notícia: abriu um horário <b>amanhã às 15h</b> para a limpeza do sofá. Quer ficar com ele?' },
+      { k: 'them', text: 'Olá, Fernanda! Boa notícia: abriu um horário <b>amanhã às 15h</b> com o Dr. Rafael. Quer ficar com ele?' },
       { k: 'me', text: 'SIM!! 😍' },
-      { k: 'them', text: 'Marcado! ✨ Te espero amanhã às 15h.', sat: { icon: 'calendar-check', title: 'Encaixe feito', text: 'Horário que seria perdido' } },
+      { k: 'them', text: 'Marcado! ✨ Te espero amanhã às 15h.', sat: { icon: 'calendar-check', title: 'Encaixe feito', text: 'Cadeira que ficaria vazia' } },
     ],
   },
 ];

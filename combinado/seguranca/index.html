@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Segurança e LGPD · Como a ORBYTA protege seus dados</title>
-<meta name="description" content="Como a ORBYTA protege os dados da sua empresa: isolamento por empresa, criptografia, permissões por papel, confirmação nas ações sensíveis e LGPD.">
+<meta name="description" content="Como a ORBYTA protege os dados da clínica e dos pacientes: isolamento por clínica, criptografia, permissões, IA com regras de saúde e LGPD.">
 <meta name="theme-color" content="#3D86F0">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>try{var t=localStorage.getItem('orbyta-tema');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="canonical" href="__SITE_URL__/seguranca/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Segurança e privacidade · ORBYTA">
-<meta property="og:description" content="Os dados da sua empresa protegidos em cada camada.">
+<meta property="og:description" content="Os dados da clínica e dos pacientes protegidos em cada camada.">
 <meta property="og:image" content="__SITE_URL__/img/og.png">
 </head>
 <body class="site">
@@ -22,11 +22,11 @@
   <section class="inner-hero">
     <div class="wrap">
       <span class="kicker"><i data-icon="shield-check"></i>Central de segurança</span>
-      <h1>Os dados da sua empresa, <em class="accent">protegidos em cada camada.</em></h1>
-      <p>A ORBYTA cuida de clientes, vendas e conversas de quem confia nela. Por isso a segurança vem do desenho do sistema, e não de uma promessa no rodapé.</p>
+      <h1>Os dados da clínica e dos pacientes, <em class="accent">protegidos em cada camada.</em></h1>
+      <p>A ORBYTA cuida de pacientes, agendas e conversas de clínicas que confiam nela, e dado de saúde é dado sensível. Por isso a segurança vem do desenho do sistema, e não de uma promessa no rodapé.</p>
       <div class="inner-badges">
         <span><i data-icon="lock"></i>Criptografia em trânsito e em repouso</span>
-        <span><i data-icon="database"></i>Isolamento por empresa no banco</span>
+        <span><i data-icon="database"></i>Isolamento por clínica no banco</span>
         <span><i data-icon="scale"></i>De acordo com a LGPD</span>
       </div>
     </div>
@@ -36,8 +36,8 @@
     <div class="pillar-grid">
       <article class="pillar">
         <span class="pillar-ic blue"><i data-icon="database"></i></span>
-        <h2>Cada empresa no seu espaço</h2>
-        <p>As regras de acesso ficam no próprio banco de dados (Row Level Security do PostgreSQL). Toda consulta passa por elas: uma empresa nunca enxerga os dados de outra, nem por erro do painel.</p>
+        <h2>Cada clínica no seu espaço</h2>
+        <p>As regras de acesso ficam no próprio banco de dados (Row Level Security do PostgreSQL). Toda consulta passa por elas: uma clínica nunca enxerga os pacientes de outra, nem por erro do painel.</p>
       </article>
       <article class="pillar">
         <span class="pillar-ic violet"><i data-icon="lock-keyhole"></i></span>
@@ -52,12 +52,12 @@
       <article class="pillar">
         <span class="pillar-ic orange"><i data-icon="users"></i></span>
         <h2>Cada pessoa vê o que precisa</h2>
-        <p>Dono, gerente e atendente têm permissões diferentes. Financeiro, vendas, cobranças e configurações ficam fechados para quem não deve mexer neles. A IA respeita as mesmas regras.</p>
+        <p>Dono, gerente e recepção têm permissões diferentes. Financeiro, cobranças, profissionais e configurações ficam fechados para quem não deve mexer neles. A IA respeita as mesmas regras.</p>
       </article>
       <article class="pillar">
         <span class="pillar-ic blue"><i data-icon="circle-check"></i></span>
         <h2>Seu “sim” antes do que importa</h2>
-        <p>Vendas, cobranças, notas fiscais, baixas no financeiro, cancelamentos, descontos acima do limite e mudança de preço só acontecem depois da sua confirmação.</p>
+        <p>Recebimentos, cobranças, notas fiscais, baixas no financeiro, cancelamentos de consulta, descontos acima do limite e mudança de valor só acontecem depois da sua confirmação.</p>
       </article>
       <article class="pillar">
         <span class="pillar-ic violet"><i data-icon="history"></i></span>
@@ -71,8 +71,8 @@
       </article>
       <article class="pillar">
         <span class="pillar-ic orange"><i data-icon="sparkles"></i></span>
-        <h2>IA com regras claras</h2>
-        <p>A IA só usa as informações que a sua empresa cadastrou e o que é necessário para responder. Os dados vão ao provedor de IA apenas para gerar a resposta e, pelos termos comerciais do provedor, não são usados para treinar modelos.</p>
+        <h2>IA com regras de saúde</h2>
+        <p>A IA não dá diagnóstico, não orienta tratamento nem medicação e encaminha urgências para o pronto-socorro ou o SAMU (192). Ela só usa as informações que a clínica cadastrou e o que é necessário para responder. Os dados vão ao provedor de IA apenas para gerar a resposta e, pelos termos comerciais do provedor, não são usados para treinar modelos.</p>
       </article>
       <article class="pillar">
         <span class="pillar-ic blue"><i data-icon="credit-card"></i></span>
@@ -87,12 +87,12 @@
       <div>
         <span class="kicker"><i data-icon="scale"></i>LGPD</span>
         <h2 class="inner-h2">Seus dados continuam <em class="accent">seus.</em></h2>
-        <p class="inner-lead">A sua empresa é a controladora dos dados dos clientes dela; a ORBYTA trata esses dados só para prestar o serviço, como operadora.</p>
+        <p class="inner-lead">A clínica é a controladora dos dados dos pacientes; a ORBYTA trata esses dados só para prestar o serviço, como operadora. Dados de saúde são dados sensíveis (art. 11 da LGPD) e só são usados para o atendimento do paciente.</p>
       </div>
       <ul class="check-list">
-        <li><i data-icon="download"></i><span><b>Exporte quando quiser.</b> Clientes, vendas, financeiro e estoque saem em planilha; a conta inteira, em Configurações → Sua conta.</span></li>
-        <li><i data-icon="trash-2"></i><span><b>Exclua de verdade.</b> O dono pode apagar a empresa e todos os dados dela. Registros que a lei manda guardar ficam só pelo prazo legal.</span></li>
-        <li><i data-icon="bell-off"></i><span><b>Respeito ao “não”.</b> Quem pede para não receber mensagens deixa de receber lembretes e promoções.</span></li>
+        <li><i data-icon="download"></i><span><b>Exporte quando quiser.</b> Pacientes, consultas, financeiro e estoque saem em planilha; a conta inteira, em Configurações → Sua conta.</span></li>
+        <li><i data-icon="trash-2"></i><span><b>Exclua de verdade.</b> O dono pode apagar a clínica e todos os dados dela. Registros que a lei manda guardar ficam só pelo prazo legal.</span></li>
+        <li><i data-icon="bell-off"></i><span><b>Respeito ao “não”.</b> O paciente que pede para não receber mensagens deixa de receber lembretes, retornos e promoções.</span></li>
         <li><i data-icon="file-text"></i><span><b>Transparência.</b> A <a href="/privacidade/">política de privacidade</a> explica, em linguagem simples, cada dado, a finalidade e a base legal.</span></li>
       </ul>
     </div>
@@ -110,8 +110,8 @@
           <tr><td>Vercel</td><td>Hospedagem do site e do painel</td><td>Registros técnicos de acesso</td></tr>
           <tr><td>Meta (WhatsApp Business Platform)</td><td>Envio e recebimento de mensagens</td><td>Telefone e conteúdo das conversas</td></tr>
           <tr><td>Anthropic (Claude)</td><td>Inteligência artificial que entende e responde</td><td>Trechos de conversa e dados cadastrados necessários para a resposta</td></tr>
-          <tr><td>Asaas</td><td>Assinatura da ORBYTA e cobranças que a sua empresa faz aos clientes</td><td>Nome, CPF ou CNPJ, e-mail e valores</td></tr>
-          <tr><td>Focus NFe</td><td>Emissão de nota fiscal de serviço (só se a empresa conectar)</td><td>Dados do tomador e do serviço</td></tr>
+          <tr><td>Asaas</td><td>Assinatura da ORBYTA e cobranças que a clínica faz aos pacientes</td><td>Nome, CPF ou CNPJ, e-mail e valores</td></tr>
+          <tr><td>Focus NFe</td><td>Emissão de nota fiscal de serviço (só se a clínica conectar)</td><td>Dados do tomador e do serviço</td></tr>
           <tr><td>Provedor de e-mail transacional</td><td>E-mails de acesso, convite e recuperação de senha</td><td>Nome e e-mail</td></tr>
         </tbody>
       </table>

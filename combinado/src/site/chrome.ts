@@ -25,7 +25,7 @@ export const SITE_FOOTER = `<footer class="site-foot">
   <div class="wrap foot-grid">
     <div class="foot-brand">
       <a class="site-brand" href="/" aria-label="ORBYTA, página inicial"><i data-wordmark="30"></i></a>
-      <p>Gestão empresarial com IA que executa. Administre sua empresa conversando.</p>
+      <p>Software com IA para clínicas. A recepção da sua clínica, no automático.</p>
       <a class="foot-mail" href="mailto:${SITE_EMAIL}"><i data-icon="mail"></i>${SITE_EMAIL}</a>
     </div>
     <nav class="foot-col" aria-label="Produto"><b>Produto</b><a href="/#como-funciona">Como funciona</a><a href="/#recursos">Recursos</a><a href="/#modulos">ORBYTA ONE</a><a href="/#precos">Preços</a><a href="/app/?demo">Demonstração</a></nav>

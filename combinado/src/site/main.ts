@@ -52,7 +52,7 @@ const today = todayLocal('America/Sao_Paulo');
 const monthIdx = Number(today.slice(5, 7)) - 1;
 const long = fmtLong(today, 'America/Sao_Paulo');
 $$('[data-today]').forEach((el) => { el.textContent = long[0].toUpperCase() + long.slice(1); });
-$$('[data-goal-title]').forEach((el) => { el.textContent = `Meta de vendas de ${MONTHS[monthIdx]}`; });
+$$('[data-goal-title]').forEach((el) => { el.textContent = `Meta de faturamento de ${MONTHS[monthIdx]}`; });
 
 function pairBars(el: HTMLElement) {
   const conv = [182, 204, 196, 238, 251, 276, 262, 298, 314, 342, 365, 388];
@@ -63,12 +63,12 @@ function pairBars(el: HTMLElement) {
     `<div class="pb-y">${ticks.map((t) => `<span style="bottom:${(t / max) * 100}%">${num(t)}</span>`).join('')}</div>` +
     `<div class="pb-plot">${ticks.map((t) => `<div class="pb-grid" style="bottom:${(t / max) * 100}%"></div>`).join('')}` +
     `<div class="pb-cols">${conv.map((c, i) => `<div class="pb-col${i === conv.length - 1 ? ' hover' : ''}"><div class="pb-track"><div class="pb-bar a" style="height:${(c / max) * 100}%;animation-delay:${300 + i * 40}ms"></div></div><div class="pb-track"><div class="pb-bar b" style="height:${(sales[i] / max) * 100}%;animation-delay:${360 + i * 40}ms"></div></div></div>`).join('')}</div>` +
-    `<div class="chart-tip pv-tip" style="left:${((conv.length - 0.5) / conv.length) * 100}%;top:${(1 - conv[conv.length - 1] / max) * 100}%"><div class="tt">${MONTHS[monthIdx][0].toUpperCase() + MONTHS[monthIdx].slice(1)} até agora</div><div class="tr"><i style="background:var(--c1)"></i>Conversas<span class="sp"></span><b>${num(conv[11])}</b></div><div class="tr"><i style="background:var(--c2)"></i>Vendas<span class="sp"></span><b>${num(sales[11])}</b></div></div></div>` +
+    `<div class="chart-tip pv-tip" style="left:${((conv.length - 0.5) / conv.length) * 100}%;top:${(1 - conv[conv.length - 1] / max) * 100}%"><div class="tt">${MONTHS[monthIdx][0].toUpperCase() + MONTHS[monthIdx].slice(1)} até agora</div><div class="tr"><i style="background:var(--c1)"></i>Conversas<span class="sp"></span><b>${num(conv[11])}</b></div><div class="tr"><i style="background:var(--c2)"></i>Consultas<span class="sp"></span><b>${num(sales[11])}</b></div></div></div>` +
     `<div class="pb-x">${labels.map((l) => `<span>${l}</span>`).join('')}</div>`;
 }
 
 function gauge(el: HTMLElement) {
-  const parts = [{ v: 27, c: 'var(--c2)' }, { v: 80, c: 'var(--c-muted)' }, { v: 128, c: 'var(--c1)' }];
+  const parts = [{ v: 412, c: 'var(--c1)' }, { v: 21, c: 'var(--c2)' }, { v: 18, c: 'var(--c-muted)' }];
   const total = parts.reduce((s, p) => s + p.v, 0);
   const N = 66, start = 135, sweep = 270, r1 = 70, r2 = 92;
   let acc = 0;
