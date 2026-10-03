@@ -243,3 +243,14 @@ describe('valor para o empreendedor (demonstração)', () => {
     expect(table('waitlist').some((w) => w.status === 'aguardando' && findContacts('Lia Teste')[0]?.id === w.contact_id)).toBe(true);
   });
 });
+
+describe('segurança', () => {
+  it('nome de profissional com caracteres especiais não quebra o assistente', async () => {
+    const pros = table('professionals');
+    const before = pros.length;
+    pros.push({ ...pros[0], id: 'pro-especial', name: 'Dr. Jo(ão [teste]+', active: true });
+    const r = await runSimulator('Oi! Quanto custa a limpeza?', { reset: true });
+    expect(r.reply.length).toBeGreaterThan(0);
+    pros.splice(before);
+  });
+});

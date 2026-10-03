@@ -8,5 +8,6 @@ const cwd = fileURLToPath(new URL('../supabase/functions/', import.meta.url));
 const common = ['--no-config', '--node-modules-dir=none', '--min-dep-age=0'];
 const fns = ['agent', 'whatsapp-webhook', 'whatsapp', 'billing', 'asaas-webhook', 'team', 'cron', 'integrations', 'cobranca-webhook'].map((f) => `${f}/index.ts`);
 const args = mode === 'test' ? ['test', ...common, '--allow-env', '--allow-net=127.0.0.1', 'tests/'] : ['check', ...common, ...fns];
+// nosemgrep -- argumentos fixos; o shell só é usado no Windows para achar o npx
 const r = spawnSync('npx', ['--yes', 'deno@2', ...args], { cwd, stdio: 'inherit', env: { ...process.env, DENO_NO_PACKAGE_JSON: '1' }, shell: process.platform === 'win32' });
 process.exit(r.status ?? 1);

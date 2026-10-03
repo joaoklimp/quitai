@@ -21,10 +21,12 @@ const AI_NAME = () => `${demoDb().ai.assistant_name} (IA)`;
 const po = (serviceId?: string | null, professionalId?: string | null): SlotOpts => ({ professionals: table('professionals'), serviceId: serviceId ?? null, professionalId: professionalId ?? null });
 const proName = (id?: string | null) => (id ? table('professionals').find((p) => p.id === id)?.name : undefined);
 /** "com a Dra. Marina", "com o Rafael": o profissional citado na mensagem. */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function matchPro(f: string): string | null {
   for (const p of table('professionals').filter((x) => x.active)) {
     const toks = fold(p.name).replace(/^(dra?|prof(a)?)\.?\s+/, '').split(/\s+/);
-    if (toks.some((t) => t.length > 2 && new RegExp(`\\bcom (a |o )?(dra?\\.? |doutora? |dr )?${t}\\b`).test(f))) return p.id;
+    // nosemgrep -- o nome do profissional passa por escapeRe antes de entrar na expressão
+    if (toks.some((t) => t.length > 2 && new RegExp(`\\bcom (a |o )?(dra?\\.? |doutora? |dr )?${escapeRe(t)}\\b`).test(f))) return p.id;
   }
   return null;
 }

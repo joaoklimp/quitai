@@ -118,7 +118,7 @@ export async function resolvePending(b: Base, pendingId: string, approve: boolea
     return finish(b, p, 'Tudo bem, não fiz nada.', { tool: p.tool, label: p.summary, status: 'cancelada' }, 'cancelada');
   }
   const ctx: AgentCtx = { ...b, mode: 'dono', channel, conversationId: p.conversation_id, member };
-  const exec = EXECUTORS[p.tool];
+  const exec = Object.hasOwn(EXECUTORS, p.tool) ? EXECUTORS[p.tool] : undefined;
   const r = exec ? await exec(ctx, p.args ?? {}) : { content: 'Ação desconhecida.', error: true };
   if (r.error) {
     await db.from('pending_actions').update({ status: 'erro' }).eq('id', p.id);

@@ -59,6 +59,7 @@ function pairBars(el: HTMLElement) {
   const sales = [41, 47, 44, 55, 61, 66, 63, 74, 79, 88, 94, 103];
   const max = 400, ticks = [0, 100, 200, 300, 400];
   const labels = conv.map((_, i) => MONTHS_SHORT[(monthIdx - 11 + i + 12) % 12]);
+  // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
   el.innerHTML =
     `<div class="pb-y">${ticks.map((t) => `<span style="bottom:${(t / max) * 100}%">${num(t)}</span>`).join('')}</div>` +
     `<div class="pb-plot">${ticks.map((t) => `<div class="pb-grid" style="bottom:${(t / max) * 100}%"></div>`).join('')}` +
@@ -118,6 +119,7 @@ $$('[data-heat]').forEach((el) => {
       html += `<i style="--v:${v.toFixed(2)}"></i>`;
     }
   });
+  // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
   el.innerHTML = html;
 });
 
@@ -188,6 +190,7 @@ const plansBox = $('#planos');
 let cycle: Cycle = 'mensal';
 function renderPlans() {
   if (!plansBox) return;
+  // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
   plansBox.innerHTML = PAID_PLANS.map((id: PaidPlanId) => {
     const p = PLANS[id];
     const per = monthlyEquivalent(id, cycle);

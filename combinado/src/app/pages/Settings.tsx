@@ -323,8 +323,14 @@ function MetaConnect({ onDone }: { onDone: () => void }) {
       await loadFbSdk(appId);
       const info: { phone_number_id?: string; waba_id?: string } = {};
       const onMsg = (ev: MessageEvent) => {
-        if (!/facebook\.com$/.test(new URL(ev.origin).hostname)) return;
-        try { const d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data; if (d?.type === 'WA_EMBEDDED_SIGNUP' && d.data) Object.assign(info, d.data); } catch { /* outra mensagem */ }
+        const host = new URL(ev.origin).hostname;
+        if (host !== 'facebook.com' && !host.endsWith('.facebook.com')) return; // "evilfacebook.com" não passa
+        try {
+          const d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+          if (d?.type !== 'WA_EMBEDDED_SIGNUP' || !d.data) return;
+          if (typeof d.data.phone_number_id === 'string') info.phone_number_id = d.data.phone_number_id;
+          if (typeof d.data.waba_id === 'string') info.waba_id = d.data.waba_id;
+        } catch { /* outra mensagem */ }
       };
       window.addEventListener('message', onMsg);
       const code = await new Promise<string | null>((resolve) => {

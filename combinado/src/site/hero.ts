@@ -124,6 +124,7 @@ export function initHero(head: HTMLElement, reduced: boolean) {
   const later = (ms: number, fn: () => void) => { timers.push(window.setTimeout(fn, reduced ? 0 : ms)); };
   const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
   const keep = () => { while (chat.children.length > 7) chat.firstElementChild?.remove(); };
+  // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
   const add = (html: string, cls: string) => { const el = document.createElement('div'); el.className = cls; el.innerHTML = html; chat.appendChild(el); keep(); return el; };
   const satHtml = (s: Sat) => `<span class="si ${s.tone ?? ''}">${icon(s.icon)}</span><span><b>${s.title}</b><small>${s.text}</small></span>`;
 
@@ -137,6 +138,7 @@ export function initHero(head: HTMLElement, reduced: boolean) {
     sats.forEach((s) => s.classList.remove('on'));
     tryLink.classList.remove('on');
     tryLink.href = sc.link; tryLink.firstChild!.textContent = sc.linkText;
+    // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
     av.innerHTML = sc.avLogo ? logo : sc.av;
     av.style.background = sc.avLogo ? '#04060D' : '';
     title.textContent = sc.title; subtitle.textContent = sc.subtitle;
@@ -151,6 +153,7 @@ export function initHero(head: HTMLElement, reduced: boolean) {
         if (st.k === 'me' || st.k === 'them') add(`${st.who ? `<span class="who">${st.who}</span>` : ''}${st.text}${st.buttons ? `<span class="hx-btns"><span>${st.buttons[0]}</span><span>${st.buttons[1]}</span></span>` : ''}<time>${clock()}</time>`, `hx-b ${st.k}`);
         else if (st.k === 'audio') add(`<span class="hx-audio"><span class="pl">${icon('play')}</span><span class="wave">${Array.from({ length: 26 }, (_, j) => `<i style="height:${30 + Math.round(Math.abs(Math.sin(j * 1.7)) * 70)}%"></i>`).join('')}</span><small>${st.secs}</small></span><time>${clock()}</time>`, 'hx-b me');
         else if (st.k === 'sys') add(st.text, 'hx-b sys');
+        // nosemgrep -- HTML montado só com textos fixos deste arquivo (cenas, planos, números do exemplo); nada vem do visitante
         if (st.sat) { const el = sats[slot++ % sats.length]; el.classList.remove('on'); el.innerHTML = satHtml(st.sat); requestAnimationFrame(() => el.classList.add('on')); }
         tabs[i].style.setProperty('--prog', String((n + 1) / sc.steps.length));
       });

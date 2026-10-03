@@ -48,7 +48,9 @@ function apply(b: Record<string, Function>, f: Filter) {
     case 'is': return b.is(f.col, null);
     case 'not_null': return b.not(f.col, 'is', null);
     case 'in': return b.in(f.col, f.value);
-    default: return b[f.op](f.col, f.value);
+    // nosemgrep -- f.op só chega aqui depois de conferido na lista de operações acima
+    case 'eq': case 'neq': case 'gt': case 'gte': case 'lt': case 'lte': return b[f.op](f.col, f.value);
+    default: throw new Error('Filtro desconhecido.');
   }
 }
 
