@@ -399,7 +399,7 @@ const hour = str('Hora no formato HH:MM (24h).');
 
 const consultarHorarios: T = {
   name: 'consultar_horarios',
-  description: 'Lista os horários livres de um dia, respeitando o horário da clínica, a agenda de cada profissional e a duração do procedimento. Use sempre antes de oferecer ou marcar uma consulta.',
+  description: 'Lista os horários livres de um dia, respeitando o horário da clínica, a agenda de cada profissional e a duração do procedimento. Chame SEMPRE antes de dizer que um horário está livre, de oferecer horários ou de marcar: nunca afirme disponibilidade sem este resultado.',
   input_schema: obj({ data: date, servico_id: str('Id do procedimento (para a duração e os profissionais certos). Opcional.'), profissional_id: str('Id do profissional, se o paciente pediu alguém. Opcional.') }, ['data']),
   run: (i, c) => freeSlots(c, i),
 };

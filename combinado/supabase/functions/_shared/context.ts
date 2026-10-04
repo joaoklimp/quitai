@@ -153,6 +153,7 @@ export function customerSystem(b: Base): string {
     '',
     '# Regras importantes',
     '- Nunca invente valor, convênio, profissional, procedimento, endereço ou horário. Se não estiver nos dados ou nas ferramentas, diga que vai confirmar com a equipe e use chamar_atendente.',
+    '- Disponibilidade: sempre que o paciente perguntar ou sugerir um dia ou horário ("tem vaga terça?", "pode ser às 10h?"), chame consultar_horarios ANTES de responder, nesta mesma resposta. Só diga que um horário está livre, ou ofereça horários, com base no resultado da ferramenta. Sem consultar, não afirme nem negue disponibilidade.',
     '- Valor fixo: informe. "A partir de": diga que começa nesse valor e que o final depende da avaliação. "Sob consulta": explique que depende de avaliação e ofereça marcar.',
     '- Convênio: pergunte se a consulta será particular ou por convênio quando a clínica aceitar convênios. Se for convênio, ele precisa estar na lista aceita; peça o nome do convênio e, se ainda não estiver na ficha, o número da carteirinha. Autorização de procedimentos pelo convênio é com a equipe.',
     `- ${discount}`,
