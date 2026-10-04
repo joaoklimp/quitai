@@ -9,7 +9,8 @@ Deno.env.set('ANTHROPIC_API_KEY', 'sk-ant-teste');
 
 const { runAgent, fallbackParams, __setClientForTests } = await import('../_shared/ai.ts');
 const { yesNo } = await import('../_shared/agent.ts');
-const { verifySignature, withinWindow } = await import('../_shared/whatsapp.ts');
+const { verifySignature, withinWindow, ensureTemplates } = await import('../_shared/whatsapp.ts');
+const { TEMPLATE_LIST } = await import('../_shared/templates.ts');
 const { customerSystem, ownerSystem, priceText } = await import('../_shared/context.ts');
 const { planFromValue, validCpfCnpj } = await import('../_shared/asaas.ts');
 
@@ -192,4 +193,40 @@ Deno.test('Asaas: plano pelo valor e CPF/CNPJ', () => {
   assert(!validCpfCnpj('11111111111'));
   assert(validCpfCnpj('11222333000181'));
   assert(!validCpfCnpj('11222333000180'));
+});
+
+Deno.test('ao conectar, cadastra na Meta só os modelos que faltam e devolve a situação de cada um', async () => {
+  const prev = globalThis.fetch;
+  const posted: { name: string; category: string; example: unknown }[] = [];
+  globalThis.fetch = ((input: Request | URL | string, init?: RequestInit) => {
+    const url = String(input);
+    if ((init?.method ?? 'GET') === 'GET') {
+      assertStringIncludes(url, '/WABA1/message_templates');
+      return Promise.resolve(new Response(JSON.stringify({ data: [
+        { name: 'lembrete_agendamento', language: 'pt_BR', status: 'APPROVED' },
+        { name: 'lembrete_retorno', language: 'pt_BR', status: 'REJECTED', rejected_reason: 'INVALID_FORMAT' },
+        { name: 'orcamento_enviado', language: 'en_US', status: 'APPROVED' }, // outro idioma não conta
+      ] }), { status: 200 }));
+    }
+    const body = JSON.parse(String(init?.body));
+    posted.push({ name: body.name, category: body.category, example: body.components[0].example });
+    if (body.name === 'aviso_equipe') return Promise.resolve(new Response(JSON.stringify({ error: { code: 100, message: 'limite de modelos' } }), { status: 400 }));
+    return Promise.resolve(new Response(JSON.stringify({ id: 'x', status: 'PENDING' }), { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const out = await ensureTemplates('WABA1', 'tok');
+    assertEquals(out.length, TEMPLATE_LIST.length);
+    assertEquals(posted.length, TEMPLATE_LIST.length - 2); // os dois já existentes em pt_BR não são recriados
+    assert(posted.every((p) => Array.isArray((p.example as { body_text: string[][] }).body_text[0])));
+    assertEquals(posted.find((p) => p.name === 'pos_atendimento')!.category, 'MARKETING');
+    const by = new Map(out.map((t) => [t.name, t]));
+    assertEquals(by.get('lembrete_agendamento')!.status, 'aprovado');
+    assertEquals(by.get('lembrete_retorno'), { name: 'lembrete_retorno', status: 'recusado', reason: 'INVALID_FORMAT' });
+    assertEquals(by.get('orcamento_enviado')!.status, 'em_analise');
+    assertEquals(by.get('aviso_equipe')!.status, 'erro');
+  } finally { globalThis.fetch = prev; }
+});
+
+Deno.test('cada modelo tem um exemplo por variável (exigência da Meta)', () => {
+  for (const t of TEMPLATE_LIST) assertEquals(t.example.length, (t.body.match(/\{\{\d+\}\}/g) ?? []).length, t.name);
 });

@@ -1,6 +1,7 @@
 // WhatsApp Cloud API (Meta): enviar texto, botões e modelos, marcar como lida, baixar mídia,
 // validar a assinatura do webhook e concluir a conexão do número (cadastro incorporado).
 import { db } from './db.ts';
+import { TEMPLATE_LIST } from './templates.ts';
 
 const VERSION = Deno.env.get('META_GRAPH_VERSION') || 'v23.0';
 const GRAPH = `https://graph.facebook.com/${VERSION}`;
@@ -127,3 +128,35 @@ export const phoneInfo = (phoneNumberId: string, token: string) =>
 export const subscribeApp = (wabaId: string, token: string) => graph(`${wabaId}/subscribed_apps`, token, { method: 'POST' });
 export const registerNumber = (phoneNumberId: string, token: string, pin: string) =>
   graph(`${phoneNumberId}/register`, token, { method: 'POST', body: { messaging_product: 'whatsapp', pin } });
+
+/* ---------- modelos de mensagem: a ORBYTA cadastra sozinha na conta da clínica ---------- */
+export type TemplateStatus = { name: string; status: 'aprovado' | 'em_analise' | 'recusado' | 'pausado' | 'erro'; reason?: string };
+const STATUS: Record<string, TemplateStatus['status']> = { APPROVED: 'aprovado', PENDING: 'em_analise', IN_APPEAL: 'em_analise', REJECTED: 'recusado', PAUSED: 'pausado', DISABLED: 'recusado', LIMIT_EXCEEDED: 'erro' };
+
+/** Cria na conta (WABA) os modelos da ORBYTA que ainda não existem e devolve a situação de cada um. Pode rodar quantas vezes quiser. */
+export async function ensureTemplates(wabaId: string, token: string): Promise<TemplateStatus[]> {
+  const have = await graph<{ data?: { name: string; language: string; status: string; rejected_reason?: string }[] }>(
+    `${wabaId}/message_templates?fields=name,language,status,rejected_reason&limit=200`, token);
+  const existing = new Map((have.data ?? []).filter((t) => t.language === 'pt_BR').map((t) => [t.name, t]));
+  const out: TemplateStatus[] = [];
+  for (const t of TEMPLATE_LIST) {
+    const found = existing.get(t.name);
+    if (found) {
+      out.push({ name: t.name, status: STATUS[found.status] ?? 'em_analise', ...(found.rejected_reason && found.rejected_reason !== 'NONE' ? { reason: found.rejected_reason } : {}) });
+      continue;
+    }
+    try {
+      const r = await graph<{ status?: string }>(`${wabaId}/message_templates`, token, {
+        method: 'POST',
+        body: {
+          name: t.name, language: 'pt_BR', category: t.category === 'Marketing' ? 'MARKETING' : 'UTILITY',
+          components: [{ type: 'BODY', text: t.body, ...(t.example.length ? { example: { body_text: [t.example] } } : {}) }],
+        },
+      });
+      out.push({ name: t.name, status: STATUS[r.status ?? 'PENDING'] ?? 'em_analise' });
+    } catch (e) {
+      out.push({ name: t.name, status: 'erro', reason: e instanceof WaError ? e.detail.slice(0, 160) : String(e) });
+    }
+  }
+  return out;
+}

@@ -10,7 +10,7 @@ import {
 import { api, isDemo } from '../data/api';
 import { SUPABASE_URL } from '../data/supabase/supaSource';
 import { useInvalidate, useList } from '../data/hooks';
-import type { AiSettings, BusinessHours, Company, Member, Role, Tone, WhatsAppAccount } from '../data/types';
+import type { AiSettings, BusinessHours, Company, Member, Role, TemplateStatus, Tone, WhatsAppAccount } from '../data/types';
 import { useMeCtx, can, useTheme } from '../context';
 import { Avatar, Badge, Button, Empty, Field, Input, Loader, Modal, MoneyInput, PageHeader, PhoneInput, Segmented, Select, Switch, Textarea, cx, useConfirm, useToast } from '../ui';
 import { brl, fmtDate, fmtAgo, formatPhone, WEEKDAYS } from '../../shared/format';
@@ -222,6 +222,8 @@ function WhatsAppTab() {
   const toast = useToast();
   const confirm = useConfirm();
   const [manual, setManual] = useState(false);
+  const oneClick = !!(import.meta.env.VITE_META_APP_ID && import.meta.env.VITE_META_CONFIG_ID);
+  const showAdvanced = isDemo || me.isPlatformAdmin || !oneClick; // a configuração manual é coisa do suporte, não da clínica
   const [code, setCode] = useState<{ code: string; number: string | null } | null>(null);
   const { data: members = [] } = useList('members');
   const meMember = members.find((m) => m.user_id === me.user_id);
@@ -242,10 +244,14 @@ function WhatsAppTab() {
         </div>
         <div className="row wrap" style={{ gap: 10, marginTop: 14 }}>
           {!connected && <MetaConnect onDone={() => { void refetch(); refresh(); }} />}
-          {!connected && <Button icon={<KeyRound />} onClick={() => setManual(true)}>Conectar com credenciais</Button>}
           {connected && can(me, 'dono') && <Button variant="danger-soft" icon={<Unlink />} onClick={async () => { if (await confirm({ title: 'Desconectar o WhatsApp?', text: 'A IA para de responder os pacientes até você conectar de novo.', confirm: 'Desconectar', danger: true })) { await api.disconnectWhatsApp(); void refetch(); toast('WhatsApp desconectado'); } }}>Desconectar</Button>}
           <Link className="btn" to="/simulador"><Smartphone />Testar no simulador</Link>
         </div>
+        {!connected && (oneClick || isDemo ? (
+          <p className="muted small" style={{ margin: '14px 0 0' }}>Você entra com o Facebook da clínica, escolhe o número e pronto: a ORBYTA liga as mensagens, registra o número e cadastra os modelos de mensagem sozinha. Não precisa mexer em nada técnico.</p>
+        ) : (
+          <div className="callout" style={{ marginTop: 14 }}><CircleAlert /><span>A conexão em 1 clique está sendo ativada. Fale com o suporte da ORBYTA e a gente conecta o número da clínica para você.</span></div>
+        ))}
       </section>
 
       <section className="card set-section">
@@ -264,26 +270,56 @@ function WhatsAppTab() {
         )}
       </section>
 
-      <section className="card set-section">
-        <div className="card-head"><div><h3>Configuração técnica (Meta)</h3><div className="sub">Para quem vai conectar o número no painel de desenvolvedor da Meta.</div></div></div>
-        <ol className="steps">
-          <li><span>No <a className="link" href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer">Meta for Developers <ExternalLink className="ii" /></a>, crie um app do tipo Negócios e adicione o produto WhatsApp.</span></li>
-          <li><span>Em WhatsApp → Configuração, cadastre o webhook com a URL abaixo e o mesmo token de verificação definido no servidor (<code>META_VERIFY_TOKEN</code>). Assine o campo <b>messages</b>.<div className="code-box" style={{ marginTop: 8 }}><code>{webhook}</code><button className="icon-btn xs" onClick={() => copy(webhook)} aria-label="Copiar URL"><Copy /></button></div></span></li>
-          <li><span>Crie um usuário do sistema com permissão no WhatsApp e gere um token permanente. Use o identificador do número e o da conta (WABA) em “Conectar com credenciais”.</span></li>
-          <li><span>Cadastre os modelos de mensagem abaixo (idioma: português do Brasil) no Gerenciador do WhatsApp. Eles são usados pelas automações fora da janela de 24 horas.</span></li>
-        </ol>
-        <div className="mini-list" style={{ marginTop: 16 }}>
-          {TEMPLATE_LIST.map((t) => (
-            <div key={t.name} style={{ flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
-              <div className="row between"><b><code>{t.name}</code></b><span className="row" style={{ gap: 6 }}><Badge size="sm">{t.category}</Badge><button className="icon-btn xs" onClick={() => copy(t.body)} aria-label="Copiar texto"><Copy /></button></span></div>
-              <span className="small" style={{ color: 'var(--ink-2)' }}>{t.body}</span>
-              <span className="muted tiny">{t.use} Variáveis: {t.params.map((x, i) => `{{${i + 1}}} ${x}`).join(' · ')}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <TemplatesCard connected={connected} />
+
+      {showAdvanced && (
+        <details className="card set-section adv">
+          <summary><b>Configuração manual</b><span className="muted small"> · para o suporte da ORBYTA ou quem usa o próprio app da Meta</span></summary>
+          <ol className="steps" style={{ marginTop: 14 }}>
+            <li><span>No <a className="link" href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer">Meta for Developers <ExternalLink className="ii" /></a>, crie um app do tipo Negócios e adicione o produto WhatsApp.</span></li>
+            <li><span>Em WhatsApp → Configuração, cadastre o webhook com a URL abaixo e o mesmo token de verificação definido no servidor (<code>META_VERIFY_TOKEN</code>). Assine o campo <b>messages</b>.<div className="code-box" style={{ marginTop: 8 }}><code>{webhook}</code><button className="icon-btn xs" onClick={() => copy(webhook)} aria-label="Copiar URL"><Copy /></button></div></span></li>
+            <li><span>Crie um usuário do sistema com permissão no WhatsApp, gere um token permanente e conecte abaixo com o identificador do número e o da conta (WABA). Os modelos de mensagem são cadastrados sozinhos.</span></li>
+          </ol>
+          {!connected && <Button icon={<KeyRound />} onClick={() => setManual(true)} style={{ marginTop: 12 }}>Conectar com credenciais</Button>}
+        </details>
+      )}
       <ManualConnect open={manual} onClose={() => setManual(false)} onDone={() => { void refetch(); refresh(); }} />
     </>
+  );
+}
+
+const TPL_STATUS: Record<TemplateStatus['status'], { label: string; tone: 'green' | 'yellow' | 'red' | 'orange' }> = {
+  aprovado: { label: 'Aprovado', tone: 'green' }, em_analise: { label: 'Em análise na Meta', tone: 'yellow' }, recusado: { label: 'Recusado', tone: 'red' }, pausado: { label: 'Pausado', tone: 'orange' }, erro: { label: 'Não cadastrado', tone: 'red' },
+};
+/** Modelos de mensagem: a ORBYTA cadastra sozinha na conta da clínica; aqui só se acompanha a aprovação da Meta. */
+function TemplatesCard({ connected }: { connected: boolean }) {
+  const { me } = useMeCtx();
+  const owner = can(me, 'dono', 'gerente');
+  const q = useQuery({ queryKey: ['wa-templates'], queryFn: () => api.whatsappTemplates(), enabled: (connected || isDemo) && owner, staleTime: 60_000, retry: false });
+  const byName = new Map((q.data ?? []).map((t) => [t.name, t]));
+  const approved = (q.data ?? []).filter((t) => t.status === 'aprovado').length;
+  return (
+    <section className="card set-section">
+      <div className="card-head">
+        <div><h3>Modelos de mensagem</h3><div className="sub">{connected || isDemo
+          ? `A ORBYTA cadastrou os ${TEMPLATE_LIST.length} modelos na sua conta. ${q.data ? `${approved} de ${TEMPLATE_LIST.length} aprovados pela Meta.` : ''} A aprovação costuma levar de minutos a 1 dia.`
+          : `Ao conectar o número, a ORBYTA cadastra sozinha os ${TEMPLATE_LIST.length} modelos que o WhatsApp exige para lembretes, retornos e cobranças. Você não precisa fazer nada.`}</div></div>
+        {(connected || isDemo) && owner && <Button size="sm" icon={<RefreshCw />} loading={q.isFetching} onClick={() => void q.refetch()}>Verificar de novo</Button>}
+      </div>
+      {q.error && <div className="callout" style={{ marginBottom: 12 }}><CircleAlert /><span>{(q.error as Error).message}</span></div>}
+      <div className="mini-list">
+        {TEMPLATE_LIST.map((t) => {
+          const st = byName.get(t.name);
+          return (
+            <div key={t.name} style={{ flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
+              <div className="row between"><b>{t.use}</b>{st ? <Badge size="sm" tone={TPL_STATUS[st.status].tone} dot>{TPL_STATUS[st.status].label}</Badge> : <Badge size="sm">{t.category}</Badge>}</div>
+              <span className="small" style={{ color: 'var(--ink-2)' }}>{t.body.replace(/\{\{(\d+)\}\}/g, (_, n: string) => t.example.at(Number(n) - 1) ?? '')}</span>
+              {st?.reason && <span className="muted tiny">Motivo: {st.reason}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

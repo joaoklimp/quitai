@@ -1,8 +1,9 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
 import type { DataSource, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import { presetsFor } from '../../../shared/presets';
-import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount } from '../types';
+import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
+import { TEMPLATE_LIST } from '../../../shared/templates';
 import { audit, contactById, demoDb, emit, newId, notify, onChange, pushMessage, resetDemoDb, runQuery, table } from './db';
 import { DEMO_COMPANY_ID, DEMO_USER_ID } from './seed';
 import { resolvePendingDemo, runOwnerCommand, runSimulator, suggestReplyDemo } from './agent';
@@ -76,6 +77,7 @@ export class DemoSource implements DataSource {
     emit('members');
     return structuredClone(d.whatsapp);
   }
+  async whatsappTemplates(): Promise<TemplateStatus[]> { return TEMPLATE_LIST.map((t) => ({ name: t.name, status: 'aprovado' as const })); }
   async disconnectWhatsApp() { const d = demoDb(); Object.assign(d.whatsapp, { status: 'desconectado', connected_at: null }); emit('members'); }
   async ownerLinkCode() {
     await wait();

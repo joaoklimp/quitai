@@ -1,7 +1,7 @@
 // Interface única de dados do painel. Há duas implementações:
 // - demo (localStorage, sem servidor) para quem quer ver o produto funcionando na hora;
 // - Supabase (banco real com RLS + Edge Functions com a IA e o WhatsApp).
-import type {
+import type { TemplateStatus,
   AgentReply, AiSettings, Company, ModuleKey, ValueReport, DailyStat, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role,
 } from './types';
 import type { ProductRow } from './sheet';
@@ -40,6 +40,8 @@ export interface DataSource {
   whatsapp(): Promise<WhatsAppAccount>;
   connectWhatsApp(input: { phone_number_id: string; waba_id: string; access_token: string; pin?: string }): Promise<WhatsAppAccount>;
   disconnectWhatsApp(): Promise<void>;
+  /** Modelos de mensagem na Meta: cadastra os que faltam e devolve a situação de cada um. */
+  whatsappTemplates(): Promise<TemplateStatus[]>;
   ownerLinkCode(): Promise<{ code: string; number: string | null; expires_at: string }>;
   inviteMember(input: { name: string; email: string; role: Role }): Promise<Member>;
   updateMember(user_id: string, patch: Partial<Member>): Promise<void>;

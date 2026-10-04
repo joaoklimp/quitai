@@ -539,6 +539,9 @@ export interface FiscalNote {
   updated_at: ISO;
 }
 
+/** Situação de um modelo de mensagem do WhatsApp na Meta (a ORBYTA cadastra sozinha ao conectar). */
+export interface TemplateStatus { name: string; status: 'aprovado' | 'em_analise' | 'recusado' | 'pausado' | 'erro'; reason?: string }
+
 export type TableName =
   | 'contacts' | 'services' | 'quotes' | 'quote_items' | 'appointments' | 'sales' | 'tasks'
   | 'conversations' | 'messages' | 'pending_actions' | 'audit_log' | 'automations' | 'automation_runs'

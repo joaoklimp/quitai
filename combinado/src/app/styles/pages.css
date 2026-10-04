@@ -633,3 +633,9 @@
 .goal-bar i { display: block; height: 100%; border-radius: 99px; }
 .pro-chip .pro-chip-av { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; margin-left: -6px; }
 @media (max-width: 560px) { .pro-photo { flex-direction: column; text-align: center; } .pro-photo .row { justify-content: center; } .rank-val .muted { display: none; } }
+
+/* configurações: bloco técnico recolhido (suporte) */
+details.adv > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+details.adv > summary::-webkit-details-marker { display: none; }
+details.adv > summary::before { content: '›'; display: inline-block; width: 14px; transition: transform .15s; color: var(--ink-3); font-weight: 700; }
+details.adv[open] > summary::before { transform: rotate(90deg); }

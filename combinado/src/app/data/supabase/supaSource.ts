@@ -1,7 +1,7 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
-import type { AgentReply, AiSettings, Company, ValueReport, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role } from '../types';
+import type { AgentReply, AiSettings, Company, ValueReport, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
 
 export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || '';
@@ -212,6 +212,7 @@ export class SupabaseSource implements DataSource {
     return r.account;
   }
   async disconnectWhatsApp() { await this.fn('whatsapp', { action: 'disconnect' }); }
+  async whatsappTemplates() { return (await this.fn<{ templates: TemplateStatus[] }>('whatsapp', { action: 'templates' })).templates; }
   async ownerLinkCode() {
     const { data, error } = await this.sb.rpc('owner_link_code');
     if (error) throw friendly(error);

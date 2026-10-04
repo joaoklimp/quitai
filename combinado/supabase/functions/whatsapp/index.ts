@@ -3,7 +3,7 @@ import { bad, forbidden, json, readJson, serve, str } from '../_shared/http.ts';
 import { audit, caller, db, requireRole } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { insertMessage, sendQuote } from '../_shared/conversation.ts';
-import { exchangeCode, loadAccount, phoneInfo, registerNumber, sendText, subscribeApp, WaError, withinWindow } from '../_shared/whatsapp.ts';
+import { ensureTemplates, exchangeCode, loadAccount, phoneInfo, registerNumber, sendText, subscribeApp, WaError, withinWindow } from '../_shared/whatsapp.ts';
 import { normalizePhone } from '../_shared/format.ts';
 
 serve(async (req) => {
@@ -39,7 +39,10 @@ serve(async (req) => {
         }).select('*').single();
         if (error) throw new Error(error.message);
         await audit({ company_id: me.companyId, actor_type: 'usuario', actor_name: me.name, actor_user_id: me.userId, channel: 'painel', action: 'conectar_whatsapp', summary: `Conectou o WhatsApp ${info.display_phone_number ?? phoneNumberId}` });
-        return json({ account }, 200, req);
+        // modelos de mensagem (lembrete, retorno, cobrança...): cadastrados na conta da clínica sem ela precisar fazer nada
+        let templates: Awaited<ReturnType<typeof ensureTemplates>> = [];
+        try { templates = await ensureTemplates(wabaId, token); } catch (e) { console.error('modelos', (e as Error).message); }
+        return json({ account, templates }, 200, req);
       } catch (e) {
         if (e instanceof WaError) {
           await db.from('whatsapp_accounts').upsert({ company_id: me.companyId, status: 'erro', last_error: e.detail.slice(0, 300) });
@@ -47,6 +50,16 @@ serve(async (req) => {
         }
         throw e;
       }
+    }
+
+    /* situação dos modelos de mensagem na Meta (e cadastra os que faltarem) */
+    case 'templates': {
+      requireRole(me, 'dono', 'gerente');
+      const { data: acc } = await db.from('whatsapp_accounts').select('waba_id, status').eq('company_id', me.companyId).maybeSingle();
+      const { data: cred } = await db.from('whatsapp_credentials').select('access_token').eq('company_id', me.companyId).maybeSingle();
+      if (!acc?.waba_id || acc.status !== 'conectado' || !cred) throw bad('Conecte o WhatsApp primeiro.');
+      try { return json({ templates: await ensureTemplates(acc.waba_id, cred.access_token) }, 200, req); }
+      catch (e) { if (e instanceof WaError) throw bad(e.friendly); throw e; }
     }
 
     case 'disconnect': {
