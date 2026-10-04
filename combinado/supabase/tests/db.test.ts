@@ -345,6 +345,57 @@ describe('assinatura e uso', () => {
     expect(o.data.mrr).toBe(299);
     expect(o.data.active).toBe(1);
   });
+
+  it('admin da plataforma: controla a assinatura das clínicas sem ver os dados delas', async () => {
+    const asAdmin = <T,>(sql: string, args: unknown[] = []) => db.as(user(ana), (q) => q.one<{ r: T }>(`select ${sql} as r`, args)).then((x) => x.r);
+    // quem não é administrador não age nem vê o histórico
+    await expect(db.as(user(beto), (q) => q.one(`select public.admin_company_action($1, 'cortesia', 'sim')`, [cidB]))).rejects.toThrow('Acesso restrito');
+    await expect(db.as(user(beto), (q) => q.one(`select public.admin_history()`))).rejects.toThrow('Acesso restrito');
+    await expect(db.as(user(beto), (q) => q.rows(`select * from admin_actions`))).rejects.toThrow(/permission denied/);
+    await expect(db.as(user(beto), (q) => q.rows(`select * from admin_company_notes`))).rejects.toThrow(/permission denied/);
+
+    // visão geral: cadastro, assinatura e quantidades — sem nomes de pacientes nem mensagens
+    const o = await asAdmin<{ companies: Record<string, unknown>[]; trialing: number }>(`public.admin_overview()`);
+    const row = o.companies.find((c) => c.id === cidB)!;
+    expect(row).toMatchObject({ owner_email: 'beto@oficina.com', billing_status: 'trialing', segment: 'fisioterapia' });
+    expect(typeof row.contacts).toBe('number');
+    expect(JSON.stringify(o)).not.toMatch(/Maria Silva|98765/);
+
+    // estender teste
+    const before = await db.as('service', (q) => q.one<{ t: string }>(`select greatest(trial_ends_at, now()) as t from companies where id = $1`, [cidB]));
+    await asAdmin(`public.admin_company_action($1, 'estender_teste', '10')`, [cidB]);
+    const after = await db.as('service', (q) => q.one<{ t: string; s: string }>(`select trial_ends_at as t, billing_status as s from companies where id = $1`, [cidB]));
+    expect(Math.round((+new Date(after.t) - +new Date(before.t)) / 86400000)).toBe(10);
+    expect(after.s).toBe('trialing');
+    await expect(asAdmin(`public.admin_company_action($1, 'estender_teste', '500')`, [cidB])).rejects.toThrow('1 a 90');
+    await expect(asAdmin(`public.admin_company_action($1, 'estender_teste', '7')`, [cidA])).rejects.toThrow('já é assinante');
+
+    // cortesia, plano, anotação
+    await asAdmin(`public.admin_company_action($1, 'cortesia', 'sim')`, [cidB]);
+    await asAdmin(`public.admin_company_action($1, 'plano', 'empresa')`, [cidB]);
+    await asAdmin(`public.admin_company_action($1, 'nota', 'Clínica piloto')`, [cidB]);
+    await expect(asAdmin(`public.admin_company_action($1, 'plano', 'ouro')`, [cidB])).rejects.toThrow('Plano inválido');
+    const c = await db.as('service', (q) => q.one<{ complimentary: boolean; plan: string }>(`select complimentary, plan from companies where id = $1`, [cidB]));
+    expect(c).toEqual({ complimentary: true, plan: 'empresa' });
+    const n = await db.as('service', (q) => q.one<{ n: number }>(`select count(*)::int as n from notifications where company_id = $1 and kind = 'assinatura'`, [cidB]));
+    expect(n.n).toBe(2); // teste estendido + cortesia
+
+    // bloquear tira a cortesia e trava a escrita; desbloquear volta para o teste
+    await asAdmin(`public.admin_company_action($1, 'bloquear', 'teste de bloqueio')`, [cidB]);
+    await expect(db.as(user(beto), (q) => q.exec(`insert into contacts (company_id, name) values ($1, 'Novo')`, [cidB]))).rejects.toThrow(/row-level security/);
+    await asAdmin(`public.admin_company_action($1, 'desbloquear')`, [cidB]);
+    const s = await db.as('service', (q) => q.one<{ billing_status: string; complimentary: boolean }>(`select billing_status, complimentary from companies where id = $1`, [cidB]));
+    expect(s).toEqual({ billing_status: 'trialing', complimentary: false });
+    await expect(asAdmin(`public.admin_company_action($1, 'desbloquear')`, [cidB])).rejects.toThrow('não está bloqueada');
+
+    const h = await asAdmin<{ detail: string }[]>(`public.admin_history($1)`, [cidB]);
+    expect(h.map((x) => x.detail)).toEqual(['Desbloqueou o acesso', 'Bloqueou o acesso: teste de bloqueio', 'Atualizou a anotação', 'Trocou o plano de teste para empresa', 'Liberou como cortesia', expect.stringMatching(/^Estendeu o teste em 10 dia/)]);
+    const o2 = await asAdmin<{ companies: { id: string; note: string }[] }>(`public.admin_overview()`);
+    expect(o2.companies.find((x) => x.id === cidB)!.note).toBe('Clínica piloto');
+    // a clínica não vê a anotação interna nem o histórico da plataforma
+    const mine = await db.as(user(beto), (q) => q.one<Record<string, unknown>>(`select * from companies where id = $1`, [cidB]));
+    expect(JSON.stringify(mine)).not.toContain('Clínica piloto');
+  });
 });
 
 describe('histórico de ações', () => {

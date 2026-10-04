@@ -93,12 +93,23 @@ export interface DataSource {
   exportAll(): Promise<Record<string, unknown>>;
   deleteAccount(): Promise<void>;
   adminOverview(): Promise<AdminOverview>;
+  adminHistory(companyId?: string): Promise<AdminHistoryRow[]>;
+  adminAction(companyId: string, action: AdminAction, value?: string): Promise<{ detail: string }>;
   subscribe(cb: (table: TableName) => void): () => void;
   resetDemo?(): void;
 }
 
 export interface AdminCompanyRow {
-  id: string; name: string; plan: string; billing_status: string; created_at: string; members: number; ai_replies_month: number;
-  whatsapp: boolean; last_activity: string | null; mrr: number;
+  id: string; name: string; segment: string; city: string | null; state: string | null; phone: string | null;
+  plan: string; billing_status: string; billing_cycle: string | null; billing_method: string | null;
+  trial_ends_at: string; current_period_end: string | null; canceled_at: string | null; complimentary: boolean; created_at: string;
+  owner_name: string; owner_email: string; owner_phone: string | null;
+  members: number; professionals: number; contacts: number; appointments_month: number; ai_replies_month: number;
+  whatsapp: boolean; last_activity: string | null; paid_total: number; note: string; mrr: number;
 }
-export interface AdminOverview { companies: AdminCompanyRow[]; mrr: number; active: number; trialing: number; canceled: number }
+export interface AdminOverview {
+  companies: AdminCompanyRow[]; mrr: number; active: number; trialing: number; trial_ending: number; past_due: number; canceled: number;
+  complimentary: number; new_month: number; received_month: number;
+}
+export type AdminAction = 'cortesia' | 'estender_teste' | 'plano' | 'bloquear' | 'desbloquear' | 'nota';
+export interface AdminHistoryRow { id: string; company_id: string | null; company_name: string | null; action: string; detail: string; admin_email: string | null; created_at: string }

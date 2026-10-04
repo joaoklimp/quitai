@@ -1,6 +1,6 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
-import type { AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import type { AdminAction, AdminHistoryRow, AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import type { AgentReply, AiSettings, Company, ValueReport, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
 
@@ -378,6 +378,16 @@ export class SupabaseSource implements DataSource {
     const { data, error } = await this.sb.rpc('admin_overview');
     if (error) throw friendly(error);
     return data as AdminOverview;
+  }
+  async adminHistory(companyId?: string) {
+    const { data, error } = await this.sb.rpc('admin_history', { p_company: companyId ?? null });
+    if (error) throw friendly(error);
+    return (data ?? []) as AdminHistoryRow[];
+  }
+  async adminAction(companyId: string, action: AdminAction, value?: string) {
+    const { data, error } = await this.sb.rpc('admin_company_action', { p_company: companyId, p_action: action, p_value: value ?? null });
+    if (error) throw friendly(error);
+    return data as { detail: string };
   }
   subscribe(cb: (t: TableName) => void) {
     const cid = this.companyId;

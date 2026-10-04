@@ -88,7 +88,7 @@
 
 /* ================= listas e filtros ================= */
 .filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .stat { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .stat span { font-size: 13px; color: var(--ink-2); font-weight: 550; }
 .stat b { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
@@ -639,3 +639,21 @@ details.adv > summary { cursor: pointer; list-style: none; display: flex; align-
 details.adv > summary::-webkit-details-marker { display: none; }
 details.adv > summary::before { content: '›'; display: inline-block; width: 14px; transition: transform .15s; color: var(--ink-3); font-weight: 700; }
 details.adv[open] > summary::before { transform: rotate(90deg); }
+
+/* ---------- admin da plataforma ---------- */
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.admin-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface); min-width: 0; }
+.admin-box h4, .admin-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin: 0 0 8px; font-weight: 700; }
+.admin-h { margin: 22px 0 10px; }
+.admin-box a.btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+.admin-dl dt { color: var(--ink-3); }
+.admin-dl dd { margin: 0; text-align: right; font-weight: 600; }
+.admin-actions { display: grid; gap: 8px; }
+.admin-act { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; flex-wrap: wrap; }
+.admin-act > svg { width: 18px; height: 18px; color: var(--ink-3); flex: none; }
+.admin-act p { margin: 2px 0 0; font-size: 12.5px; }
+.admin-act .grow { flex: 1 1 200px; min-width: 0; }
+.admin-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.admin-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.admin-log li:last-child { border-bottom: 0; }

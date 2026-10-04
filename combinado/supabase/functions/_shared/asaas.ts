@@ -123,6 +123,8 @@ export async function syncCompany(companyId: string): Promise<void> {
     patch.canceled_at = null;
   }
   const before = company.billing_status;
+  // bloqueio feito pelo dono da plataforma só sai pelo próprio admin
+  if (before === 'blocked') delete patch.billing_status;
   const { error } = await db.from('companies').update(patch).eq('id', companyId);
   if (error) throw new Error(`não consegui salvar a assinatura: ${error.message}`);
   if (patch.billing_status && patch.billing_status !== before) {

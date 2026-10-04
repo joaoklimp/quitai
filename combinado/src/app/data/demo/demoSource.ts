@@ -1,5 +1,5 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
-import type { DataSource, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import type { DataSource, AdminAction, AdminCompanyRow, AdminHistoryRow, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
 import { presetsFor } from '../../../shared/presets';
 import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
@@ -430,16 +430,53 @@ export class DemoSource implements DataSource {
   async adminOverview(): Promise<AdminOverview> {
     await wait(300);
     const d = demoDb();
-    const fake = (name: string, plan: string, status: string, days: number, members: number, ai: number, wa: boolean, mrr: number) => ({ id: newId(), name, plan, billing_status: status, created_at: new Date(Date.now() - days * 86400000).toISOString(), members, ai_replies_month: ai, whatsapp: wa, last_activity: new Date(Date.now() - Math.random() * 3 * 86400000).toISOString(), mrr });
-    const companies = [
-      { id: d.company.id, name: d.company.name, plan: d.company.plan, billing_status: d.company.billing_status, created_at: d.company.created_at, members: d.members.length, ai_replies_month: (await this.usage()).ai_replies, whatsapp: true, last_activity: new Date().toISOString(), mrr: 299 },
-      fake('Studio Bella Estética', 'profissional', 'active', 64, 4, 1120, true, 299), fake('Oficina do Zé Auto Center', 'essencial', 'active', 41, 2, 388, true, 149),
-      fake('Pet Feliz Banho & Tosa', 'profissional', 'past_due', 90, 3, 940, true, 299), fake('Clínica Sorriso Leve', 'empresa', 'active', 120, 9, 3012, true, 699),
-      fake('Reforma Já Construções', 'teste', 'trialing', 3, 1, 42, false, 0), fake('Doce Encanto Confeitaria', 'teste', 'trialing', 5, 1, 77, true, 0),
-      fake('Climatiza Ar-Condicionado', 'essencial', 'canceled', 150, 1, 0, false, 0), fake('Fit Personal Studio', 'essencial', 'active', 22, 1, 260, true, 149),
-    ];
-    const active = companies.filter((c) => c.billing_status === 'active' || c.billing_status === 'past_due');
-    return { companies, mrr: active.reduce((s, c) => s + c.mrr, 0), active: active.length, trialing: companies.filter((c) => c.billing_status === 'trialing').length, canceled: companies.filter((c) => c.billing_status === 'canceled').length };
+    const own: AdminCompanyRow = {
+      ...demoAdminRow(d.company.id, d.company.name, 'odontologia', d.company.plan, d.company.billing_status, 200, d.members.length, 0, true, 299),
+      city: d.company.city, trial_ends_at: d.company.trial_ends_at, owner_name: d.members.find((m) => m.role === 'dono')?.name ?? '', owner_email: d.company.email ?? '',
+      professionals: d.professionals.length, contacts: d.contacts.length, ai_replies_month: (await this.usage()).ai_replies,
+    };
+    const companies = [own, ...demoAdmin().companies];
+    const live = (c: AdminCompanyRow) => !c.complimentary;
+    const mstart = new Date(); mstart.setDate(1); mstart.setHours(0, 0, 0, 0);
+    return {
+      companies,
+      mrr: companies.reduce((s, c) => s + c.mrr, 0),
+      active: companies.filter((c) => live(c) && c.billing_status === 'active').length,
+      trialing: companies.filter((c) => live(c) && c.billing_status === 'trialing' && new Date(c.trial_ends_at) > new Date()).length,
+      trial_ending: companies.filter((c) => live(c) && c.billing_status === 'trialing' && new Date(c.trial_ends_at) > new Date() && +new Date(c.trial_ends_at) - Date.now() <= 2 * 86400000).length,
+      past_due: companies.filter((c) => live(c) && c.billing_status === 'past_due').length,
+      canceled: companies.filter((c) => ['canceled', 'blocked'].includes(c.billing_status)).length,
+      complimentary: companies.filter((c) => c.complimentary).length,
+      new_month: companies.filter((c) => new Date(c.created_at) >= mstart).length,
+      received_month: 1546,
+    };
+  }
+  async adminHistory(companyId?: string): Promise<AdminHistoryRow[]> {
+    await wait(150);
+    return demoAdmin().history.filter((h) => !companyId || h.company_id === companyId);
+  }
+  async adminAction(companyId: string, action: AdminAction, value?: string) {
+    await wait(250);
+    const st = demoAdmin();
+    const c = st.companies.find((x) => x.id === companyId);
+    if (!c) throw new Error('No exemplo, as ações funcionam nas clínicas fictícias. Na sua conta real, valem para todas.');
+    let detail = '';
+    if (action === 'cortesia') { c.complimentary = value === 'sim'; detail = c.complimentary ? 'Liberou como cortesia' : 'Tirou a cortesia'; c.mrr = c.complimentary ? 0 : c.mrr; }
+    else if (action === 'estender_teste') {
+      const days = Number(value);
+      if (!(days >= 1 && days <= 90)) throw new Error('Informe de 1 a 90 dias.');
+      if (['active', 'past_due'].includes(c.billing_status)) throw new Error('A clínica já é assinante; o teste não se aplica.');
+      c.trial_ends_at = new Date(Math.max(Date.now(), +new Date(c.trial_ends_at)) + days * 86400000).toISOString(); c.billing_status = 'trialing';
+      detail = `Estendeu o teste em ${days} dia(s), até ${new Date(c.trial_ends_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+    } else if (action === 'plano') { detail = `Trocou o plano de ${c.plan} para ${value}`; c.plan = value ?? c.plan; }
+    else if (action === 'bloquear') { if (c.billing_status === 'blocked') throw new Error('A clínica já está bloqueada.'); c.billing_status = 'blocked'; c.complimentary = false; detail = 'Bloqueou o acesso' + (value?.trim() ? `: ${value.trim()}` : ''); }
+    else if (action === 'desbloquear') {
+      if (c.billing_status !== 'blocked') throw new Error('A clínica não está bloqueada.');
+      c.billing_status = c.current_period_end && c.current_period_end >= new Date().toISOString().slice(0, 10) ? 'active' : new Date(c.trial_ends_at) > new Date() ? 'trialing' : 'canceled';
+      detail = 'Desbloqueou o acesso';
+    } else if (action === 'nota') { c.note = (value ?? '').slice(0, 2000); detail = 'Atualizou a anotação'; }
+    st.history.unshift({ id: newId(), company_id: c.id, company_name: c.name, action, detail, admin_email: 'voce@orbyta.com.br', created_at: new Date().toISOString() });
+    return { detail };
   }
   subscribe(cb: (t: TableName) => void) { return onChange(cb); }
   resetDemo() { resetDemoDb(); }
@@ -592,4 +629,39 @@ export function demoEncaixe(ap: Appointment) {
   notify({ kind: 'agendamento', title: `Encaixe oferecido para ${c.name.split(' ')[0]}`, body: `${date.split('-').reverse().slice(0, 2).join('/')} às ${hora} · ${ap.title}`, link: '#/agenda' });
   audit({ actor_type: 'sistema', actor_name: 'Encaixe automático', channel: 'automacao', action: 'encaixe', summary: `Ofereceu o horário cancelado de ${hora} para ${c.name}, que estava na lista de espera`, target_type: 'waitlist', target_id: w.id, status: 'ok' });
   emit('waitlist');
+}
+
+/* ---------- admin da plataforma (exemplo): clínicas fictícias, guardadas só enquanto a página está aberta ---------- */
+function demoAdminRow(id: string, name: string, segment: string, plan: string, status: string, days: number, members: number, ai: number, wa: boolean, mrr: number): AdminCompanyRow {
+  const created = new Date(Date.now() - days * 86400000);
+  const paid = ['active', 'past_due'].includes(status);
+  return {
+    id, name, segment, city: 'Brasília', state: 'DF', phone: '(61) 99999-0000', plan, billing_status: status, billing_cycle: paid ? 'mensal' : null, billing_method: paid ? 'pix_boleto' : null,
+    trial_ends_at: new Date(+created + 7 * 86400000).toISOString(), current_period_end: paid ? new Date(Date.now() + 18 * 86400000).toISOString().slice(0, 10) : null,
+    canceled_at: status === 'canceled' ? new Date(Date.now() - 20 * 86400000).toISOString() : null, complimentary: false, created_at: created.toISOString(),
+    owner_name: 'Responsável', owner_email: 'contato@clinica.com.br', owner_phone: null, members, professionals: Math.max(1, members - 1), contacts: members * 140,
+    appointments_month: Math.round(ai / 4), ai_replies_month: ai, whatsapp: wa, last_activity: new Date(Date.now() - (days % 5) * 36e5 * 7).toISOString(),
+    paid_total: paid ? mrr * Math.max(1, Math.floor(days / 30)) : 0, note: '', mrr: paid ? mrr : 0,
+  };
+}
+let adminState: { companies: AdminCompanyRow[]; history: AdminHistoryRow[] } | null = null;
+function demoAdmin() {
+  if (adminState) return adminState;
+  const rows = [
+    demoAdminRow(newId(), 'Clínica Sorriso Leve', 'odontologia', 'empresa', 'active', 120, 9, 3012, true, 699),
+    demoAdminRow(newId(), 'Dermaclin Estética Avançada', 'estetica', 'profissional', 'active', 64, 4, 1120, true, 299),
+    demoAdminRow(newId(), 'Fisio Movimento', 'fisioterapia', 'essencial', 'active', 41, 2, 388, true, 149),
+    demoAdminRow(newId(), 'Instituto Mente Leve Psicologia', 'psicologia', 'profissional', 'past_due', 90, 3, 940, true, 299),
+    demoAdminRow(newId(), 'Clínica Vida Kids Pediatria', 'clinica_medica', 'teste', 'trialing', 6, 1, 42, false, 0),
+    demoAdminRow(newId(), 'NutriBem Consultório', 'nutricao', 'teste', 'trialing', 2, 1, 77, true, 0),
+    demoAdminRow(newId(), 'Ortho Prime Odontologia', 'odontologia', 'essencial', 'canceled', 150, 1, 0, false, 0),
+    demoAdminRow(newId(), 'Centro Médico Bem Estar', 'multidisciplinar', 'essencial', 'active', 22, 3, 260, true, 149),
+  ];
+  rows[4].trial_ends_at = new Date(Date.now() + 30 * 36e5).toISOString();
+  rows[7].complimentary = true; rows[7].mrr = 0; rows[7].note = 'Clínica parceira: cortesia em troca de depoimento.';
+  adminState = {
+    companies: rows,
+    history: [{ id: newId(), company_id: rows[7].id, company_name: rows[7].name, action: 'cortesia', detail: 'Liberou como cortesia', admin_email: 'voce@orbyta.com.br', created_at: new Date(Date.now() - 5 * 86400000).toISOString() }],
+  };
+  return adminState;
 }
