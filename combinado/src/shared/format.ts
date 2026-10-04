@@ -209,3 +209,12 @@ export function fold(s: string | null | undefined): string {
 }
 export function plural(n: number, one: string, many: string): string { return `${num(n)} ${n === 1 ? one : many}`; }
 export function cap(s: string): string { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
+/** Quanto falta de um prazo, sem arredondar para cima: "6 dias (até 11/10)"; no último dia, "menos de 1 dia (até 11/10 às 01:54)". */
+export function timeLeftLabel(end: string, tz = displayTz, now = Date.now()): string {
+  const ms = Date.parse(end) - now;
+  if (ms <= 0) return 'encerrado';
+  const days = Math.floor(ms / 86400000);
+  const date = fmtDate(end, tz).slice(0, 5);
+  return days >= 1 ? `${days} ${days === 1 ? 'dia' : 'dias'} (até ${date})` : `menos de 1 dia (até ${date} às ${localTime(end, tz)})`;
+}

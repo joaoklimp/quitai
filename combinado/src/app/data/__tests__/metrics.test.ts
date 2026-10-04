@@ -25,3 +25,15 @@ describe('comparação com o período anterior', () => {
     expect(dayElapsed(tz, new Date('2026-10-03T00:30:00Z'))).toBe(1); // 21h30
   });
 });
+
+import { timeLeftLabel } from '../../../shared/format';
+describe('tempo restante do teste grátis', () => {
+  const end = '2026-10-11T04:54:55Z'; // 11/10 às 01:54 em Brasília
+  it('não arredonda para cima: 6 dias e 15 horas aparecem como 6 dias', () => {
+    expect(timeLeftLabel(end, 'America/Sao_Paulo', Date.parse('2026-10-04T13:37:00Z'))).toBe('6 dias (até 11/10)');
+  });
+  it('no último dia mostra o horário e, depois do prazo, encerrado', () => {
+    expect(timeLeftLabel(end, 'America/Sao_Paulo', Date.parse('2026-10-10T12:00:00Z'))).toBe('menos de 1 dia (até 11/10 às 01:54)');
+    expect(timeLeftLabel(end, 'America/Sao_Paulo', Date.parse('2026-10-11T05:00:00Z'))).toBe('encerrado');
+  });
+});

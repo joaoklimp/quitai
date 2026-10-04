@@ -13,7 +13,7 @@ import { useInvalidate, useList } from '../data/hooks';
 import type { AiSettings, BusinessHours, Company, Member, Role, TemplateStatus, Tone, WhatsAppAccount } from '../data/types';
 import { useMeCtx, can, useTheme } from '../context';
 import { Avatar, Badge, Button, Empty, Field, Input, Loader, Modal, MoneyInput, PageHeader, PhoneInput, Segmented, Select, Switch, Textarea, cx, useConfirm, useToast } from '../ui';
-import { brl, fmtDate, fmtAgo, formatPhone, WEEKDAYS } from '../../shared/format';
+import { brl, fmtDate, fmtAgo, formatPhone, timeLeftLabel, WEEKDAYS } from '../../shared/format';
 import { TEMPLATE_LIST } from '../../shared/templates';
 import { PLANS, PAID_PLANS, planPrice, monthlyEquivalent, type Cycle, type PaidPlanId } from '../../shared/plans';
 
@@ -460,7 +460,6 @@ function BillingTab() {
   const plan = PLANS[c.plan];
   const used = usage?.ai_replies ?? 0;
   const [label, tone] = STATUS_LABEL[c.billing_status] ?? ['—', 'blue'];
-  const trialLeft = Math.max(0, Math.ceil((Date.parse(c.trial_ends_at) - Date.now()) / 86400000));
   const owner = can(me, 'dono');
   return (
     <>
@@ -469,7 +468,7 @@ function BillingTab() {
           <div className="grow">
             <div className="row" style={{ gap: 10 }}><h3 style={{ fontSize: 22 }}>Plano {plan.name}</h3><Badge tone={tone} dot>{label}</Badge>{c.complimentary && <Badge tone="violet">Cortesia</Badge>}</div>
             <p className="muted" style={{ marginTop: 6 }}>
-              {c.billing_status === 'trialing' ? `${trialLeft} ${trialLeft === 1 ? 'dia' : 'dias'} de teste restantes (até ${fmtDate(c.trial_ends_at)}).` : c.current_period_end ? `${c.billing_status === 'canceled' ? 'Acesso até' : 'Próxima cobrança em'} ${fmtDate(c.current_period_end)} · ${c.billing_cycle ?? ''} · ${c.billing_method === 'cartao' ? 'cartão de crédito' : 'Pix ou boleto'}` : ''}
+              {c.billing_status === 'trialing' ? `Teste grátis: faltam ${timeLeftLabel(c.trial_ends_at, c.timezone)}.` : c.current_period_end ? `${c.billing_status === 'canceled' ? 'Acesso até' : 'Próxima cobrança em'} ${fmtDate(c.current_period_end)} · ${c.billing_cycle ?? ''} · ${c.billing_method === 'cartao' ? 'cartão de crédito' : 'Pix ou boleto'}` : ''}
             </p>
           </div>
           {!isDemo && <Button size="sm" icon={<RefreshCw />} onClick={async () => { try { const r = await api.syncBilling(); refresh(); toast(r.status === 'active' ? 'Pagamento confirmado. Tudo certo!' : 'Ainda não encontramos o pagamento. Pode levar alguns minutos.'); } catch (e) { toast((e as Error).message, 'err'); } }}>Já paguei e não liberou</Button>}

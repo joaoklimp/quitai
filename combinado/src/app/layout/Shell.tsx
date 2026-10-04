@@ -8,7 +8,7 @@ import { Stethoscope,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
-import { fmtAgo } from '../../shared/format';
+import { fmtAgo, timeLeftLabel } from '../../shared/format';
 import { Avatar, Button, IconButton, Menu, cx, useToast } from '../ui';
 import { useAssistant, useMeCtx, useTheme } from '../context';
 import { useList, useInvalidate } from '../data/hooks';
@@ -113,7 +113,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         )}
         {!isDemo && !me.company.complimentary && trialDays !== null && trialDays > 0 && (
-          <div className="demo-bar" role="note"><Info /><span className="grow">Seu teste grátis termina em <b>{trialDays} {trialDays === 1 ? 'dia' : 'dias'}</b>. Assine para manter a IA atendendo.</span><Button size="sm" variant="solid" onClick={() => nav('/configuracoes/assinatura')}>Ver planos</Button></div>
+          <div className="demo-bar" role="note"><Info /><span className="grow">Seu teste grátis termina em <b>{timeLeftLabel(me.company.trial_ends_at, me.company.timezone)}</b>. Assine para manter a IA atendendo.</span><Button size="sm" variant="solid" onClick={() => nav('/configuracoes/assinatura')}>Ver planos</Button></div>
         )}
         {!isDemo && blocked && (
           <div className="demo-bar" role="alert" style={{ background: 'var(--red-soft)' }}><Info /><span className="grow"><b>Sua assinatura está inativa.</b> O painel está em modo leitura e a IA parou de responder.</span><Button size="sm" variant="solid" onClick={() => nav('/configuracoes/assinatura')}>Reativar</Button></div>
