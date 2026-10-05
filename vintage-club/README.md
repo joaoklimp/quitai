@@ -27,6 +27,12 @@ no aparelho, as animações grandes não rodam.
   completos estiverem confirmados, atualize a seção Visite, o rodapé e a pergunta "Até que horas vocês atendem?".
 - **Equipe**: os cards ficam na seção `#equipe`. As fotos são quadradas (600×600).
 
+## Prévia para o cliente
+
+Enquanto o site está em apresentação, `vercel.json` (cabeçalho `X-Robots-Tag: noindex`) e `robots.txt`
+(`Disallow: /`) impedem que buscadores indexem a prévia. **Apague os dois arquivos no lançamento**, senão o site
+oficial também fica fora do Google.
+
 ## Quando o domínio estiver definido
 
 No `<head>` há um comentário `TODO` explicando o que trocar: `og:image` e o `image` do JSON-LD com endereço
