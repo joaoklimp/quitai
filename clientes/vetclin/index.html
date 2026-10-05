@@ -390,6 +390,19 @@ h2 em{white-space:nowrap}
 .diferenciais strong{display:block;font-family:'Poppins',sans-serif;color:var(--tinta);font-size:1rem;line-height:1.3;margin-bottom:.2rem}
 .diferenciais span{display:block;font-size:.9rem;line-height:1.45}
 
+/* ==== Conheça a clínica ==== */
+.galeria{padding:0 0 clamp(4.5rem,8vw,7rem)}
+.galeria-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:1.4rem;grid-auto-rows:clamp(380px,38vw,540px)}
+.galeria-item{position:relative;margin:0;min-width:0;border-radius:var(--raio);overflow:hidden;box-shadow:var(--sombra);background:#EDE6DE}
+.galeria-item img{width:100%;height:100%;object-fit:cover;transition:transform .8s var(--mola)}
+.galeria-item:hover img{transform:scale(1.05)}
+.galeria-item:first-child img{object-position:50% 45%}
+.galeria-item:not(:first-child) img{object-position:50% 72%}
+.galeria-item figcaption{position:absolute;left:0;right:0;bottom:0;padding:3rem 1.2rem 1.1rem;background:linear-gradient(transparent,rgba(20,25,39,.82));color:#fff;font-weight:700;font-size:.98rem;display:flex;align-items:center;gap:.5rem}
+.galeria-item figcaption .icone{width:18px;height:18px;color:#FF9A57}
+.galeria-texto{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;margin-bottom:2rem}
+.galeria-texto p{max-width:520px}
+
 /* ==== Como agendar ==== */
 .passos{padding:clamp(4.5rem,8vw,7rem) 0;background:#fff}
 .passos-lista{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;position:relative;counter-reset:passo}
@@ -537,6 +550,9 @@ h2 em{white-space:nowrap}
   .sobre-foto{width:100%;max-width:560px;margin:0 auto}
   .relogio-caixa{width:min(100%,340px)}
   .passos-lista{grid-template-columns:1fr;gap:2.4rem}
+  .galeria-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto}
+  .galeria-item{aspect-ratio:3/4}
+  .galeria-item:first-child{grid-column:1/-1;aspect-ratio:4/3}
   .trilha{display:none}
 }
 @media (max-width:640px){
@@ -579,6 +595,9 @@ h2 em{white-space:nowrap}
   .plantao-acoes .botao,.contato-acoes .botao,.cta-final-acoes .botao{width:100%}
   .agora{font-size:.95rem}
   .diferenciais{grid-template-columns:1fr}
+  .galeria-grid{grid-template-columns:1fr;gap:.9rem}
+  .galeria-item{aspect-ratio:4/5}
+  .galeria-item figcaption{font-size:.85rem;padding:2.4rem .8rem .8rem}
   .etiqueta-galera{font-size:1.7rem;right:0}
   .mapa{min-height:340px}
   .cta-final{top:-56px}
@@ -951,6 +970,24 @@ h2 em{white-space:nowrap}
           <li><span class="ic"><svg class="icone"><use href="#i-equipe"/></svg></span><div><strong>Equipe dedicada</strong><span>Gente apaixonada por animais, que trata seu pet como família.</span></div></li>
           <li><span class="ic"><svg class="icone"><use href="#i-sacola"/></svg></span><div><strong>Tudo em um só lugar</strong><span>Clínica, banho &amp; tosa e pet shop no mesmo endereço.</span></div></li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Conheça a clínica ==== -->
+  <section class="galeria" id="clinica" aria-label="Fotos da clínica">
+    <div class="container">
+      <div class="galeria-texto revelar">
+        <div>
+          <span class="selo"><svg class="icone"><use href="#i-pino"/></svg> Conheça a clínica</span>
+          <h2 class="h2">Venha nos fazer <em>uma visita</em></h2>
+        </div>
+        <p>Fácil de achar: é a fachada laranja no Setor Leste do Gama, com portas abertas 24 horas para você e o seu pet.</p>
+      </div>
+      <div class="galeria-grid">
+        <figure class="galeria-item revelar"><img src="imagens/clinica-fachada.jpg" alt="Fachada laranja da VetClin Clínica Veterinária no Setor Leste do Gama" width="720" height="1280" loading="lazy"><figcaption><svg class="icone"><use href="#i-pino"/></svg> Nossa fachada no Setor Leste</figcaption></figure>
+        <figure class="galeria-item revelar" style="--atraso:.1s"><img src="imagens/clinica-veterinario.jpg" alt="Veterinário da VetClin em frente à entrada da clínica" width="900" height="1200" loading="lazy"><figcaption><svg class="icone"><use href="#i-estetoscopio"/></svg> Pronto para receber seu pet</figcaption></figure>
+        <figure class="galeria-item revelar" style="--atraso:.2s"><img src="imagens/clinica-equipe.jpg" alt="Equipe da VetClin na entrada da clínica" width="900" height="1200" loading="lazy"><figcaption><svg class="icone"><use href="#i-coracao"/></svg> Atendimento com carinho</figcaption></figure>
       </div>
     </div>
   </section>
