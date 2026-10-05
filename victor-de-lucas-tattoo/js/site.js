@@ -16,7 +16,7 @@
   var reduce = mq('(prefers-reduced-motion: reduce)').matches;
   var fineMQ = mq('(hover: hover) and (pointer: fine)');
   var mobileMQ = mq('(max-width: 820px)');
-  var menuMQ = mq('(max-width: 959px)');
+  var menuMQ = mq('(max-width: 820px)');
   var gsap = w.gsap, ST = w.ScrollTrigger;
   var hasGsap = !!gsap, hasST = hasGsap && !!ST;
   var WA = 'https://wa.me/5561998043597?text=';
@@ -89,7 +89,7 @@
   safe('lenis', function () {
     if (reduce || !hasGsap || !w.Lenis) return;
     lenis = new w.Lenis({ lerp: 0.11, smoothWheel: true, wheelMultiplier: 1 });
-    root.classList.add('has-lenis');
+    root.classList.add('smooth-js');
     if (hasST) lenis.on('scroll', ST.update);
     gsap.ticker.add(function (time) { lenis.raf(time * 1000); });
     gsap.ticker.lagSmoothing(0);
@@ -160,7 +160,9 @@
       var secIO = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           if (!en.isIntersecting) return;
-          links.forEach(function (a) { a.toggleAttribute('aria-current', a.getAttribute('href') === '#' + en.target.id); if (a.hasAttribute('aria-current')) a.setAttribute('aria-current', 'true'); });
+          links.forEach(function (a) {
+            if (a.getAttribute('href') === '#' + en.target.id) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+          });
         });
       }, { rootMargin: '-45% 0px -50% 0px' });
       links.forEach(function (a) { var s = $(a.getAttribute('href')); if (s) secIO.observe(s); });
@@ -341,19 +343,25 @@
     var cols = $$('.col', gallery).map(function (el) {
       var track = $('.track', el);
       var items = $$('.shot', track);
+      // Trilha = [cópias A][originais][cópias B]. Com cópias dos dois lados, qualquer foto original
+      // pode ser centralizada quando recebe foco de teclado, e o loop continua sem emenda.
+      // As cópias são aria-hidden, fora do Tab, usam a mesma URL (cache de memória) e continuam lazy.
+      var cloneA = null;
       if (!reduce) {
-        items.forEach(function (n) {
+        var mk = function (n) {
           var c = n.cloneNode(true);
           c.setAttribute('aria-hidden', 'true');
           c.setAttribute('data-clone', '');
           $$('a', c).forEach(function (a) { a.setAttribute('tabindex', '-1'); });
-          // cópias usam a mesma URL (cache de memória) e continuam lazy
           $$('img', c).forEach(function (im) { im.alt = ''; im.removeAttribute('fetchpriority'); });
-          track.appendChild(c);
-        });
+          return c;
+        };
+        items.forEach(function (n) { track.insertBefore(mk(n), items[0]); });
+        items.forEach(function (n) { track.appendChild(mk(n)); });
+        cloneA = track.children[0];
       }
       return {
-        el: el, track: track, first: items[0], clone: reduce ? null : track.children[items.length],
+        el: el, track: track, first: items[0], clone: cloneA, focusX: null,
         speed: parseFloat(el.dataset.speed) || 1, depth: parseFloat(el.dataset.depth) || 16,
         start: parseFloat(el.dataset.start) || 0, off: 0, period: 1, factor: 1, target: 1
       };
@@ -370,14 +378,15 @@
       cols.forEach(function (c) {
         c.el.style.transform = '';
         if (!c.clone) return;
-        var p = axis === 'y' ? c.clone.offsetTop - c.first.offsetTop : c.clone.offsetLeft - c.first.offsetLeft;
+        var p = axis === 'y' ? c.first.offsetTop - c.clone.offsetTop : c.first.offsetLeft - c.clone.offsetLeft;
         c.period = p > 0 ? p : 1;
       });
       tilt.style.transform = '';
     }
     function dirOf(c) { return axis === 'x' ? -c.speed : c.speed; }
     function render(c) {
-      var p = c.period, o = ((c.off % p) + p) % p;
+      // focusX: posição livre usada enquanto uma foto está com foco de teclado
+      var p = c.period, o = c.focusX !== null ? c.focusX : ((c.off % p) + p) % p;
       c.track.style.transform = axis === 'y' ? 'translate3d(0,' + (-o).toFixed(2) + 'px,0)' : 'translate3d(' + (-o).toFixed(2) + 'px,0,0)';
     }
     function placeStart(withIntro) {
@@ -408,7 +417,8 @@
         intro = 1 + INTRO_GAIN * Math.pow(1 - k, 3);
         if (k >= 1) introOn = false;
       }
-      run += (runTarget - run) * Math.min(1, dt * (runTarget ? 3 : 7));
+      run += (runTarget - run) * Math.min(1, dt * (runTarget ? 3 : 9));
+      if (runTarget === 0 && run < 0.02) run = 0;
       boostT *= Math.pow(0.04, dt);
       boost += (boostT - boost) * Math.min(1, dt * 5);
       var e = Math.min(1, dt * 4);
@@ -424,7 +434,7 @@
       if (desktopFx) tilt.style.transform = 'translate3d(' + (mx * -14).toFixed(2) + 'px,' + (my * -10).toFixed(2) + 'px,0) rotate(' + (-7 + mx * 1).toFixed(3) + 'deg)';
       // parado e sem nada para assentar: sai do laço (CPU zero)
       var settled = Math.abs(tmx - mx) < 0.001 && Math.abs(tmy - my) < 0.001;
-      if (runTarget === 0 && run < 0.003 && settled) { run = 0; loop.remove(tick); }
+      if (runTarget === 0 && run === 0 && settled) loop.remove(tick);
     }
     function wake() { if (!reduce && cols[0].clone) loop.add(tick); }
 
@@ -432,18 +442,6 @@
     var rot = $('.rotator'), words = $$('.rotator__w', rot);
     var current = 0, swapTl = null, auto = null, hoverLock = false, under = null, widths = [], maxW = 1;
     var rotLive = !reduce && hasGsap && words.length > 1;
-    function splitWords() {
-      words.forEach(function (wEl) {
-        var text = wEl.textContent.trim();
-        wEl.textContent = '';
-        text.split(' ').forEach(function (word, i, arr) {
-          var wd = d.createElement('span'); wd.className = 'wd';
-          Array.from(word).forEach(function (ch) { var s = d.createElement('span'); s.className = 'ch'; s.textContent = ch; wd.appendChild(s); });
-          wEl.appendChild(wd);
-          if (i < arr.length - 1) wEl.appendChild(d.createTextNode(' '));
-        });
-      });
-    }
     function measureWords() {
       if (!under) return;
       maxW = rot.getBoundingClientRect().width || 1;
@@ -459,22 +457,24 @@
         goTo((current + 1) % words.length);
       });
     }
+    // troca em "rolo": a frase inteira sobe e a próxima entra por baixo, dentro da máscara.
+    // Em qualquer quadro as duas frases estão inteiras (nada de letras soltas pelo caminho).
     function goTo(nx) {
       if (!rotLive || nx === current) return;
-      finishSwap(); // nunca deixa letras no meio do caminho
+      finishSwap();
       var out = words[current], inn = words[nx];
-      var outCh = $$('.ch', out), inCh = $$('.ch', inn);
       current = nx;
       if (auto) auto.kill();
+      inn.classList.add('is-on');
       swapTl = gsap.timeline({ onComplete: function () { swapTl = null; scheduleAuto(); } });
-      swapTl.to(under, { scaleX: 0, transformOrigin: '100% 50%', duration: 0.34, ease: 'power3.in' }, 0)
-        .to(outCh, { yPercent: -120, duration: 0.36, ease: 'power3.in', stagger: 0.01 }, 0)
-        .add(function () { out.classList.remove('is-on'); inn.classList.add('is-on'); gsap.set(outCh, { yPercent: 0 }); }, 0.5)
-        .fromTo(inCh, { yPercent: 120 }, { yPercent: 0, duration: 0.7, ease: 'expo.out', stagger: 0.014, immediateRender: false }, 0.5)
-        .fromTo(under, { scaleX: 0, transformOrigin: '0% 50%' }, { scaleX: function () { return widths[nx] / maxW; }, duration: 0.7, ease: 'expo.out', immediateRender: false }, 0.85);
+      swapTl.to(under, { scaleX: 0, transformOrigin: '100% 50%', duration: 0.32, ease: 'power3.in' }, 0)
+        .fromTo(out, { yPercent: 0 }, { yPercent: -112, duration: 0.6, ease: 'power3.inOut', immediateRender: false }, 0.08)
+        .fromTo(inn, { yPercent: 112 }, { yPercent: 0, duration: 0.75, ease: 'power3.inOut' }, 0.14)
+        .add(function () { out.classList.remove('is-on'); gsap.set(out, { yPercent: 0 }); })
+        .fromTo(under, { scaleX: 0, transformOrigin: '0% 50%' }, { scaleX: function () { return widths[nx] / maxW; }, duration: 0.7, ease: 'expo.out', immediateRender: false }, 0.8);
     }
     if (rotLive) {
-      splitWords();
+      rot.classList.add('is-live');
       under = d.createElement('i'); under.className = 'rotator__u'; under.setAttribute('aria-hidden', 'true');
       rot.appendChild(under);
       rot.style.clipPath = 'inset(-0.12em -0.45em -0.28em -0.16em)';
@@ -509,7 +509,8 @@
       focusIn = kb; sync();
     });
     hero.addEventListener('focusout', function (e) {
-      if (!hero.contains(e.relatedTarget)) { focusIn = false; gallery.classList.remove('is-focusing'); sync(); }
+      if (!gallery.contains(e.relatedTarget)) { gallery.classList.remove('is-focusing'); releaseFocus(); }
+      if (!hero.contains(e.relatedTarget)) { focusIn = false; sync(); }
     });
     d.addEventListener('visibilitychange', sync);
     if ('IntersectionObserver' in w) {
@@ -556,13 +557,42 @@
       if (!c) return;
       var gr = (axis === 'y' ? gallery : col).getBoundingClientRect(), fr = fig.getBoundingClientRect();
       var delta = axis === 'y' ? (fr.top + fr.height / 2) - (gr.top + gr.height / 2) : (fr.left + fr.width / 2) - (gr.left + gr.width / 2);
+      var p = c.period, cur = c.focusX !== null ? c.focusX : ((c.off % p) + p) % p;
+      if (c.focusX === null) c.focusX = cur;
       if (Math.abs(delta) < 4) return;
-      if (hasGsap) gsap.to(c, { off: c.off + delta, duration: 0.8, ease: 'expo.out', overwrite: true, onUpdate: function () { render(c); } });
-      else { c.off += delta; render(c); }
+      if (hasGsap) gsap.to(c, { focusX: cur + delta, duration: 0.8, ease: 'expo.out', overwrite: true, onUpdate: function () { render(c); } });
+      else { c.focusX = cur + delta; render(c); }
     }
+    // foco saiu da galeria: o loop continua exatamente de onde a foto focada ficou (cópia idêntica)
+    function releaseFocus() {
+      cols.forEach(function (c) {
+        if (c.focusX === null) return;
+        if (hasGsap) gsap.killTweensOf(c);
+        c.off = c.focusX; c.focusX = null; render(c);
+      });
+    }
+    // Ao entrar com Tab, a foto que recebe o foco é a mais próxima do centro da galeria (visível),
+    // e qualquer rolagem automática que o navegador faça para "mostrar" o foco é desfeita.
+    var beforeY = w.scrollY;
+    function pickVisible() {
+      var gr = gallery.getBoundingClientRect(), cy = gr.top + gr.height / 2, cx = gr.left + gr.width / 2, best = null, bd = 1e9;
+      origLinks().forEach(function (x) {
+        var r = x.getBoundingClientRect(), dd = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
+        if (dd < bd) { bd = dd; best = x; }
+      });
+      if (best) { origLinks().forEach(function (x) { x.setAttribute('tabindex', x === best ? '0' : '-1'); }); }
+    }
+    d.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      beforeY = w.scrollY;
+      if (!gallery.contains(d.activeElement)) pickVisible();
+    }, true);
     gallery.addEventListener('focusin', function (e) {
       var a = e.target.closest('.shot__a');
       if (!a) return;
+      if (Math.abs(w.scrollY - beforeY) > 2) { if (lenis) lenis.scrollTo(beforeY, { immediate: true, force: true }); w.scrollTo(0, beforeY); }
+      // o navegador pode "rolar" contêineres com overflow ao focar; zera isso (quem posiciona é o loop)
+      [gallery, tilt, a.closest('.col'), hero].forEach(function (el) { if (el) { el.scrollTop = 0; el.scrollLeft = 0; } });
       gallery.classList.add('is-focusing');
       var t = a.closest('.shot').getAttribute('data-theme');
       if (t !== null) goTo(+t);
@@ -588,8 +618,23 @@
     // medidas, troca celular/desktop
     var rT = 0;
     w.addEventListener('resize', function () { clearTimeout(rT); rT = setTimeout(function () { measure(); cols.forEach(render); measureWords(); }, 140); });
-    var onMQ = function () { measure(); placeStart(false); measureWords(); var first = origLinks()[0]; if (first) { $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', '-1'); }); first.setAttribute('tabindex', '0'); } };
+    // tabindex itinerante: só uma foto da galeria entra na ordem do Tab; as setas fazem o resto
+    function resetRoving() { var first = origLinks()[0]; if (first) { $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', '-1'); }); first.setAttribute('tabindex', '0'); } }
+    resetRoving();
+    var onMQ = function () { measure(); placeStart(false); measureWords(); resetRoving(); };
     mobileMQ.addEventListener ? mobileMQ.addEventListener('change', onMQ) : mobileMQ.addListener(onMQ);
+
+    // Depois do load, as fotos que estão de fato na tela (inclusive cópias, que vêm do cache de memória)
+    // deixam de ser lazy, para nenhuma moldura entrar vazia na faixa. Fotos escondidas (coluna 3 e
+    // data-m-hide no celular) continuam lazy e não são baixadas.
+    function warm() {
+      $$('.track img', gallery).forEach(function (im) {
+        if (im.loading === 'lazy' && im.closest('.shot').offsetParent !== null) im.loading = 'eager';
+      });
+    }
+    if (d.readyState === 'complete') setTimeout(warm, 300);
+    else w.addEventListener('load', function () { setTimeout(warm, 300); });
+    mobileMQ.addEventListener ? mobileMQ.addEventListener('change', warm) : mobileMQ.addListener(warm);
 
     // início: a "bobina" gira rápido e assenta (~2,2 s), sem esconder nada do texto
     measure();
@@ -623,7 +668,7 @@
     splitNode(p);
     gsap.fromTo(words, { opacity: 0.16 }, {
       opacity: 1, ease: 'none', stagger: 0.1,
-      scrollTrigger: { trigger: p, start: 'top 82%', end: 'bottom 48%', scrub: 0.6 }
+      scrollTrigger: { trigger: p, start: 'top 86%', end: 'bottom 68%', scrub: 0.6 }
     });
   });
 
@@ -741,7 +786,9 @@
 
     // prévia que segue o cursor: só desktop, só quando existe foto real do serviço
     if (!fineMQ.matches || reduce || !hasGsap) return;
-    var pv = $('.svc-preview'), imgs = $$('img', pv), cur = 0, onRow = null;
+    var pv = $('.svc-preview'), cur = 0, onRow = null;
+    // as duas imagens da prévia (troca cruzada) só existem no desktop
+    var imgs = [0, 1].map(function () { var im = d.createElement('img'); im.alt = ''; im.width = 277; im.height = 371; im.decoding = 'async'; pv.appendChild(im); return im; });
     var xTo = gsap.quickTo(pv, 'x', { duration: 0.55, ease: 'power3' });
     var yTo = gsap.quickTo(pv, 'y', { duration: 0.55, ease: 'power3' });
     var rTo = gsap.quickTo(pv, 'rotation', { duration: 0.8, ease: 'power3' });
@@ -757,7 +804,8 @@
       var btn = $('.svc__btn', row);
       btn.addEventListener('pointerenter', function (e) {
         if (e.pointerType !== 'mouse') return;
-        if (!src) { pv.classList.remove('is-on'); onRow = null; return; }
+        // sem foto real, ou linha já aberta (a prévia cobriria o texto): nada de prévia
+        if (!src || row.classList.contains('is-open')) { pv.classList.remove('is-on'); onRow = null; return; }
         if (onRow !== src) {
           var next = imgs[1 - cur];
           next.src = src; next.classList.add('is-on'); imgs[cur].classList.remove('is-on'); cur = 1 - cur;
@@ -767,6 +815,7 @@
       });
       btn.addEventListener('pointermove', function (e) { if (onRow && e.pointerType === 'mouse') place(e); });
       btn.addEventListener('pointerleave', function () { pv.classList.remove('is-on'); onRow = null; });
+      btn.addEventListener('click', function () { if (row.classList.contains('is-open')) { pv.classList.remove('is-on'); onRow = null; } });
     });
   });
 
@@ -827,6 +876,29 @@
       }
     });
     update(); renderPreview(build());
+  });
+
+  /* =============== Perguntas frequentes: <details> com abertura animada =============== */
+  safe('faq', function () {
+    if (reduce || !Element.prototype.animate) return; // sem animação: o <details> nativo funciona igual
+    $$('.qa').forEach(function (det) {
+      var sum = $('summary', det), body = $('.qa__a', det), anim = null;
+      sum.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (anim) { anim.cancel(); anim = null; }
+        var refresh = function () { if (hasST) ST.refresh(); };
+        if (det.open && !det.classList.contains('is-closing')) {
+          det.classList.add('is-closing');
+          anim = body.animate([{ height: body.offsetHeight + 'px', opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 380, easing: 'cubic-bezier(.65,0,.35,1)' });
+          anim.onfinish = function () { det.open = false; det.classList.remove('is-closing'); anim = null; refresh(); };
+        } else {
+          det.classList.remove('is-closing');
+          det.open = true;
+          anim = body.animate([{ height: '0px', opacity: 0 }, { height: body.offsetHeight + 'px', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.16,1,.3,1)' });
+          anim.onfinish = function () { anim = null; refresh(); };
+        }
+      });
+    });
   });
 
   /* =============== Contato: copiar endereço + mapa =============== */
