@@ -710,32 +710,58 @@
 
   /* ------------------------------------------------------------------
      Etapas do método: etapa ativa calculada pela posição (robusto a saltos).
-     No celular e no tablet a prancha fica grudada no topo; a linha de leitura
-     começa abaixo dela, onde o texto da etapa está de fato visível.
+     Três arranjos da prancha:
+     - ao lado (desktop): gruda ao lado das etapas; linha de leitura a 62% da tela;
+     - no topo (celular e tablet): gruda no topo; a etapa seguinte assume quando o
+       título e a descrição da anterior terminam de passar por baixo da prancha
+       (o vão do min-height entre etapas não deixa mais a etapa ativa escondida e a
+       seguinte, à mostra, apagada);
+     - parada (celular baixo e telas com pouca altura, ver o CSS): não gruda, fica
+       num tamanho legível e se desenha inteira quando entra na tela.
   ------------------------------------------------------------------ */
-  var stick = $('.plate-stick'), stickBottom = 0;
+  var STILL_Q = '(max-width: 767px) and (max-height: 800px), (max-height: 540px)';
+  var stick = $('.plate-stick'), stickBottom = 0, still = false, tails = [];
+  var stepEls = $$('.steps .step'), plateSvg = $('.plate'), plateTagEl = $('#plate-step');
+  var STEP_NAMES = ['Leitura', 'Corte', 'Detalhe'];
   function measureStick() {
-    stickBottom = (w.innerWidth < 1024 && stick && getComputedStyle(stick).position === 'sticky') ? headH() + stick.offsetHeight : 0;
+    still = !!(stick && getComputedStyle(stick).position !== 'sticky');
+    stickBottom = (w.innerWidth < 1024 && stick && !still) ? headH() + stick.offsetHeight : 0;
+    /* quanto de cada etapa fica abaixo da descrição dela (rótulo, nota e o vão do min-height) */
+    tails = stepEls.map(function (s) {
+      var l = $('.step-d', s) || s.lastElementChild;
+      if (!l) return 0;
+      var bottom = l.offsetParent === s.offsetParent ? l.offsetTop + l.offsetHeight - s.offsetTop : l.getBoundingClientRect().bottom - s.getBoundingClientRect().top;
+      return Math.max(0, s.offsetHeight - bottom);
+    });
   }
-  function stepLine() {
+  /* linha de leitura da etapa k, em px a partir do topo da tela */
+  function stepLine(k) {
     var H = w.innerHeight;
-    return stickBottom ? stickBottom + (H - stickBottom) * 0.35 : H * 0.62;
+    if (!stickBottom) return H * 0.62;
+    if (!k) return stickBottom + (H - stickBottom) * 0.35;
+    return stickBottom + (tails[k - 1] || 0) + 16;   /* 16: sobra no máximo meia linha da descrição */
+  }
+  /* a camada k da prancha se desenha enquanto a etapa k é a ativa */
+  function drawStart(k) { return stickBottom ? Math.round(stepLine(k)) + 'px' : '75%'; }
+  function drawEnd(k) { return stickBottom ? Math.round(stickBottom + (tails[k] || 0) + 16) + 'px' : '75%'; }
+  function plateTag(i) {
+    if (plateTagEl) plateTagEl.textContent = 'Etapa ' + (i + 1) + ' · ' + STEP_NAMES[i];
+    if (plateSvg) plateSvg.setAttribute('data-step', String(i + 1));
   }
   var setStepFromScroll = (function steps() {
-    var stepsEl = $('.steps'), svg = $('.plate');
-    if (!stepsEl) return function () {};
-    var steps = $$('.step', stepsEl), tag = $('#plate-step');
-    var names = ['Leitura', 'Corte', 'Detalhe'], curStep = -1;
+    if (!stepEls.length) return function () {};
+    var curStep = -1;
     function setStep(i) {
       if (i === curStep) return;
       curStep = i;
-      steps.forEach(function (s, k) { s.classList.toggle('is-dim', k !== i); });
-      if (tag) tag.textContent = 'Etapa ' + (i + 1) + ' · ' + names[i];
-      if (svg) svg.setAttribute('data-step', String(i + 1));
+      /* -1: prancha parada, nenhuma etapa apagada */
+      stepEls.forEach(function (s, k) { s.classList.toggle('is-dim', i > -1 && k !== i); });
+      if (i > -1) plateTag(i);
     }
     function fromScroll() {
-      var line = stepLine(), idx = 0;
-      steps.forEach(function (s, k) { if (s.getBoundingClientRect().top <= line) idx = k; });
+      if (still) { setStep(-1); return; }
+      var idx = 0;
+      stepEls.forEach(function (s, k) { if (s.getBoundingClientRect().top <= stepLine(k)) idx = k; });
       setStep(idx);
     }
     if (reduce || !hasG) return function () {};
@@ -808,9 +834,21 @@
       var canSplit = Split && !fontsLoading();
       var split = null, lines = $$('.hero-t-a'), chars = $$('.mast-t > *');
       if (canSplit) {
-        split = new Split('.hero-t-a', { type: 'lines', mask: 'lines' }); lines = split.lines;
+        /* aria "none": as linhas continuam no DOM depois da entrada, com o texto normal para leitores de tela */
+        split = new Split('.hero-t-a', { type: 'lines', mask: 'lines', aria: 'none' }); lines = split.lines;
         /* o nome (aria-hidden) fica dividido em letras: reverter criaria um novo candidato a LCP */
         chars = new Split('.mast-t .mast-a, .mast-t .mast-b', { type: 'chars' }).chars;
+      }
+      /* O título só volta ao HTML original depois da primeira interação (quando o navegador já
+         encerrou a medição do LCP) ou se a largura mudar (as quebras de linha mudam).
+         Reverter no fim da entrada recolocava o texto como um elemento novo, maior: um LCP tardio. */
+      var settled = false, poked = !split;
+      function unsplit() { if (split && settled && poked) { split.revert(); split = null; } }
+      function poke() { poked = true; unsplit(); }
+      if (split) {
+        ['pointerdown', 'keydown', 'scroll'].forEach(function (t) { w.addEventListener(t, poke, { passive: true, once: true }); });
+        var w0 = w.innerWidth;
+        w.addEventListener('resize', function () { if (w.innerWidth !== w0) poke(); });
       }
       tl.from('.hero-meta', { clipPath: 'inset(0% 100% 0% 0%)', duration: 1.2, ease: 'expo.inOut' }, 0)
         .from('.mast-cota', { scaleX: 0, transformOrigin: '50% 50%', duration: 1.1, ease: 'expo.inOut' }, 0.1)
@@ -826,9 +864,12 @@
         .from('.rail-sheet', { autoAlpha: 0, duration: 0.8 }, 0.5)
         .from('.hero-rating .stars svg', { scale: 0, rotation: -70, transformOrigin: '50% 50%', duration: 0.8, ease: 'back.out(2.4)', stagger: 0.08 }, 0.95);
       tl.eventCallback('onComplete', function () {
-        if (split) split.revert();
         G.set('.hero-meta, .hero-frame, .hero-cota, .mast-cota', { clearProps: 'clipPath,transform' });
         G.set(lines.concat(chars), { clearProps: 'transform,opacity' });
+        settled = true;
+        /* a máscara de cada linha deixa de recortar (descendentes como "q" e "p" aparecem inteiros) */
+        if (split) G.set(split.masks, { overflow: 'visible' });
+        unsplit();
       });
       showIntro();
     })();
@@ -1000,42 +1041,62 @@
 
     /* ---------- A prancha do método se desenha conforme o scroll ----------
        Cada camada (pelo data-layer; o espelho da etapa 3 fica embaixo dos rótulos no SVG)
-       se desenha enquanto a sua etapa passa pela linha de leitura. No celular e no tablet
-       essa linha fica abaixo da prancha grudada, onde o texto da etapa está visível. */
+       se desenha enquanto a sua etapa é a ativa (ver stepLine). Com a prancha parada
+       (celular baixo), as três camadas se desenham em sequência quando ela entra na tela. */
     (function plate() {
-      var svg = $('.plate'), stepsEl = $('.steps');
+      var svg = plateSvg, stepsEl = $('.steps');
       if (!svg || !stepsEl) return;
-      var lupa = $('.lupa'), stepEls = $$('.step', stepsEl);
+      var lupa = $('.lupa');
       var groups = {};
       $$('.pl-layer', svg).forEach(function (g) { var n = g.getAttribute('data-layer'); (groups[n] = groups[n] || []).push(g); });
-      measureStick();
-      function drawLine() { return stickBottom ? Math.round(stepLine()) + 'px' : '75%'; }
-      ['1', '2', '3'].forEach(function (n, i) {
-        var layer = groups[n] || [], step = stepEls[i] || stepsEl;
+      var layers = ['1', '2', '3'].map(function (n) {
+        var layer = groups[n] || [];
         function q(sel) { return layer.reduce(function (a, g) { return a.concat($$(sel, g)); }, []); }
-        var draws = q('.pl-ink, .pl-fine, .pl-ray, .pl-red, .pl-cut, .pl-cut-fine, .pl-lead, .pl-mirror');
-        var dashes = q('.pl-guide, .pl-sec, .pl-det');
-        var texts = q('text');
-        var pivots = q('.pl-pivot');
-        var rays = q('.pl-ray');
-        draws.forEach(function (p) {
-          var L = Math.ceil(p.getTotalLength ? p.getTotalLength() : 0) + 2;
-          p.style.strokeDasharray = L + ' ' + L;
-          p.style.strokeDashoffset = L;
+        return {
+          draws: q('.pl-ink, .pl-fine, .pl-ray, .pl-red, .pl-cut, .pl-cut-fine, .pl-lead, .pl-mirror'),
+          dashes: q('.pl-guide, .pl-sec, .pl-det'), texts: q('text'), pivots: q('.pl-pivot'), rays: q('.pl-ray')
+        };
+      });
+      function addLayer(tl, L, i, at) {
+        if (L.draws.length) tl.to(L.draws, { strokeDashoffset: 0, duration: 1, ease: 'none', stagger: 0.1 }, at);
+        if (L.dashes.length) tl.fromTo(L.dashes, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.12 }, at + 0.15);
+        if (L.pivots.length) tl.fromTo(L.pivots, { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.3 }, at + 0.1);
+        if (L.rays.length) tl.from(L.rays, { rotation: function (k, el) { return +el.getAttribute('data-ang'); }, svgOrigin: '492 330', duration: 1.1, ease: 'power2.inOut', stagger: 0.12 }, at + 0.25);
+        if (L.texts.length) tl.fromTo(L.texts, { opacity: 0 }, { opacity: 1, duration: 0.35, stagger: 0.08 }, at + 0.55);
+        if (i === 1 && lupa) tl.fromTo(lupa, { scale: 0.4, autoAlpha: 0, rotation: -30 }, { scale: 1, autoAlpha: 1, rotation: 0, duration: 0.8, ease: 'back.out(1.6)' }, at + 0.7);
+      }
+      /* "all" sempre vale: o bloco roda de novo (e desfaz o anterior) quando a prancha passa a grudar ou deixa de grudar */
+      mm.add({ still: STILL_Q, any: 'all' }, function (ctx) {
+        layers.forEach(function (L) {
+          L.draws.forEach(function (p) {
+            var len = Math.ceil(p.getTotalLength ? p.getTotalLength() : 0) + 2;
+            G.set(p, { strokeDasharray: len + ' ' + len, strokeDashoffset: len });
+          });
         });
+        measureStick();
+        if (ctx.conditions.still) {
+          var all = G.timeline({ scrollTrigger: { trigger: svg, start: 'top 85%', end: END, toggleActions: 'play none none none' } });
+          layers.forEach(function (L, i) {
+            all.call(plateTag, [i], i * 1.2);
+            addLayer(all, L, i, i * 1.2);
+          });
+          /* desenho completo: o rótulo passa a nomear as três etapas */
+          all.call(function () { if (plateTagEl) plateTagEl.textContent = 'Etapas 1 a 3'; }, [], layers.length * 1.2 + 0.4);
+          return;
+        }
         /* sem invalidateOnRefresh: start/end já são recalculados a cada refresh e os estados iniciais ficam */
-        var tl = G.timeline({ scrollTrigger: {
-          trigger: step, scrub: 0.8,
-          start: function () { if (i === 0) measureStick(); return 'top ' + drawLine(); },
-          end: function () { return 'bottom ' + drawLine(); }
-        } });
-        if (draws.length) tl.to(draws, { strokeDashoffset: 0, duration: 1, ease: 'none', stagger: 0.1 }, 0);
-        if (dashes.length) tl.fromTo(dashes, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.12 }, 0.15);
-        if (pivots.length) tl.fromTo(pivots, { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.3 }, 0.1);
-        if (rays.length) tl.from(rays, { rotation: function (k, el) { return +el.getAttribute('data-ang'); }, svgOrigin: '492 330', duration: 1.1, ease: 'power2.inOut', stagger: 0.12 }, 0.25);
-        if (texts.length) tl.fromTo(texts, { opacity: 0 }, { opacity: 1, duration: 0.35, stagger: 0.08 }, 0.55);
-        if (i === 1 && lupa) tl.fromTo(lupa, { scale: 0.4, autoAlpha: 0, rotation: -30 }, { scale: 1, autoAlpha: 1, rotation: 0, duration: 0.8, ease: 'back.out(1.6)' }, 0.7);
-        tl.to({}, { duration: 0.5 });
+        layers.forEach(function (L, i) {
+          /* a primeira camada começa quando a prancha entra na tela (e não quando a etapa 1
+             chega à linha de leitura), para a prancha nunca aparecer como uma caixa vazia */
+          var tl = G.timeline({ scrollTrigger: {
+            trigger: i === 0 ? (stick || svg) : (stepEls[i] || stepsEl), scrub: 0.8,
+            start: function () { if (i === 0) { measureStick(); return 'top 85%'; } return 'top ' + drawStart(i); },
+            endTrigger: stepEls[i] || stepsEl,
+            end: function () { return 'bottom ' + drawEnd(i); }
+          } });
+          addLayer(tl, L, i, 0);
+          tl.to({}, { duration: 0.5 });
+        });
       });
       ST.addEventListener('refresh', function () { measureStick(); setStepFromScroll(); });
       setStepFromScroll();

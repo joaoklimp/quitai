@@ -209,7 +209,7 @@ html:not(.ready) .rail-pro,html:not(.ready) .rail-sheet{visibility:hidden}
 .rail-sheet{margin:0;writing-mode:vertical-rl;transform:rotate(180deg);display:flex;gap:16px;align-items:center;white-space:nowrap;font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase}
 .rail-n{color:var(--lapis)}
 .rail-pro{width:100%;padding-left:6px}
-.rail-deg{margin:0 0 8px 8px;font-family:var(--f-titulo);font-weight:300;font-size:1.75rem;line-height:1;font-variant-numeric:lining-nums tabular-nums}
+.rail-deg{margin:0 0 22px 8px;font-family:var(--f-titulo);font-weight:300;font-size:1.75rem;line-height:1;font-variant-numeric:lining-nums tabular-nums}
 .rail-deg small{display:block;margin-top:4px;font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--grafite)}
 .rail svg{display:block;width:calc(var(--rail) - 16px);height:auto;overflow:visible}
 .rail-arc{fill:none;stroke:var(--nanquim);stroke-width:1}
@@ -219,7 +219,7 @@ html:not(.ready) .rail-pro,html:not(.ready) .rail-sheet{visibility:hidden}
 .rail-sweep{fill:var(--lapis-vela);stroke:none}
 .rail-needle{stroke:var(--lapis);stroke-width:1.6}
 .rail-pivot{fill:var(--lapis)}
-.rail-t{font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:14px;fill:var(--grafite)}
+.rail-t{font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:22px;fill:var(--grafite)}
 
 /* ---------- hero (capa) ---------- */
 .js-intro .hero .wrap,.js-intro .rail-pro,.js-intro .rail-sheet{opacity:0}
@@ -282,7 +282,7 @@ html:not(.ready) .rail-pro,html:not(.ready) .rail-sheet{visibility:hidden}
 
 /* botão de vídeo */
 .vid-btn{display:none}
-.ready .vid-btn{position:absolute;z-index:4;right:10px;bottom:10px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid rgba(235,233,227,.5);background:rgba(18,21,25,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:var(--papel);cursor:pointer;font-family:var(--f-texto);font-stretch:72%;font-weight:600;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase}
+.ready .vid-btn{position:absolute;z-index:4;right:10px;top:10px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid rgba(235,233,227,.5);background:rgba(18,21,25,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:var(--papel);cursor:pointer;font-family:var(--f-texto);font-stretch:72%;font-weight:600;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase}
 .vid-btn:hover{background:var(--nanquim);border-color:var(--papel)}
 .vid-btn:focus-visible{outline-color:var(--papel);box-shadow:0 0 0 5px var(--nanquim)}
 .vid-btn .ic{width:14px;height:14px}
@@ -364,7 +364,7 @@ html:not(.ready) .rail-pro,html:not(.ready) .rail-sheet{visibility:hidden}
 .lupa-in img{width:100%;height:100%;object-fit:cover;object-position:50% 56%;transform:scale(1.35)}
 .lupa figcaption{position:absolute;right:calc(100% + 16px);bottom:4px;display:grid;justify-items:end;gap:2px;text-align:right;white-space:nowrap}
 .lupa figcaption .hand{font-size:1.2rem;line-height:1}
-.lupa-c{font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:.64rem;letter-spacing:.16em;text-transform:uppercase;color:var(--osso-2)}
+.lupa-c{font-family:var(--f-texto);font-stretch:68%;font-weight:600;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--osso-2)}
 
 .steps{list-style:none;margin:0;padding:0}
 .step{display:grid;grid-template-columns:64px minmax(0,1fr);column-gap:20px;align-content:start;min-height:66vh;padding:26px 0 56px;border-top:1px solid var(--linha-d2);transition:opacity .6s var(--ease-out)}
@@ -536,6 +536,16 @@ html:not(.ready) .pc{pointer-events:none;cursor:default}
 .gal-sec.is-pinned .gal-view{overflow:visible;scroll-snap-type:none}
 .gal-sec.is-pinned .gal-frame{height:clamp(260px,calc(100vh - var(--head-h) - 380px),560px)}
 .gal-sec.is-pinned .gal-hint-d{display:inline}
+/* F4/V09: notebook com pouca altura útil (1280x600 a 1440x720): menos respiro em volta,
+   para o quadro, o desvio do parallax e a legenda caberem acima da dobra */
+@media (max-height:720px){
+  .gal-sec.is-pinned .gal-pin{padding-block:14px 6px}
+  .gal-sec.is-pinned .gal-head .sh-k{margin-bottom:18px}
+  .gal-sec.is-pinned .gal-head .sh-row{margin-bottom:12px}
+  .gal-sec.is-pinned .gal-track{padding-block:16px 14px}
+  .gal-sec.is-pinned .gal-item figcaption{margin-top:14px}
+  .gal-sec.is-pinned .gal-frame{height:clamp(220px,calc(100vh - var(--head-h) - 276px),260px)}
+}
 .gal-sec.is-pinned .gal-hint-m{display:none}
 
 /* ---------- formação ---------- */
@@ -698,8 +708,8 @@ html:not(.ready) .pc{pointer-events:none;cursor:default}
 .pt-target{fill:var(--lapis-vela);stroke:var(--lapis);stroke-width:1.8}
 .pt-dot{fill:var(--lapis)}
 .pt-name{font-family:var(--f-titulo);font-style:italic;font-size:19px;fill:var(--lapis)}
-.pt-lbl{font-family:var(--f-texto);font-stretch:70%;font-weight:600;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;fill:var(--nanquim)}
-.pt-lbl--s{font-size:10.5px;fill:var(--grafite)}
+.pt-lbl{font-family:var(--f-texto);font-stretch:70%;font-weight:600;font-size:13.5px;letter-spacing:.12em;text-transform:uppercase;fill:var(--nanquim)}
+.pt-lbl--s{font-size:13.5px;fill:var(--grafite)}
 .pt-lbl--vc{fill:var(--lapis)}
 .pt-lead{fill:none;stroke:var(--grafite);stroke-width:1}
 .pt-lead--red{stroke:var(--lapis)}
@@ -779,6 +789,11 @@ html:not(.ready) .pc{pointer-events:none;cursor:default}
   .controls{column-gap:28px}
   /* V19: a legenda da lupa sobe, fora da borda da prancha */
   .lupa figcaption{right:0;bottom:calc(100% + 10px)}
+}
+/* V10: a prancha fica menor nos notebooks; rótulos maiores no desenho para ficarem com 11 px ou mais na tela */
+@media (min-width:1024px) and (max-width:1365px){
+  .pl-hand{font-size:21px}
+  .pl-deg{font-size:21px}
 }
 @media (min-width:861px){
   .svc-sec .sh-row{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
@@ -938,17 +953,27 @@ html:not(.ready) .pc{pointer-events:none;cursor:default}
   .hero-cta .btn{padding-inline:1em;letter-spacing:.12em}
 }
 
-/* V05: celular baixo, menos cromo fixo sobre o conteúdo */
+/* V05/V10: celular baixo, menos cromo fixo sobre o conteúdo. A prancha não gruda: fica na
+   largura toda, com rótulos legíveis, e se desenha inteira quando entra na tela (site.js, STILL_Q) */
 @media (max-width:767px) and (max-height:700px){
   .controls{position:relative;top:auto}
-  .plate{max-height:24vh}
-  .plate-box{padding:22px 6px 20px}
+}
+/* a prancha só gruda em celulares altos (> 800 px úteis); abaixo disso ela tomaria mais da
+   metade da tela junto com o cabeçalho e a barra de agendar */
+@media (max-width:767px) and (max-height:800px){
+  .plate-stick{position:relative;top:auto}
+  .plate{max-height:none}
+  /* com o desenho na largura toda, a lupa desce para a linha do rótulo da etapa */
+  .lupa{position:relative;right:auto;bottom:auto;margin:4px 0 -14px auto}
 }
 /* A11Y-04: alturas pequenas (zoom de 400%, celular deitado): só o cabeçalho continua fixo */
 @media (max-height:540px){
   :root{--mbar-h:0px}
   .controls,.plate-stick,.score,.faq-head,.cmp,.ficha-wrap{position:relative;top:auto}
   .mbar{position:static}
+}
+@media (max-height:540px){
+  .plate{max-height:80vh}
 }
 
 /* animações de apoio */
