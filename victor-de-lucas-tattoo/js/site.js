@@ -18,11 +18,15 @@
   var mobileMQ = mq('(max-width: 820px)');
   var menuMQ = mq('(max-width: 820px)');
   var gsap = w.gsap, ST = w.ScrollTrigger;
-  var hasGsap = !!gsap, hasST = hasGsap && !!ST;
+  // Com movimento reduzido nenhum ScrollTrigger é criado: o plugin é desligado (sem laço de rAF à toa)
+  var hasGsap = !!gsap, hasST = hasGsap && !!ST && !reduce;
   var WA = 'https://wa.me/5561998043597?text=';
 
+  // Chegou depois da rede de segurança do <head> (conexão muito lenta): volta ao modo com JS
+  if (!root.classList.contains('js')) { root.classList.remove('no-js'); root.classList.add('js'); }
   if (reduce) root.classList.add('reduced');
   if (hasST) gsap.registerPlugin(ST);
+  else if (ST && ST.disable) { try { ST.disable(); } catch (_) {} }
 
   function safe(name, fn) {
     try { fn(); } catch (err) { if (w.console) console.warn('[site] módulo "' + name + '" falhou:', err); }
@@ -78,16 +82,20 @@
     w.__revealIO = io;
     $$('[data-reveal],[data-rise],.seam,.ba__fig,.lamp,.reviews__score,.final,.work').forEach(function (el) { io.observe(el); });
     // limpa o atraso depois da entrada, para hovers não herdarem o delay
+    // (no portfólio, o fim da revelação é a máscara da foto: .work__media)
     d.addEventListener('transitionend', function (e) {
       var el = e.target;
-      if (el.classList && el.classList.contains('is-in') && el.hasAttribute('data-reveal')) el.style.removeProperty('--d');
+      if (!el.classList) return;
+      if (el.classList.contains('is-in') && el.hasAttribute('data-reveal')) el.style.removeProperty('--d');
+      else if (el.classList.contains('work__media')) { var li = el.closest('.work.is-in'); if (li) li.style.removeProperty('--d'); }
     });
   });
   w.__vdlReady = true;
 
   /* =============== Lenis + ScrollTrigger =============== */
   safe('lenis', function () {
-    if (reduce || !hasGsap || !w.Lenis) return;
+    // Só com mouse/trackpad: no toque o Lenis não faz nada (a rolagem é nativa) e só manteria um laço rodando
+    if (reduce || !hasGsap || !w.Lenis || !fineMQ.matches) return;
     lenis = new w.Lenis({ lerp: 0.11, smoothWheel: true, wheelMultiplier: 1 });
     root.classList.add('smooth-js');
     if (hasST) lenis.on('scroll', ST.update);
@@ -112,10 +120,12 @@
   /* =============== Cabeçalho, progresso, botão flutuante =============== */
   var header = $('#site-header');
   var waFloat = $('.wa-float');
-  var floatBlock = { hero: true, end: false };
+  // end: CTA final, rodapé ou o formulário de orçamento na tela (o botão do formulário é o certo ali);
+  // form: um campo com foco (no celular o teclado aberto deixaria o botão por cima do campo)
+  var floatBlock = { hero: true, end: false, form: false };
   function updateFloat() {
     if (!waFloat) return;
-    waFloat.classList.toggle('is-on', !floatBlock.hero && !floatBlock.end && !state.menuOpen && !state.lbOpen);
+    waFloat.classList.toggle('is-on', !floatBlock.hero && !floatBlock.end && !floatBlock.form && !state.menuOpen && !state.lbOpen);
   }
 
   safe('header', function () {
@@ -143,16 +153,23 @@
     header.addEventListener('focusin', function () { header.classList.remove('is-hidden'); });
     update();
 
-    // botão flutuante: some na hero e no final da página
+    // botão flutuante: some na hero, no formulário de orçamento e no final da página
     if ('IntersectionObserver' in w && waFloat) {
       new IntersectionObserver(function (en) { floatBlock.hero = en[0].isIntersecting; updateFloat(); }, { rootMargin: '0px 0px -30% 0px' }).observe($('.hero'));
-      var ends = [$('#final'), $('#rodape')], vis = new Map();
+      var ends = [$('#orcamento'), $('#final'), $('#rodape')], vis = new Map();
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) { vis.set(en.target, en.isIntersecting); });
         floatBlock.end = Array.from(vis.values()).some(Boolean); updateFloat();
       });
       ends.forEach(function (el) { if (el) io.observe(el); });
     }
+    d.addEventListener('focusin', function (e) {
+      var f = !!(e.target.matches && e.target.matches('input,select,textarea'));
+      if (f !== floatBlock.form) { floatBlock.form = f; updateFloat(); }
+    });
+    d.addEventListener('focusout', function (e) {
+      if (floatBlock.form && !(e.relatedTarget && e.relatedTarget.matches && e.relatedTarget.matches('input,select,textarea'))) { floatBlock.form = false; updateFloat(); }
+    });
 
     // link do menu da seção atual
     var links = $$('.nav__list a');
@@ -190,7 +207,9 @@
       updateFloat(); heroApi.sync();
     }
     btn.addEventListener('click', function () { setMenu(!state.menuOpen); });
-    nav.addEventListener('click', function (e) { if (e.target.closest('a')) setMenu(false); });
+    // qualquer link do cabeçalho (do menu, a marca "voltar ao início", o botão de orçamento) fecha o menu.
+    // O cabeçalho vem antes do document na propagação: o menu fecha e a página destrava antes da rolagem.
+    header.addEventListener('click', function (e) { if (state.menuOpen && e.target.closest('a')) setMenu(false); });
     d.addEventListener('keydown', function (e) { if (e.key === 'Escape' && state.menuOpen) setMenu(false, true); });
     var onMQ = function () { if (!menuMQ.matches) setMenu(false); };
     menuMQ.addEventListener ? menuMQ.addEventListener('change', onMQ) : menuMQ.addListener(onMQ);
