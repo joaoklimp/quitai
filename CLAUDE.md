@@ -10,7 +10,7 @@ index.html                  site inteiro: página de vendas, cadastro, login e o
 CNAME, robots.txt, sitemap.xml
 _config.yml                 o que fica fora do site (o GitHub Pages publica o repositório inteiro)
 supabase/functions/         funções do servidor (Deno + TypeScript)
-  billing/                  assinatura pelo Asaas: assinar, cancelar, "já paguei", health, admin_revoke
+  billing/                  assinatura pelo Asaas: assinar, cancelar, "já paguei", health, admin_revoke, admin_comp, admin_comp_remove
   asaas-webhook/            avisos do Asaas → plano, situação e faturas da empresa
   stripe-webhook/           legado: assinaturas antigas da Stripe
   team/                     equipe: criar acesso, redefinir senha, remover pessoa, excluir conta
@@ -37,6 +37,7 @@ Não existe build, package.json, testes automatizados nem CI.
 ## Banco (Supabase, projeto `zldzvtmtulmqkikvarbj`)
 
 - Tabelas: `companies`, `members`, `platform_admins`, `support_tickets`, `support_messages`, `support_settings`, `asaas_events`.
+- Bloqueio do painel: `company_locked(c)` (usada por `save_company`). Mudou a regra de acesso, mude ali e no `billingState`/`applyServerBilling` do `index.html`.
 - RLS ligado em todas as tabelas. O site só lê `companies` e `members` da própria empresa (`my_company_id()`).
 - Toda escrita passa por funções `security definer` (RPC) ou pelas funções do servidor com a `service_role`. Não dê `insert`/`update` direto para `anon`/`authenticated`.
 - Plano, situação da assinatura e faturas só são escritos pelo servidor.
@@ -49,7 +50,9 @@ Não existe build, package.json, testes automatizados nem CI.
 - O plano de uma assinatura é identificado pelo **valor**. `PRICES` em `_shared/asaas.ts` (em reais) precisa bater com `PLANS` no `index.html` (em centavos) e com o texto `KNOWLEDGE` em `_shared/ai.ts`. Mudou preço, mude nos três.
 - `syncCompany()` é a fonte da verdade: lê assinatura e cobranças no Asaas e recalcula `plan`, `billing_status`, `current_period_end` e `invoices`.
 - Regras que não podem quebrar:
-  - Conta `complimentary` (cortesia) nunca é mexida pelo pagamento.
+  - Cortesia: `complimentary` + `comp_until` (data em que acaba; nula = sem prazo, como a conta da casa). Dada e removida pelo admin (`admin_comp`, `admin_comp_remove`, em `grantCourtesy`/`removeCourtesy`). Enquanto vale (`courtesyActive`), o pagamento não mexe na conta e `company_locked` não bloqueia. Ao dar cortesia, a assinatura paga é encerrada no Asaas.
+  - Cortesia sem prazo (`courtesyForever`) não assina. Com prazo, pode assinar: a assinatura começa em `comp_until` e a cortesia sai (`courtesyHandoff`). Vencida sem assinatura, cai nas regras normais (`billing_status = 'canceled'`) e o painel fica em modo leitura.
+  - A conta da casa (empresa de um `platform_admins`) não é mexida pelas ações de admin (`own_company`).
   - `access_revoked` (estorno, contestação ou bloqueio pelo admin) não é desfeito pela sincronização.
   - O webhook processa cada aviso uma vez só (`asaas_events`). Se der erro, apaga o registro e devolve 500 para o Asaas reenviar.
   - Troca de plano não cobra em dobro: a assinatura nova começa no fim do período já pago.

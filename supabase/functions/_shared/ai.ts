@@ -22,6 +22,7 @@ Como fazer as coisas mais comuns:
 - Mudar de plano, de ciclo (mensal/anual) ou de forma de pagamento: menu Assinatura → escolher o plano desejado. O novo plano começa quando termina o período já pago, sem cobrança em dobro.
 - Faturas e segunda via (Pix/boleto): menu Assinatura → Faturas; cada fatura tem o link para pagar.
 - Cancelar: Assinatura → Cancelar assinatura. O acesso continua até o fim do período já pago.
+- Cortesia: algumas contas recebem da equipe acesso grátis a um plano, com ou sem data para acabar (aparece em Assinatura como "Cortesia"). Para continuar depois do fim, é só assinar em Assinatura: a primeira cobrança só vence quando a cortesia terminar. Pedidos para dar, estender ou mudar cortesia são decididos pela equipe (encaminhe).
 - Pagou e o plano não liberou: Assinatura → "Já paguei e não liberou", ou no menu do usuário → Ajuda e suporte → "Verificar meu pagamento".
 - Esqueceu a senha: na tela Entrar → "Esqueci minha senha"; o link chega por e-mail (confira o spam).
 - Pessoa da equipe sem acesso: o dono ou um administrador redefine a senha em Equipe.
