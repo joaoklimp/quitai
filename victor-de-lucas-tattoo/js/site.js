@@ -366,7 +366,6 @@
         start: parseFloat(el.dataset.start) || 0, off: 0, period: 1, factor: 1, target: 1
       };
     });
-    $$('.shot__a', gallery).forEach(function (a) { a.setAttribute('data-cursor', 'view'); });
 
     var BASE = function () { return axis === 'y' ? 30 : 24; }; // px/s
     var INTRO_MS = 2200, INTRO_GAIN = 12;
@@ -677,7 +676,6 @@
     var grid = $('#works-grid'), status = $('#works-status');
     var btns = $$('.filter');
     var labels = { todos: 'todos', animais: 'Animais', fe: 'Fé', mitologia: 'Mitologia e guerreiros', retratos: 'Retratos e homenagens', grandes: 'Projetos grandes' };
-    $$('.work__a').forEach(function (a) { a.setAttribute('data-cursor', 'view'); });
     // contagens reais por filtro (se trocar fotos, os números se ajustam sozinhos)
     btns.forEach(function (b) {
       var f = b.getAttribute('data-filter');
@@ -942,7 +940,6 @@
       if (!shown) { gsap.set(c, { x: e.clientX, y: e.clientY }); shown = true; }
       xTo(e.clientX); yTo(e.clientY);
       var t = e.target;
-      c.classList.toggle('is-view', !!(t.closest && t.closest('[data-cursor="view"]')));
       c.classList.toggle('is-hidden', !!(t.closest && t.closest('input,textarea,select,iframe,label,.lb')));
     }, { passive: true });
     d.documentElement.addEventListener('pointerleave', function () { c.classList.add('is-hidden'); });

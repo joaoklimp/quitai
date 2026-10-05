@@ -59,7 +59,6 @@
 
 /* cursor do site vira a "ponta da agulha" sobre o braço */
 .cursor.is-ink::before{transform:scale(.2);background:var(--amber);border-color:var(--amber)}
-.cursor.is-ink .cursor__label{opacity:0}
 .has-cursor .skin__stage.is-over-arm{cursor:none}
 .skin__stage.is-over-arm{cursor:crosshair}
 

@@ -703,11 +703,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:300;op
 .has-cursor .cursor{display:block}
 .cursor::before{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(239,231,217,.7);transform:scale(.14);background:rgba(239,231,217,0);
   transition:transform .45s var(--ease-out),background-color .3s,border-color .3s,opacity .3s}
-.cursor__label{position:absolute;inset:0;display:grid;place-items:center;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);opacity:0;transform:scale(.6);transition:opacity .25s,transform .45s var(--ease-out)}
-.cursor.is-view::before{transform:scale(1);background:var(--bone);border-color:var(--bone)}
-.cursor.is-view .cursor__label{opacity:1;transform:none}
 .cursor.is-hidden::before{opacity:0}
-.has-cursor [data-cursor="view"],.has-cursor [data-cursor="view"] *{cursor:none}
 
 /* =====================================================================
    Responsivo
