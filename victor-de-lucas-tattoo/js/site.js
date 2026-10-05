@@ -360,7 +360,7 @@
     var axis = mobileMQ.matches ? 'x' : 'y';
     // Constantes do movimento: vêm do script em linha logo depois da galeria (index.html). Ele monta as
     // cópias e já pinta cada coluna na posição de partida, antes da primeira pintura (sem salto de layout).
-    var K = w.__vdlHero || { baseY: 30, baseX: 24, introMs: 2200, introGain: 12 };
+    var K = w.__vdlHero || { baseY: 30, baseX: 24, introMs: 2200, introGain: 12, endX: 0.36 };
 
     var cols = $$('.col', gallery).map(function (el) {
       var track = $('.track', el);
@@ -419,8 +419,8 @@
         c.off0 = null;
         var travel = withIntro ? BASE() * dirOf(c) * INTRO_EXTRA : 0;
         if (axis === 'x') {
-          // celular: a peça em destaque termina a intro a ~20% da faixa, bem visível
-          var target = -(c.el.offsetWidth * 0.2);
+          // celular: a peça em destaque termina a intro perto do centro da faixa, bem visível
+          var target = -(c.el.offsetWidth * K.endX);
           c.off = target - travel;
         } else c.off = c.start - travel;
         render(c);
@@ -492,7 +492,7 @@
       if (!visible) return;
       gallery.classList.add('is-focusing');
       if (reduce || !a.closest('.col') || !cols[0].clone) return; // nada anda: o foco basta
-      if (tabY !== null && Math.abs(w.scrollY - tabY) > 2) { if (lenis) lenis.scrollTo(tabY, { immediate: true, force: true }); w.scrollTo(0, tabY); }
+      if (tabY !== null && Math.abs(w.scrollY - tabY) > 2) { if (lenis) lenis.scrollTo(tabY, { immediate: true, force: true }); w.scrollTo({ top: tabY, behavior: 'instant' }); }
       // o navegador pode "rolar" contêineres com overflow ao focar; zera isso (quem posiciona é o loop)
       [gallery, tilt, a.closest('.col'), hero].forEach(function (el) { if (el) { el.scrollTop = 0; el.scrollLeft = 0; } });
       var t = a.closest('.shot').getAttribute('data-theme');
@@ -580,7 +580,9 @@
       if (!rotLive) return;
       if (auto) auto.kill();
       auto = gsap.delayedCall(delay || 3.4, function () {
-        if (isPaused() || hoverLock) { scheduleAuto(1.5); return; }
+        auto = null;
+        // parada ou sob o mouse: não reagenda (sync() e o pointerleave reagendam ao voltar), e o laço do GSAP pode dormir
+        if (isPaused() || hoverLock) return;
         goTo((current + 1) % words.length);
       });
     }
@@ -616,7 +618,7 @@
       runTarget = p ? 0 : 1;
       if (!p) wake();
       hero.classList.toggle('is-still', p);
-      if (p) finishSwap();
+      if (p) { finishSwap(); if (auto) { auto.kill(); auto = null; } }
       else if (rotLive && !swapTl && !hoverLock) scheduleAuto(2.4);
     }
     heroApi.sync = sync;
@@ -731,8 +733,8 @@
       });
     }
     splitNode(p);
-    // começa em 40% (3,3:1 sobre o fundo, legível para este texto grande) e termina antes do meio da tela
-    gsap.fromTo(words, { opacity: 0.4 }, {
+    // começa legível (texto grande, 3:1 sobre o fundo): 40% no creme, 55% no âmbar; termina antes do meio da tela
+    gsap.fromTo(words, { opacity: function (i, el) { return el.closest('em') ? 0.55 : 0.4; } }, {
       opacity: 1, ease: 'none', stagger: 0.1,
       scrollTrigger: { trigger: p, start: 'top 86%', end: 'bottom 78%', scrub: 0.6 }
     });
@@ -1008,6 +1010,7 @@
   safe('contact', function () {
     $$('[data-copy]').forEach(function (btn) {
       var label = $('[data-copy-label]', btn), status = $('[data-copy-status]'), orig = label.textContent, t = 0;
+      btn.hidden = false; // sem JS o botão não existiria para nada (o endereço continua selecionável)
       btn.addEventListener('click', function () {
         // espaços e hífens que não quebram linha (só para o layout) voltam a ser comuns ao copiar
         var text = $(btn.getAttribute('data-copy')).textContent.replace(/\u2011/g, '-').replace(/\s+/g, ' ').trim();

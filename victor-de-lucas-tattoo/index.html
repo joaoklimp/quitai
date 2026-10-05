@@ -248,7 +248,7 @@
        de partida da intro. As constantes do movimento ficam aqui; o site.js reaproveita.
        Com movimento reduzido (sem a classe "motion") nada disso roda e as fotos ficam paradas. */
     (function (d, w) {
-      var K = w.__vdlHero = { baseY: 30, baseX: 24, introMs: 2200, introGain: 12 };
+      var K = w.__vdlHero = { baseY: 30, baseX: 24, introMs: 2200, introGain: 12, endX: 0.36 };
       if (!d.documentElement.classList.contains('motion')) return;
       var axis = w.matchMedia('(max-width: 820px)').matches ? 'x' : 'y';
       var extra = K.introGain * (K.introMs / 1000) / 4; // distância extra da intro, em segundos de cruzeiro
@@ -268,10 +268,16 @@
         if (!(p > 0)) return;
         var speed = parseFloat(col.getAttribute('data-speed')) || 1, dir = axis === 'x' ? -speed : speed;
         var travel = (axis === 'y' ? K.baseY : K.baseX) * dir * extra;
-        var off = (axis === 'x' ? -(col.offsetWidth * 0.2) : (parseFloat(col.getAttribute('data-start')) || 0)) - travel;
+        // celular: a peça em destaque termina a intro perto do centro da faixa (e já aparece na primeira pintura)
+        var off = (axis === 'x' ? -(col.offsetWidth * K.endX) : (parseFloat(col.getAttribute('data-start')) || 0)) - travel;
         var o = ((off % p) + p) % p;
         track.style.transform = axis === 'y' ? 'translate3d(0,' + (-o).toFixed(2) + 'px,0)' : 'translate3d(' + (-o).toFixed(2) + 'px,0,0)';
         col.setAttribute('data-off', off); col.setAttribute('data-axis', axis);
+      });
+      // as fotos que já aparecem nesta posição de partida carregam agora, sem esperar o lazy-load
+      [].forEach.call(d.querySelectorAll('.gallery .shot img[loading="lazy"]'), function (im) {
+        var r = im.getBoundingClientRect();
+        if (r.width && r.right > 0 && r.left < w.innerWidth && r.bottom > 0 && r.top < w.innerHeight) im.loading = 'eager';
       });
     })(document, window);
   </script>
@@ -326,7 +332,7 @@
       <h2 class="h2 h2--sm" id="maca-title" data-rise><span class="line"><span class="line__in">Antes da</span></span> <span class="line"><span class="line__in"><em>primeira agulha</em></span></span></h2>
       <p class="skin__lede" data-reveal>Imagine o antebraço ainda sem nada, apoiado na maca. <span class="hint-mouse"><strong>Passe o mouse sobre o braço</strong></span><span class="hint-touch"><strong>Segure o dedo no braço e arraste</strong></span>: a tatuagem aparece por onde você passar. É o leão que o Victor fez nessa pele, em realismo preto e cinza.</p>
       <div class="skin__actions" data-reveal>
-        <button type="button" class="btn btn--line skin__toggle" data-skin-toggle aria-pressed="false" aria-controls="skin-stage" hidden>
+        <button type="button" class="btn btn--line skin__toggle" data-skin-toggle aria-controls="skin-stage" hidden>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
           <span data-skin-label>Ver a tatuagem</span>
         </button>
@@ -362,7 +368,8 @@
 <!-- ============ TRABALHOS (portfólio) ============
      Para trocar uma foto: edite o <li class="work"> correspondente.
      data-cat: animais, fe, mitologia, retratos, grandes (separadas por espaço).
-     data-d / data-t / data-m: posição no ritmo da grade (desktop / tablet / celular). O JS recalcula ao filtrar. -->
+     data-d / data-t / data-m: posição no ritmo da grade (desktop / tablet / celular). O JS recalcula ao filtrar
+     (e também o sizes de cada foto). "end" = a foto que ficaria sozinha na última linha fecha a grade, centralizada. -->
 <section class="sec works" id="trabalhos" aria-labelledby="trabalhos-title">
   <div class="wrap">
     <header class="sec__head works__head">
@@ -860,7 +867,7 @@
             <span class="card__label"><svg aria-hidden="true"><use href="#i-pin"/></svg>Endereço</span>
             <address class="card__value card__value--addr" id="addr">SH Ponte de Terra <span class="nb">DF 480</span> - Pte. Alta Norte (Gama), <span class="nb">Brasília - DF</span>, <span class="nb">72427-110</span></address>
             <span class="card__actions">
-              <button class="mini-btn" type="button" data-copy="#addr"><svg aria-hidden="true"><use href="#i-copy"/></svg><span data-copy-label>Copiar endereço</span></button>
+              <button class="mini-btn" type="button" data-copy="#addr" hidden><svg aria-hidden="true"><use href="#i-copy"/></svg><span data-copy-label>Copiar endereço</span></button>
               <a class="mini-btn" href="https://www.google.com/maps/search/?api=1&amp;query=Est%C3%BAdio%20Victor%20de%20Lucas%20Tattoo%2C%20SH%20Ponte%20de%20Terra%20DF%20480%2C%20Gama%2C%20Bras%C3%ADlia%20-%20DF%2C%2072427-110" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-pin"/></svg>Como chegar<span class="sr-only"> (abre o Google Maps em nova aba)</span></a>
             </span>
             <span class="sr-only" aria-live="polite" data-copy-status></span>

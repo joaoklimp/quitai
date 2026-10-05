@@ -150,7 +150,8 @@
   var painted = false, held = false;
   function setState(v) {
     stage.classList.toggle('is-inked', v);
-    if (btn) { btn.setAttribute('aria-pressed', v && full ? 'true' : 'false'); btn.querySelector('[data-skin-label]').textContent = v && full ? 'Esconder a tatuagem' : 'Ver a tatuagem'; }
+    // o rótulo muda (Ver/Esconder); sem aria-pressed junto, que contradiria o rótulo
+    if (btn) { btn.setAttribute('data-on', v && full ? 'true' : 'false'); btn.querySelector('[data-skin-label]').textContent = v && full ? 'Esconder a tatuagem' : 'Ver a tatuagem'; }
     if (status) status.textContent = v ? 'Tatuagem aparecendo: leão em realismo preto e cinza (foto real).' : 'Braço sem tatuagem (simulação digital).';
   }
 
