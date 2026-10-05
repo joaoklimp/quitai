@@ -1,5 +1,7 @@
 # O GitHub Pages publica o repositório inteiro em usequitai.com.br.
 # O que está aqui fica no repositório, mas não vai para o site.
+# (o CNAME já ficava de fora; com esta lista, ele precisa estar nela)
 exclude:
+  - CNAME
   - CLAUDE.md
   - supabase
