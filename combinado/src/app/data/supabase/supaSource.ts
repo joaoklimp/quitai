@@ -33,7 +33,7 @@ function applyQuery<Q extends { eq: Function }>(qb: Q, q?: Query): Q {
   let b = qb as unknown as Record<string, Function> & Q;
   for (const f of q?.filters ?? []) b = apply(b, f);
   if (q?.search?.term?.trim()) {
-    const t = q.search.term.replace(/[%,()]/g, ' ').trim();
+    const t = q.search.term.replace(/[%,()"\\*:]/g, ' ').trim();
     const digits = t.replace(/\D/g, '');
     const ors = q.search.cols.map((c) => (c === 'tags' ? `tags.cs.{${t.toLowerCase()}}` : `${c}.ilike.%${t}%`));
     if (digits.length >= 4 && q.search.cols.includes('phone')) ors.push(`phone.ilike.%${digits}%`);
@@ -142,14 +142,14 @@ export class SupabaseSource implements DataSource {
     this.companyId = c.id;
     return { user_id: user.id, email: user.email ?? m.email, name: m.name, role: m.role, company: c as Company, isPlatformAdmin: !!adm };
   }
-  async signIn(email: string, password: string) {
-    const { error } = await this.sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+  async signIn(email: string, password: string, captchaToken?: string) {
+    const { error } = await this.sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password, options: captchaToken ? { captchaToken } : undefined });
     if (error) throw friendly(error);
   }
   async signUp(input: SignUpInput) {
     const { data, error } = await this.sb.auth.signUp({
       email: input.email.trim().toLowerCase(), password: input.password,
-      options: { data: { name: input.name.trim() }, emailRedirectTo: `${location.origin}/app/` },
+      options: { data: { name: input.name.trim() }, emailRedirectTo: `${location.origin}/app/`, captchaToken: input.captchaToken },
     });
     if (error) throw friendly(error);
     return { needsConfirmation: !data.session };
@@ -158,13 +158,13 @@ export class SupabaseSource implements DataSource {
     const { error } = await this.sb.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}/app/`, ...(provider === 'azure' ? { scopes: 'email' } : {}) } });
     if (error) throw friendly(error);
   }
-  async signInWithEmailLink(email: string, name?: string) {
-    const { error } = await this.sb.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: `${location.origin}/app/`, shouldCreateUser: true, data: name?.trim() ? { name: name.trim() } : undefined } });
+  async signInWithEmailLink(email: string, name?: string, captchaToken?: string) {
+    const { error } = await this.sb.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: `${location.origin}/app/`, shouldCreateUser: true, data: name?.trim() ? { name: name.trim() } : undefined, captchaToken } });
     if (error) throw friendly(error);
   }
   async signOut() { await this.sb.auth.signOut(); this.companyId = null; }
-  async requestPasswordReset(email: string) {
-    const { error } = await this.sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${location.origin}/app/#/nova-senha` });
+  async requestPasswordReset(email: string, captchaToken?: string) {
+    const { error } = await this.sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${location.origin}/app/#/nova-senha`, captchaToken });
     if (error) throw friendly(error);
   }
   async updatePassword(password: string) {

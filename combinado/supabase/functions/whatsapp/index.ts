@@ -5,6 +5,7 @@ import { loadBase } from '../_shared/context.ts';
 import { insertMessage, sendQuote } from '../_shared/conversation.ts';
 import { ensureTemplates, exchangeCode, loadAccount, phoneInfo, registerNumber, sendText, subscribeApp, WaError, withinWindow } from '../_shared/whatsapp.ts';
 import { normalizePhone } from '../_shared/format.ts';
+import { open, seal } from '../_shared/crypto.ts';
 
 serve(async (req) => {
   const me = await caller(req);
@@ -32,7 +33,7 @@ serve(async (req) => {
             if (body.pin) throw e; // a pessoa informou o PIN: mostra o motivo da recusa
           }
         }
-        await db.from('whatsapp_credentials').upsert({ company_id: me.companyId, access_token: token });
+        await db.from('whatsapp_credentials').upsert({ company_id: me.companyId, access_token: await seal(token) });
         const { data: account, error } = await db.from('whatsapp_accounts').upsert({
           company_id: me.companyId, phone_number_id: phoneNumberId, waba_id: wabaId, display_phone: info.display_phone_number ? normalizePhone(info.display_phone_number) : null,
           verified_name: info.verified_name ?? null, status: 'conectado', last_error: null, connected_at: new Date().toISOString(),
@@ -58,7 +59,7 @@ serve(async (req) => {
       const { data: acc } = await db.from('whatsapp_accounts').select('waba_id, status').eq('company_id', me.companyId).maybeSingle();
       const { data: cred } = await db.from('whatsapp_credentials').select('access_token').eq('company_id', me.companyId).maybeSingle();
       if (!acc?.waba_id || acc.status !== 'conectado' || !cred) throw bad('Conecte o WhatsApp primeiro.');
-      try { return json({ templates: await ensureTemplates(acc.waba_id, cred.access_token) }, 200, req); }
+      try { return json({ templates: await ensureTemplates(acc.waba_id, await open(cred.access_token)) }, 200, req); }
       catch (e) { if (e instanceof WaError) throw bad(e.friendly); throw e; }
     }
 

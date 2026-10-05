@@ -410,3 +410,27 @@ describe('histórico de ações', () => {
     await expect(db.as(user(ana), (q) => q.exec(`delete from audit_log`))).rejects.toThrow(/permission denied/);
   });
 });
+
+describe('segurança', () => {
+  it('mass assignment: o painel não forja colunas que só o sistema escreve', async () => {
+    type C = { id: string; total_spent: string; score: number; created_via: string; name: string };
+    const c = await db.as(user(ana), (q) => q.one<C>(`insert into contacts (company_id, name, total_spent, score, created_via) values ($1, 'Forjado', 99999, 100, 'ia_cliente') returning id, total_spent, score, created_via, name`, [cidA]));
+    expect(c).toMatchObject({ total_spent: '0.00', score: 50, created_via: 'painel', name: 'Forjado' });
+    const u = await db.as(user(ana), (q) => q.one<C>(`update contacts set name = 'Renomeado', total_spent = 5000, created_via = 'ia_dono' where id = $1 returning id, total_spent, score, created_via, name`, [c.id]));
+    expect(u).toMatchObject({ name: 'Renomeado', total_spent: '0.00', created_via: 'painel' });
+    const t = await db.as(user(ana), (q) => q.one<{ created_by: string | null; reminded_at: string | null }>(`insert into tasks (company_id, title, created_by, reminded_at) values ($1, 'Tarefa', $2, now()) returning created_by, reminded_at`, [cidA, beto]));
+    expect(t).toEqual({ created_by: ana, reminded_at: null });
+    // o servidor (chave de serviço) continua podendo gravar o que precisa
+    const s = await db.as('service', (q) => q.one<{ total_spent: string }>(`update contacts set total_spent = 300 where id = $1 returning total_spent`, [c.id]));
+    expect(s.total_spent).toBe('300.00');
+  });
+
+  it('limite de requisições: conta por chave e bloqueia ao passar do limite', async () => {
+    const hit = () => db.as('service', (q) => q.one<{ ok: boolean }>(`select public.rate_hit('teste:limite', 2, 60) as ok`));
+    expect((await hit()).ok).toBe(true);
+    expect((await hit()).ok).toBe(true);
+    expect((await hit()).ok).toBe(false);
+    await expect(db.as(user(ana), (q) => q.one(`select public.rate_hit('x', 1, 60)`))).rejects.toThrow(/permission denied/);
+    await expect(db.as(user(ana), (q) => q.rows(`select * from rate_limits`))).rejects.toThrow(/permission denied/);
+  });
+});

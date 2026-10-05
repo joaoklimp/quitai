@@ -9,6 +9,7 @@ import { Button, Field, Input, cx } from '../../ui';
 import { BRAND, wordmarkHtml } from '../../../shared/brand';
 import { TRIAL_DAYS } from '../../../shared/plans';
 import { ENABLED_PROVIDERS, PROVIDER_LABEL, ProviderIcon } from './providers';
+import { Captcha, CAPTCHA_ON } from './Captcha';
 
 type Mode = 'entrar' | 'cadastro' | 'recuperar' | 'link';
 
@@ -76,6 +77,11 @@ export default function Auth() {
   const [ok, setOk] = useState('');
   const [sentLink, setSentLink] = useState(false);
   const [accept, setAccept] = useState(false);
+  // anti-robô: campo-armadilha invisível, tempo mínimo de preenchimento e (se configurado) Turnstile
+  const [trap, setTrap] = useState('');
+  const [shownAt] = useState(() => Date.now());
+  const [captcha, setCaptcha] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
   const qc = useQueryClient();
   const nav = useNavigate();
   const st = strength(pw);
@@ -102,16 +108,19 @@ export default function Auth() {
       if (!accept) { setErr('Aceite os termos de uso e a política de privacidade para continuar.'); return; }
     }
     if (mode === 'entrar' && !pw) { setErr('Digite sua senha.'); return; }
+    if (trap || (mode === 'cadastro' && Date.now() - shownAt < 2500)) { setErr('Não foi possível continuar. Confira os dados e tente de novo em alguns segundos.'); return; }
+    if (CAPTCHA_ON && !isDemo && !captcha) { setErr('Confirme que você não é um robô.'); return; }
+    const token = captcha || undefined;
     setBusy(true);
     try {
-      if (mode === 'entrar') { await api.signIn(email, pw); await enter(); }
+      if (mode === 'entrar') { await api.signIn(email, pw, token); await enter(); }
       else if (mode === 'cadastro') {
-        const r = await api.signUp({ name, email, password: pw });
+        const r = await api.signUp({ name, email, password: pw, captchaToken: token });
         if (r.needsConfirmation) setOk(`Quase lá! Enviamos um link de confirmação para ${email}. Abra o e-mail para ativar sua conta (confira também o spam).`);
         else await enter();
-      } else if (mode === 'link') { await api.signInWithEmailLink(email); setSentLink(true); setOk(`Enviamos um link de acesso para ${email}. Abra no celular ou no computador: ele vale por 1 hora.`); }
-      else { await api.requestPasswordReset(email); setOk('Se houver uma conta com esse e-mail, você vai receber um link para criar uma nova senha.'); }
-    } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); }
+      } else if (mode === 'link') { await api.signInWithEmailLink(email, undefined, token); setSentLink(true); setOk(`Enviamos um link de acesso para ${email}. Abra no celular ou no computador: ele vale por 1 hora.`); }
+      else { await api.requestPasswordReset(email, token); setOk('Se houver uma conta com esse e-mail, você vai receber um link para criar uma nova senha.'); }
+    } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); if (CAPTCHA_ON) setCaptchaReset((n) => n + 1); }
   };
 
   const title = { entrar: 'Entrar na sua conta', cadastro: 'Crie sua conta grátis', recuperar: 'Recuperar a senha', link: 'Entrar sem senha' }[mode];
@@ -170,6 +179,8 @@ export default function Auth() {
               </div>
             )}
             {mode === 'cadastro' && <label className="check small"><input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} /><span>Li e aceito os <a className="link" href="/termos/" target="_blank" rel="noreferrer">termos de uso</a> e a <a className="link" href="/privacidade/" target="_blank" rel="noreferrer">política de privacidade</a>.</span></label>}
+            <input className="auth-trap" type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" value={trap} onChange={(e) => setTrap(e.target.value)} />
+            {!isDemo && <Captcha onToken={setCaptcha} resetKey={captchaReset} />}
             {err && <div className="auth-err" role="alert">{err}</div>}
             {ok && <div className="auth-ok" role="status">{ok}</div>}
             <Button type="submit" variant="solid" size="lg" block loading={busy}>{{ entrar: 'Entrar', cadastro: 'Criar minha conta', recuperar: 'Enviar link', link: 'Enviar link de acesso' }[mode]}</Button>

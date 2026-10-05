@@ -3,7 +3,7 @@
 // - Número verificado da equipe → comandos (cadastra, orça, agenda, confirma com botões).
 // - Qualquer outro número → atendimento ao cliente pela IA (uma resposta para várias mensagens seguidas).
 import { transcribe } from '../_shared/transcribe.ts';
-import { db } from '../_shared/db.ts';
+import { db, webhookLimited } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { AUDIO_REPLY, countUsage, customerGate, customerTurn, ownerTurn, resolvePending, yesNo, type Member } from '../_shared/agent.ts';
 import { findOrCreateContact, findOrCreateConversation, insertMessage } from '../_shared/conversation.ts';
@@ -18,6 +18,7 @@ const debounceMs = () => Number(Deno.env.get('WA_DEBOUNCE_MS') ?? 2500);
 
 /** Trata uma requisição da Meta (verificação GET ou avisos POST). Exportado para os testes. */
 export async function handleWebhook(req: Request): Promise<Response> {
+  const limited = await webhookLimited(req, 'whatsapp', 3000); if (limited) return limited;
   const url = new URL(req.url);
   if (req.method === 'GET') {
     // verificação do webhook pela Meta

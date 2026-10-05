@@ -3,6 +3,7 @@ import { bad, HttpError, json, readJson, serve, str } from '../_shared/http.ts';
 import { audit, caller, db, requireRole } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { asaasCall, cancelCharge, createCharge, credsFor, markChargePaid, ProviderError, sendCharge, WEBHOOK_EVENTS, webhookUrl, type Actor } from '../_shared/payments.ts';
+import { seal } from '../_shared/crypto.ts';
 import { cancelNote, checkFocusToken, emitNote, syncNote, type FiscalConfig } from '../_shared/fiscal.ts';
 import type { Charge, ChargeMethod, FiscalNote } from '../_shared/types.ts';
 
@@ -23,7 +24,7 @@ serve(async (req) => {
       const cr = { api_key: key, environment: env(body.environment) };
       await asaasCall(cr, '/customers?limit=1'); // confere a chave
       const { data: old } = await db.from('integration_credentials').select('webhook_token').eq('company_id', me.companyId).eq('provider', 'asaas').maybeSingle();
-      const { data: saved } = await db.from('integration_credentials').upsert({ company_id: me.companyId, provider: 'asaas', api_key: key, ...(old ? { webhook_token: old.webhook_token } : {}) }).select('webhook_token').single();
+      const { data: saved } = await db.from('integration_credentials').upsert({ company_id: me.companyId, provider: 'asaas', api_key: await seal(key), ...(old ? { webhook_token: old.webhook_token } : {}) }).select('webhook_token').single();
       // tenta cadastrar o aviso de pagamento sozinho; se o Asaas não deixar, a tela mostra como fazer à mão
       let webhook = 'automatico';
       try {
@@ -57,7 +58,7 @@ serve(async (req) => {
       if (!config.item_lista_servico) throw bad('Informe o item da lista de serviço (LC 116), ex.: 0702. Seu contador sabe qual é.');
       const cr = { api_key: token, environment: env(body.environment) };
       await checkFocusToken(cr);
-      await db.from('integration_credentials').upsert({ company_id: me.companyId, provider: 'focusnfe', api_key: token });
+      await db.from('integration_credentials').upsert({ company_id: me.companyId, provider: 'focusnfe', api_key: await seal(token) });
       const { data: integration } = await db.from('company_integrations').upsert({ company_id: me.companyId, provider: 'focusnfe', status: 'conectado', environment: cr.environment, config, account_name: null, last_error: null, connected_at: new Date().toISOString() }).select('*').single();
       await audit({ company_id: me.companyId, actor_type: 'usuario', actor_name: me.name, actor_user_id: me.userId, channel: 'painel', action: 'conectar_focusnfe', summary: `Conectou a emissão de nota fiscal (${cr.environment === 'producao' ? 'produção' : 'homologação'})` });
       return json({ integration }, 200, req);

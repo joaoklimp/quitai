@@ -3,6 +3,7 @@
 // Fluxo: cria (ou acha) o cliente no Asaas, gera a cobrança (Pix, boleto ou os dois), guarda o link e o Pix copia e cola,
 // lança o valor a receber no financeiro e, se pedido, manda o link no WhatsApp. O webhook avisa o pagamento.
 import { db, audit, notify } from './db.ts';
+import { open } from './crypto.ts';
 import { brl, fmtDate, firstName, normalizePhone } from './format.ts';
 import type { Base } from './context.ts';
 import { deliverToContact } from './conversation.ts';
@@ -27,7 +28,7 @@ export async function credsFor(companyId: string, provider: 'asaas' | 'focusnfe'
     db.from('company_integrations').select('environment, status, config').eq('company_id', companyId).eq('provider', provider).maybeSingle(),
   ]);
   if (!c || !i || i.status === 'desconectado') return null;
-  return { api_key: c.api_key, webhook_token: c.webhook_token, environment: i.environment };
+  return { api_key: await open(c.api_key), webhook_token: c.webhook_token, environment: i.environment };
 }
 
 export async function asaasCall<T = Record<string, unknown>>(cr: Pick<Creds, 'api_key' | 'environment'>, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {

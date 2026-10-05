@@ -1,12 +1,25 @@
 // Acesso ao banco com a chave de serviço (ignora o RLS: as funções conferem permissões antes de agir).
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
-import { HttpError } from './http.ts';
+import { clientIp, HttpError } from './http.ts';
 import type { Role } from './types.ts';
 
 export const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 export const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+/** Limite de requisições por chave (usuário ou IP) numa janela de tempo. Se o banco falhar, deixa passar. */
+export async function rateLimit(key: string, max: number, windowSeconds: number): Promise<void> {
+  const { data, error } = await db.rpc('rate_hit', { p_key: key, p_max: max, p_window_seconds: windowSeconds });
+  if (error) { console.error('limite de requisições', error.message); return; }
+  if (data === false) throw new HttpError(429, 'muitas_requisicoes', 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente de novo.');
+}
+
+/** Para webhooks: devolve 429 quando o mesmo IP passa do limite. */
+export async function webhookLimited(req: Request, name: string, max = 1200): Promise<Response | null> {
+  try { await rateLimit(`wh:${name}:${clientIp(req)}`, max, 60); return null; }
+  catch { return new Response('too many requests', { status: 429, headers: { 'Retry-After': '60' } }); }
+}
 
 export interface Caller { userId: string; companyId: string; role: Role; name: string; email: string }
 
@@ -16,6 +29,7 @@ export async function caller(req: Request): Promise<Caller> {
   if (!token) throw new HttpError(401, 'nao_autenticado', 'Entre na sua conta para continuar.');
   const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) throw new HttpError(401, 'nao_autenticado', 'Sua sessão expirou. Entre de novo.');
+  await rateLimit(`u:${data.user.id}`, 120, 60);
   const { data: m } = await db.from('members').select('company_id, role, name, email, active').eq('user_id', data.user.id).maybeSingle();
   if (!m || !m.active) throw new HttpError(403, 'sem_empresa', 'Seu acesso a esta empresa não está ativo.');
   return { userId: data.user.id, companyId: m.company_id, role: m.role, name: m.name || data.user.email || 'Equipe', email: m.email || data.user.email || '' };

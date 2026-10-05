@@ -8,7 +8,7 @@ import type { ProductRow } from './sheet';
 import type { Cycle, PaidPlanId } from '../../shared/plans';
 
 export type IntegrationAction = 'connect_asaas' | 'connect_focus' | 'disconnect' | 'webhook_info' | 'charge_create' | 'charge_send' | 'charge_cancel' | 'charge_sync' | 'note_emit' | 'note_sync' | 'note_cancel' | 'demo_pay';
-export interface SignUpInput { name: string; email: string; password: string }
+export interface SignUpInput { name: string; email: string; password: string; captchaToken?: string }
 /** Login social. 'azure' é a conta Microsoft (Outlook, Hotmail, Microsoft 365). */
 export type AuthProvider = 'google' | 'apple' | 'azure';
 export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean; modules?: ModuleKey[] }
@@ -19,14 +19,14 @@ export interface DataSource {
 
   /* sessão */
   me(): Promise<Me | null>;
-  signIn(email: string, password: string): Promise<void>;
+  signIn(email: string, password: string, captchaToken?: string): Promise<void>;
   signUp(input: SignUpInput): Promise<{ needsConfirmation: boolean }>;
   /** Entrar ou criar conta com Google ou Microsoft (Apple opcional; sai do site e volta já com a sessão). */
   signInWithProvider(provider: AuthProvider, intent?: 'entrar' | 'cadastro'): Promise<void>;
   /** Link de acesso por e-mail, sem senha (também cria a conta se for a primeira vez). */
-  signInWithEmailLink(email: string, name?: string): Promise<void>;
+  signInWithEmailLink(email: string, name?: string, captchaToken?: string): Promise<void>;
   signOut(): Promise<void>;
-  requestPasswordReset(email: string): Promise<void>;
+  requestPasswordReset(email: string, captchaToken?: string): Promise<void>;
   updatePassword(password: string): Promise<void>;
   onboard(input: OnboardInput): Promise<void>;
   onAuthChange(cb: () => void): () => void;

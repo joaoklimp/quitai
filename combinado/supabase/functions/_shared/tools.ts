@@ -535,7 +535,7 @@ export const OWNER_TOOLS: T[] = [
     description: 'Procura pacientes pelo nome, telefone ou e-mail. Devolve id, nome, telefone, convênio e nascimento.',
     input_schema: obj({ busca: str('Nome, parte do nome ou telefone.') }, ['busca']),
     run: async (i, c) => {
-      const term = s(i.busca, 80).replace(/[%,()]/g, ' ').trim();
+      const term = s(i.busca, 80).replace(/[%,()"\\*:]/g, ' ').trim();
       if (!term) return err('Informe o que procurar.');
       const digits = term.replace(/\D/g, '');
       const ors = [`name.ilike.%${term}%`, `email.ilike.%${term}%`];
@@ -899,7 +899,7 @@ export const OWNER_TOOLS: T[] = [
     run: async (i, c) => {
       const term = s(i.busca, 80);
       let q = db.from('products').select('id, name, sku, unit, stock, min_stock').eq('company_id', c.company.id).eq('active', true).order('name').limit(30);
-      if (term) q = q.or(`name.ilike.%${term.replace(/[%,()]/g, ' ')}%,sku.ilike.%${term.replace(/[%,()]/g, ' ')}%`);
+      if (term) q = q.or(`name.ilike.%${term.replace(/[%,()"\\*:]/g, ' ')}%,sku.ilike.%${term.replace(/[%,()"\\*:]/g, ' ')}%`);
       const { data } = await q;
       let rows = data ?? [];
       if (!term) rows = rows.filter((p) => Number(p.min_stock) > 0 && Number(p.stock) <= Number(p.min_stock));

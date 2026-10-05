@@ -230,3 +230,15 @@ Deno.test('ao conectar, cadastra na Meta só os modelos que faltam e devolve a s
 Deno.test('cada modelo tem um exemplo por variável (exigência da Meta)', () => {
   for (const t of TEMPLATE_LIST) assertEquals(t.example.length, (t.body.match(/\{\{\d+\}\}/g) ?? []).length, t.name);
 });
+
+Deno.test('criptografia dos segredos: grava cifrado e lê de volta; lê valores antigos em texto puro', async () => {
+  Deno.env.set('DATA_ENCRYPTION_KEY', 'a'.repeat(64));
+  const { seal, open, isSealed } = await import('../_shared/crypto.ts');
+  const sealed = await seal('EAAG-token-secreto');
+  assert(isSealed(sealed));
+  assert(!sealed.includes('token-secreto'));
+  assertEquals(await open(sealed), 'EAAG-token-secreto');
+  assert((await seal('EAAG-token-secreto')) !== sealed); // vetor aleatório: cada gravação sai diferente
+  assertEquals(await open('texto-antigo'), 'texto-antigo');
+  assertEquals(await open(null), '');
+});

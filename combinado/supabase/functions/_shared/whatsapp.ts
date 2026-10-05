@@ -1,6 +1,7 @@
 // WhatsApp Cloud API (Meta): enviar texto, botões e modelos, marcar como lida, baixar mídia,
 // validar a assinatura do webhook e concluir a conexão do número (cadastro incorporado).
 import { db } from './db.ts';
+import { open } from './crypto.ts';
 import { TEMPLATE_LIST } from './templates.ts';
 
 const VERSION = Deno.env.get('META_GRAPH_VERSION') || 'v23.0';
@@ -47,7 +48,7 @@ export async function loadAccount(companyId: string): Promise<WaAccount | null> 
     db.from('whatsapp_credentials').select('access_token').eq('company_id', companyId).maybeSingle(),
   ]);
   if (!acc || acc.status !== 'conectado' || !acc.phone_number_id || !cred?.access_token) return null;
-  return { company_id: companyId, phone_number_id: acc.phone_number_id, access_token: cred.access_token, display_phone: acc.display_phone };
+  return { company_id: companyId, phone_number_id: acc.phone_number_id, access_token: await open(cred.access_token), display_phone: acc.display_phone };
 }
 
 async function send(acc: WaAccount, to: string, payload: Record<string, unknown>): Promise<string> {

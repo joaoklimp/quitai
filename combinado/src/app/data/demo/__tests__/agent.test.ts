@@ -123,7 +123,7 @@ describe('simulador (IA atendendo o paciente)', () => {
   it('pergunta no meio do agendamento não vira o nome do cliente (caso do print)', async () => {
     await runSimulator('Oi, tudo bem?', { reset: true, name: 'Paciente Print' });
     const today = localDate(new Date(), 'America/Sao_Paulo');
-    let d = addDays(today, 3); while (weekdayOf(d) !== 5) d = addDays(d, 1); // próxima sexta
+    let d = addDays(today, 15); while (weekdayOf(d) !== 5) d = addDays(d, 1); // uma sexta sem agendamentos de exemplo
     const [, m, dd] = d.split('-');
     const a = await runSimulator(`Tem horário dia ${dd}/${m} às 14h?`, {});
     expect(a.reply).toMatch(/nome completo/);

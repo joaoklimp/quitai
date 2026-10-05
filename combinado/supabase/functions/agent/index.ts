@@ -1,7 +1,7 @@
 // Função "agent" (chamada pelo painel): assistente de comandos, confirmações, simulador do WhatsApp
 // e sugestão de resposta para a equipe na caixa de conversas.
 import { bad, json, readJson, serve, str } from '../_shared/http.ts';
-import { caller, db } from '../_shared/db.ts';
+import { caller, db, rateLimit } from '../_shared/db.ts';
 import { loadBase } from '../_shared/context.ts';
 import { countUsage, customerGate, customerTurn, ownerTurn, resolvePending, usageLeft, type Member } from '../_shared/agent.ts';
 import { buildHistory, findOrCreateConversation, insertMessage } from '../_shared/conversation.ts';
@@ -11,6 +11,8 @@ import type { Contact } from '../_shared/types.ts';
 serve(async (req) => {
   const me = await caller(req);
   const body = await readJson(req);
+  // cada chamada aqui usa a IA (custo): limite mais curto por pessoa
+  await rateLimit(`ia:${me.userId}`, 30, 60);
   const b = await loadBase(me.companyId, req.headers.get('origin'));
   const member: Member = { userId: me.userId, name: me.name, role: me.role };
 

@@ -1,12 +1,13 @@
 // Aviso de pagamento do Asaas DA EMPRESA (cobranças dos clientes dela). Cada empresa tem o próprio endereço
 // (?empresa=<id>) e o próprio token, cadastrados no Asaas dela quando conecta. Pago → vira venda e baixa a conta.
-import { db } from '../_shared/db.ts';
+import { db, webhookLimited } from '../_shared/db.ts';
 import { markChargePaid } from '../_shared/payments.ts';
 
 type Ev = { id?: string; event?: string; payment?: { id: string; status?: string; billingType?: string; externalReference?: string; paymentDate?: string; clientPaymentDate?: string } };
 
 export async function handleChargeWebhook(req: Request): Promise<Response> {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
+  const limited = await webhookLimited(req, 'cobranca', 600); if (limited) return limited;
   const company = new URL(req.url).searchParams.get('empresa') ?? '';
   if (!/^[0-9a-f-]{36}$/.test(company)) return new Response('bad request', { status: 400 });
   const { data: cred } = await db.from('integration_credentials').select('webhook_token').eq('company_id', company).eq('provider', 'asaas').maybeSingle();

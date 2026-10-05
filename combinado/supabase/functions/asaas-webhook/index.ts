@@ -1,6 +1,6 @@
 // Webhook do Asaas (checkout, assinaturas e cobranças): mantém plano, situação e faturas em dia.
 // Configure no Asaas: URL https://SEU-PROJETO.supabase.co/functions/v1/asaas-webhook e o token ASAAS_WEBHOOK_TOKEN.
-import { db } from '../_shared/db.ts';
+import { db, webhookLimited } from '../_shared/db.ts';
 import { adoptFromCheckout, adoptSubscription, revokeCompany, syncCompany } from '../_shared/asaas.ts';
 
 type Sub = { id: string; customer: string; status: string; checkoutSession?: string | null };
@@ -16,6 +16,7 @@ async function companyBy(field: 'asaas_subscription_id' | 'asaas_checkout_id', v
 }
 
 Deno.serve(async (req) => {
+  const limited = await webhookLimited(req, 'asaas'); if (limited) return limited;
   const token = (Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '').trim();
   if (!token || (req.headers.get('asaas-access-token') ?? '').trim() !== token) return new Response('unauthorized', { status: 401 });
   let ev: Ev;

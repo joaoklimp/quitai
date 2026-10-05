@@ -15,7 +15,7 @@ export function cors(req?: Request): Record<string, string> {
 }
 
 export function json(body: unknown, status = 200, req?: Request): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json; charset=utf-8' } });
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
 }
 
 /** Erro esperado: vira { error, message } com o status certo. */
@@ -41,6 +41,11 @@ export function serve(handler: (req: Request) => Promise<Response>) {
 
 export async function readJson<T = Record<string, unknown>>(req: Request): Promise<T> {
   try { return (await req.json()) as T; } catch { throw bad('Pedido inválido.'); }
+}
+
+/** IP de quem chamou (o Supabase repassa no x-forwarded-for). */
+export function clientIp(req: Request): string {
+  return (req.headers.get('cf-connecting-ip') ?? req.headers.get('x-real-ip') ?? (req.headers.get('x-forwarded-for') ?? '').split(',')[0]).trim() || 'desconhecido';
 }
 
 export const str = (v: unknown, max = 500) => String(v ?? '').trim().slice(0, max);
