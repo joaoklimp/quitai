@@ -1,7 +1,8 @@
 // Assinatura do Quitaí pelo Asaas: assinar (cartão ou Pix/boleto), cancelar e conferir pagamento.
 // Empresas antigas da Stripe (se houver) ainda podem abrir o portal da Stripe.
 import { admin, caller, cors, CYCLES, json, PLAN_IDS, SITE_URL, stripe } from '../_shared/common.ts';
-import { adoptFromCheckout, asaas, AsaasError, CHECKOUT_BASE, PRICES, revokeCompany, syncCompany, todaySP } from '../_shared/asaas.ts';
+import { adoptFromCheckout, asaas, AsaasError, CHECKOUT_BASE, courtesyActive, courtesyForever, courtesyHandoff, grantCourtesy, PRICES, removeCourtesy, revokeCompany, syncCompany, todaySP } from '../_shared/asaas.ts';
+import { courtesyMail } from '../_shared/billing-mail.ts';
 import { LOGO_PNG_BASE64 } from '../_shared/logo.ts';
 
 function onlyDigits(s: unknown): string { return String(s ?? '').replace(/\D/g, ''); }
@@ -40,15 +41,42 @@ Deno.serve(async (req) => {
     if (!me) return json(req, { error: 'not_authenticated' }, 401);
     const body = await req.json().catch(() => ({}));
 
-    // Administração do Quitaí: cancelar a assinatura de uma empresa e bloquear o painel na hora
-    if (body.action === 'admin_revoke') {
+    // Administração do Quitaí (só administradores): bloquear, dar e remover cortesia
+    if (['admin_revoke', 'admin_comp', 'admin_comp_remove'].includes(body.action)) {
       const { data: adm } = await admin.from('platform_admins').select('user_id').eq('user_id', me.user_id).maybeSingle();
       if (!adm) return json(req, { error: 'not_allowed' }, 403);
-      const { data: target } = await admin.from('companies').select('id,complimentary').eq('id', String(body.company_id ?? '')).maybeSingle();
+      const { data: target } = await admin.from('companies').select('id,complimentary,comp_until').eq('id', String(body.company_id ?? '')).maybeSingle();
       if (!target) return json(req, { error: 'not_found' }, 404);
-      if (target.complimentary) return json(req, { error: 'complimentary' }, 409);
-      await revokeCompany(target.id, 'reembolsada');
-      return json(req, { ok: true });
+      // a conta da casa (de um administrador) não é mexida por aqui
+      const { data: people } = await admin.from('members').select('user_id').eq('company_id', target.id);
+      const ids = (people ?? []).map((p) => p.user_id);
+      if (ids.length) {
+        const { data: house, error: houseErr } = await admin.from('platform_admins').select('user_id').in('user_id', ids);
+        if (houseErr) throw houseErr;
+        if (house && house.length) return json(req, { error: 'own_company' }, 409);
+      }
+
+      if (body.action === 'admin_revoke') {
+        if (courtesyActive(target)) return json(req, { error: 'complimentary' }, 409);
+        await revokeCompany(target.id, 'reembolsada');
+        return json(req, { ok: true });
+      }
+      if (body.action === 'admin_comp_remove') {
+        if (!target.complimentary) return json(req, { error: 'not_courtesy' }, 409);
+        await removeCourtesy(target.id);
+        return json(req, { ok: true });
+      }
+      // admin_comp: dar ou alterar a cortesia
+      const plan = String(body.plan);
+      if (!PLAN_IDS.includes(plan as never)) return json(req, { error: 'invalid_plan' }, 400);
+      const until = body.until ? String(body.until) : null;
+      if (until && (!/^\d{4}-\d{2}-\d{2}$/.test(until) || until < todaySP())) return json(req, { error: 'invalid_until' }, 400);
+      const note = body.note ? String(body.note).trim().slice(0, 120) || null : null;
+      const { hadSubscription } = await grantCourtesy(target.id, { plan, until, note });
+      if (body.notify !== false) {
+        try { await courtesyMail(target.id, plan, until, hadSubscription); } catch (e) { console.error('e-mail da cortesia', e); }
+      }
+      return json(req, { ok: true, hadSubscription });
     }
     const { data: company } = await admin.from('companies').select('*').eq('id', me.company_id).single();
     if (!company) return json(req, { error: 'no_company' }, 404);
@@ -84,7 +112,7 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'checkout') {
-      if (company.complimentary) return json(req, { error: 'complimentary' }, 409);
+      if (courtesyForever(company)) return json(req, { error: 'complimentary' }, 409);
       // no site oficial, só com o Asaas de produção (impede assinar no ambiente de testes)
       // (contas de teste listadas em ASAAS_SANDBOX_TESTERS podem testar o sandbox no site oficial)
       const testers = (Deno.env.get('ASAAS_SANDBOX_TESTERS') ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -101,7 +129,10 @@ Deno.serve(async (req) => {
       const asaasCycle = cycle === 'anual' ? 'YEARLY' : 'MONTHLY';
       const today = todaySP();
       // já tem período pago (troca de plano ou reativação): a nova assinatura começa quando ele acabar
-      const paidUntil = !company.access_revoked && ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null;
+      const courtesy = courtesyActive(company);
+      const paidUntil = courtesy
+        ? (company.comp_until > today ? company.comp_until : null)
+        : (!company.access_revoked && ['active', 'past_due', 'canceled'].includes(company.billing_status) && company.current_period_end && company.current_period_end > today ? company.current_period_end : null);
       const firstDue = paidUntil ?? today;
       const desc = `Quitaí · Plano ${PRICES[plan].name} · ${cycle}`;
       const name = String((company.data?.name as string) || me.name).slice(0, 100);
@@ -157,7 +188,7 @@ Deno.serve(async (req) => {
         sub = await asaas<{ id: string }>('/subscriptions', { method: 'POST', body: subBody });
       }
       const old = company.asaas_subscription_id;
-      await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix', access_revoked: false }).eq('id', company.id);
+      await admin.from('companies').update({ asaas_customer_id: customer, asaas_subscription_id: sub.id, billing_provider: 'asaas', billing_method: 'pix', access_revoked: false, ...courtesyHandoff(company) }).eq('id', company.id);
       if (old && old !== sub.id) await asaas(`/subscriptions/${old}`, { method: 'DELETE' }).catch((e) => console.error('remover assinatura anterior', e));
       if (paidUntil) return json(req, { ok: true, scheduled: firstDue });
       const pays = await asaas<{ data: { invoiceUrl?: string }[] }>(`/subscriptions/${sub.id}/payments?limit=1`);

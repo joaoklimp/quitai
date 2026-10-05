@@ -1971,10 +1971,14 @@ function applyServerBilling(c, row) {
     trialEndsAt: row.trial_ends_at, currentPeriodEnd: row.current_period_end || null,
     method: row.billing_status === 'trial' ? null : 'cartao', canceledAt: row.canceled_at ? Date.parse(row.canceled_at) : null,
     cycle: row.billing_cycle === 'anual' ? 'anual' : 'mensal', hasSub: !!row.stripe_subscription_id,
-    complimentary: !!row.complimentary,
+    complimentary: false, compUntil: null,
     provider: row.billing_provider || (row.stripe_subscription_id ? 'stripe' : 'asaas'),
   };
   if (row.billing_method) c.billing.method = row.billing_method;
+  // cortesia valendo hoje: plano liberado, sem cobrança (vencida, segue as regras normais)
+  if (row.complimentary && (!row.comp_until || row.comp_until >= todayISO())) {
+    Object.assign(c.billing, { complimentary: true, compUntil: row.comp_until || null, status: 'active', pastDue: false, currentPeriodEnd: row.comp_until || null });
+  }
   c.invoices = Array.isArray(row.invoices) ? row.invoices : [];
 }
 async function cloudLoad() {
@@ -2098,7 +2102,7 @@ async function cloudReload() {
 /* confere de tempos em tempos se a assinatura ou os dados mudaram no servidor */
 async function cloudPoll() {
   if (!Cloud.on || Cloud.saving || Cloud.t || document.visibilityState === 'hidden') return;
-  const { data: row } = await Cloud.sb.from('companies').select('version,updated_at,plan,billing_status,billing_cycle,trial_ends_at,current_period_end,canceled_at,invoices,stripe_subscription_id,complimentary,billing_provider,billing_method').eq('id', Cloud.companyId).maybeSingle();
+  const { data: row } = await Cloud.sb.from('companies').select('version,updated_at,plan,billing_status,billing_cycle,trial_ends_at,current_period_end,canceled_at,invoices,stripe_subscription_id,complimentary,comp_until,billing_provider,billing_method').eq('id', Cloud.companyId).maybeSingle();
   if (!row || !Cloud.on) return;
   if (row.version !== Cloud.version) { if (!Cloud.t && !Cloud.saving) await cloudReload(); return; }
   if (row.updated_at !== Cloud.updatedAt) {
@@ -2141,6 +2145,11 @@ const FN_ERRORS = {
   no_subscription: 'Ainda não há assinatura para gerenciar.',
   payments_soon: 'Os pagamentos online serão liberados em breve. Enquanto isso, aproveite o teste grátis.',
   payments_not_configured: 'Os pagamentos estão em configuração. Tente de novo em instantes.',
+  complimentary: 'Esta conta tem cortesia sem prazo: não precisa assinar.',
+  own_company: 'Esta é a conta da casa (de um administrador). Ela não muda por aqui.',
+  not_courtesy: 'Esta empresa não tem cortesia.',
+  invalid_until: 'Escolha uma data de hoje em diante.',
+  invalid_plan: 'Escolha um plano.',
   payment_error: 'O Asaas não conseguiu abrir o pagamento. Confira o CPF/CNPJ e tente de novo.',
   doc_required: 'Para pagar com Pix ou boleto, informe o CPF ou CNPJ.',
   invalid_doc: 'Este CPF ou CNPJ não é válido.',
@@ -5373,6 +5382,10 @@ function viewBanners() {
   } else if (bs.kind === 'canceled-active') {
     out.push(html`<div class="banner warn">${icon('info')}<span>Assinatura cancelada. Você pode usar tudo até ${fmtDate(bs.until)}.</span>${owner ? html`<span class="banner-act"><button type="button" class="btn btn-sm" data-act="nav" data-page="assinatura">Reativar</button></span>` : ''}</div>`);
   }
+  if (c.billing.complimentary && c.billing.compUntil) {
+    const left = diffDays(c.billing.compUntil, todayISO());
+    if (left <= 7) out.push(html`<div class="banner ${left <= 2 ? 'warn' : 'info'}">${icon('star')}<span>Sua cortesia do plano <strong>${planOf(c).name}</strong> ${left === 0 ? 'termina hoje' : `termina em ${plural(left, 'dia', 'dias')} (${fmtDate(c.billing.compUntil)})`}. Assine para continuar usando sem interrupção.</span>${owner ? html`<span class="banner-act"><button type="button" class="btn btn-sm btn-primary" data-act="checkout" data-plan="${c.plan}">Assinar</button></span>` : ''}</div>`);
+  }
   if (c.billing.pastDue) out.push(html`<div class="banner warn">${icon('alert')}<span>A última cobrança da assinatura está em aberto. Pague até ${fmtDate(c.billing.currentPeriodEnd)} para não perder o acesso.</span>${owner ? html`<span class="banner-act">${c.billing.provider === 'stripe' ? html`<button type="button" class="btn btn-sm btn-primary" data-act="billingPortal">Atualizar cartão</button>` : overdueInvoice(c) ? html`<a class="btn btn-sm btn-primary" href="${overdueInvoice(c).url}" target="_blank" rel="noopener">Pagar agora</a>` : html`<button type="button" class="btn btn-sm btn-primary" data-act="nav" data-page="assinatura">Ver cobrança</button>`}</span>` : ''}</div>`);
   if (Sync.state === 'memory') out.push(html`<div class="banner warn">${icon('alert')}<span>Este navegador não está permitindo salvar dados. Exporte um backup antes de fechar a página.</span><span class="banner-act"><button type="button" class="btn btn-sm" data-act="exportJSON">Baixar backup</button></span></div>`);
   return html`${out}`;
@@ -7391,14 +7404,14 @@ function viewBilling() {
   const lim = clientLimit(c);
   const team = usersOf(c).length;
   const comp = !!c.billing.complimentary;
-  const statusChipB = comp ? html`<span class="chip st-pago">${icon('star')}Cortesia</span>` : {
+  const statusChipB = comp ? html`<span class="chip st-pago">${icon('star')}Cortesia${c.billing.compUntil ? ` até ${fmtDate(c.billing.compUntil)}` : ''}</span>` : {
     trial: html`<span class="chip st-pendente">${icon('clock')}Teste grátis · ${bs.left === 0 ? 'termina hoje' : `${plural(bs.left, 'dia', 'dias')}`}</span>`,
     'trial-ended': html`<span class="chip st-atrasado">${icon('lock')}Teste encerrado</span>`,
     active: html`<span class="chip st-pago">${icon('checkCircle')}Ativa</span>`,
     'canceled-active': html`<span class="chip st-pendente">${icon('info')}Cancelada · acesso até ${fmtDate(bs.until)}</span>`,
     'canceled-ended': html`<span class="chip st-atrasado">${icon('lock')}Cancelada</span>`,
   }[bs.kind];
-  const detail = comp ? html`Plano ${p.name} liberado como cortesia, sem cobrança e sem data para acabar.` : {
+  const detail = comp ? (c.billing.compUntil ? html`Plano ${p.name} liberado como cortesia, sem cobrança, até <strong>${fmtDate(c.billing.compUntil)}</strong>. Para continuar depois, assine: a primeira cobrança só vence quando a cortesia terminar.` : html`Plano ${p.name} liberado como cortesia, sem cobrança e sem data para acabar.`) : {
     trial: html`Seu teste vai até <strong>${fmtDate(c.billing.trialEndsAt)}</strong>. Assine antes para não perder o acesso de edição.`,
     'trial-ended': html`O teste terminou em ${fmtDate(c.billing.trialEndsAt)}. Seus dados estão guardados. Assine para voltar a editar.`,
     active: html`Próxima cobrança em <strong>${fmtDate(c.billing.currentPeriodEnd)}</strong>, no valor de <strong>${fmtMoney(planCharge(c.plan, c.billing.cycle))}</strong> (${c.billing.cycle === 'anual' ? 'plano anual' : 'plano mensal'})${c.billing.method ? html`, via ${METHODS[c.billing.method] || c.billing.method}` : ''}.`,
@@ -7414,6 +7427,7 @@ function viewBilling() {
       <p class="muted">${fmtMoney(planMonthly(c.plan, c.billing.cycle))} por mês${c.billing.cycle === 'anual' ? ' no plano anual' : ''} · ${Number.isFinite(p.clients) ? `até ${p.clients} clientes` : 'clientes ilimitados'} · ${p.ai} análises com IA por mês · ${p.support}</p>
     </div>
     <div class="row-wrap" style="justify-content:flex-end">
+      ${comp && c.billing.compUntil && me().role === 'owner' ? html`<button type="button" class="btn btn-primary" data-act="checkout" data-plan="${c.plan}">Assinar para continuar depois da cortesia</button>` : ''}
       ${!comp && c.cloud && bs.kind !== 'active' ? html`<button type="button" class="btn btn-ghost" data-act="syncPayment">${icon('refresh')}Já paguei e não liberou</button>` : ''}
       ${!comp && (bs.kind === 'trial' || bs.kind === 'trial-ended' || bs.kind === 'canceled-ended') ? html`<button type="button" class="btn btn-primary" data-act="checkout" data-plan="${c.plan}">Assinar o ${p.name}</button>` : ''}
       ${!comp && bs.kind === 'active' ? (c.cloud && c.billing.provider === 'stripe' ? html`<button type="button" class="btn" data-act="billingPortal">${icon('card')}Gerenciar assinatura</button>` : html`<button type="button" class="btn btn-danger-outline" data-act="cancelSub">Cancelar assinatura</button>`) : ''}
@@ -7451,7 +7465,8 @@ A.changePlan = async (el) => {
   const c = co();
   const to = el.dataset.plan;
   closeAllModals();
-  if (c.billing.complimentary) { toast('Sua conta é cortesia e já tem o plano Empresa, com tudo liberado.', { type: 'info' }); return; }
+  if (c.billing.complimentary && !c.billing.compUntil) { toast('Sua conta é cortesia sem prazo, com o plano liberado. Não precisa assinar.', { type: 'info' }); return; }
+  if (c.billing.complimentary) { openCheckout(to); return; }
   if (me().role !== 'owner' || isImpersonating()) { toast('Só o proprietário da conta pode mudar o plano.', { type: 'warn' }); return; }
   if (!PLANS[to]) return;
   const np = PLANS[to];
@@ -7503,7 +7518,7 @@ function openCheckout(planId) {
         <label class="radio-card"><input type="radio" name="method" value="cartao" data-change="checkoutMethod"><span class="grow"><span class="rc-title">Cartão de crédito</span><br><span class="rc-sub">Renova sozinho no cartão, sem precisar lembrar.</span></span></label>
       </div></fieldset>
       <div class="field"><label for="co-doc">CPF ou CNPJ de quem paga <span class="muted" id="co-doc-opt" hidden>(opcional)</span></label><input id="co-doc" name="doc" class="input" inputmode="numeric" autocomplete="off" value="${c.doc ? fmtDoc(c.doc) : ''}" data-input="maskDoc"><p class="hint">Exigido pelo Asaas para emitir a cobrança.</p></div>
-      ${paidUntilISO(c) ? html`<div class="callout">${icon('info')}<div>Você já tem o plano pago até <strong>${fmtDate(paidUntilISO(c))}</strong>. O novo plano começa nessa data, e a primeira cobrança só vence nela.</div></div>` : ''}
+      ${paidUntilISO(c) ? html`<div class="callout">${icon('info')}<div>${c.billing.complimentary ? 'Sua cortesia vale até' : 'Você já tem o plano pago até'} <strong>${fmtDate(paidUntilISO(c))}</strong>. A assinatura começa nessa data, e a primeira cobrança só vence nela.</div></div>` : ''}
       <div class="callout">${icon('shield')}<div>O pagamento é feito no ambiente seguro do <strong>Asaas</strong>. O plano é liberado assim que o pagamento é confirmado. Cancele quando quiser, em Assinatura.</div></div>` : html`<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Forma de pagamento</legend><div class="radio-cards">
         ${[['pix', 'Pix', 'Aprovação na hora'], ['cartao', 'Cartão de crédito', 'Renovação automática todo mês'], ['boleto', 'Boleto', 'Compensação em até 3 dias úteis']].map(([k, l, s], i) => html`<label class="radio-card"><input type="radio" name="method" value="${k}"${chk(i === 0)}><span class="grow"><span class="rc-title">${l}</span><br><span class="rc-sub">${s}</span></span></label>`)}
       </div></fieldset>
@@ -7546,7 +7561,8 @@ A.pixWaitClose = async () => {
 function overdueInvoice(c) { return (c.invoices || []).find((i) => (i.status === 'vencida' || i.status === 'pendente') && i.url) || null; }
 function paidUntilISO(c) {
   const b = c.billing;
-  return c.cloud && ['active', 'canceled'].includes(b.status) && b.currentPeriodEnd && b.currentPeriodEnd > todayISO() && !b.complimentary ? b.currentPeriodEnd : null;
+  if (b.complimentary) return c.cloud && b.compUntil && b.compUntil > todayISO() ? b.compUntil : null;
+  return c.cloud && ['active', 'canceled'].includes(b.status) && b.currentPeriodEnd && b.currentPeriodEnd > todayISO() ? b.currentPeriodEnd : null;
 }
 CH.checkoutMethod = (el) => {
   const opt = document.getElementById('co-doc-opt');
@@ -7596,16 +7612,18 @@ F.checkout = async (f) => {
   toast(`Assinatura do plano ${PLANS[planId].name} ativada. Obrigado!`);
 };
 /* ---------- administração do Quitaí (só administradores) ---------- */
+function courtesyOn(r) { return !!r.complimentary && (!r.comp_until || r.comp_until >= todayISO()); }
 function adminStatus(r) {
   const t = todayISO();
-  if (r.complimentary) return { key: 'ativas', label: 'Cortesia', cls: 'st-pago', icon: 'star' };
+  if (r.house) return { key: 'casa', label: 'Conta da casa', cls: 'st-pago', icon: 'star' };
+  if (courtesyOn(r)) return { key: 'cortesia', label: r.comp_until ? `Cortesia até ${fmtDate(r.comp_until)}` : 'Cortesia sem prazo', cls: 'st-pago', icon: 'star' };
   if (r.billing_status === 'trial') return r.trial_ends_at >= t ? { key: 'teste', label: 'Em teste', cls: 'st-pendente', icon: 'clock' } : { key: 'canceladas', label: 'Teste encerrado', cls: 'st-atrasado', icon: 'lock' };
   if (r.billing_status === 'active') return { key: 'ativas', label: 'Ativa', cls: 'st-pago', icon: 'checkCircle' };
   if (r.billing_status === 'past_due') return { key: 'ativas', label: 'Pagamento pendente', cls: 'st-atrasado', icon: 'alert' };
   return r.current_period_end && r.current_period_end > t ? { key: 'canceladas', label: 'Cancelada · acesso até ' + fmtDate(r.current_period_end), cls: 'st-pendente', icon: 'info' } : { key: 'canceladas', label: 'Cancelada', cls: 'st-cancelado', icon: 'ban' };
 }
 function adminMRR(r) {
-  if (r.complimentary || !['active', 'past_due'].includes(r.billing_status)) return 0;
+  if (courtesyOn(r) || r.house || !['active', 'past_due'].includes(r.billing_status)) return 0;
   return planMonthly(r.plan, r.billing_cycle === 'anual' ? 'anual' : 'mensal');
 }
 async function adminLoad() {
@@ -7620,7 +7638,8 @@ function viewAdmin() {
   if (!ui.admin || (!ui.admin.loadedAt && !ui.admin.loading && !ui.admin.error)) { adminLoad(); }
   const st = ui.admin || { loading: true, rows: [], tickets: [], q: '', filter: 'todas' };
   const rows = st.rows || [];
-  const real = rows.filter((r) => !r.complimentary);
+  const real = rows.filter((r) => !r.house && !courtesyOn(r));
+  const courtesies = rows.filter((r) => !r.house && courtesyOn(r)).length;
   const count = (k) => real.filter((r) => adminStatus(r).key === k).length;
   const mrr = sumBy(rows, adminMRR);
   const q = norm(st.q || '');
@@ -7628,7 +7647,7 @@ function viewAdmin() {
   const open = (st.tickets || []).filter((t) => t.status === 'aberto').length;
   const needYou = (st.tickets || []).filter((t) => t.status === 'aberto' && t.escalated).length;
   const kpi = (label, value, sub) => html`<div class="card" style="padding:16px 18px"><div class="muted" style="font-size:13px">${label}</div><div style="font:700 26px/1.2 var(--font-display, inherit);margin-top:4px" class="tnum">${value}</div>${sub ? html`<div class="muted" style="font-size:12px;margin-top:2px">${sub}</div>` : ''}</div>`;
-  const filters = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativas', 'Ativas'], ['canceladas', 'Canceladas']];
+  const filters = [['todas', 'Todas'], ['teste', 'Em teste'], ['ativas', 'Ativas'], ['cortesia', 'Cortesias'], ['canceladas', 'Canceladas']];
   return html`
   <div class="page-head">
     <div><h2>Administração</h2><p class="page-sub">Visão geral do Quitaí. Só administradores veem esta página.</p></div>
@@ -7640,6 +7659,7 @@ function viewAdmin() {
     ${kpi('Assinantes ativos', fmtInt(count('ativas')), 'pagando hoje')}
     ${kpi('Em teste grátis', fmtInt(count('teste')), `${TRIAL_DAYS} dias sem cartão`)}
     ${kpi('Cancelados / encerrados', fmtInt(count('canceladas')), '')}
+    ${kpi('Cortesias ativas', fmtInt(courtesies), 'acesso liberado sem cobrança')}
     ${kpi('Empresas cadastradas', fmtInt(real.length), 'sem contar cortesias')}
   </div>
   <section class="card">
@@ -7652,14 +7672,14 @@ function viewAdmin() {
     <div class="card-body flush">${st.loading && !rows.length ? html`<p class="muted" style="padding:20px">Carregando…</p>` : list.length ? html`<div class="table-wrap"><table class="table responsive">
       <thead><tr><th>Empresa</th><th>Plano</th><th>Situação</th><th>Teste até / próxima cobrança</th><th class="num">Clientes</th><th>Último acesso</th><th>Cadastro</th><th class="actions"><span class="sr-only">Ações</span></th></tr></thead>
       <tbody>${list.map((r) => { const s = adminStatus(r); return html`<tr>
-        <td class="td-main"><div class="cell-main ellipsis">${r.name || '(sem nome)'}</div><div class="cell-sub ellipsis">${r.owner_name || ''}${r.owner_email ? html` · <a href="mailto:${r.owner_email}">${r.owner_email}</a>` : ''}</div></td>
-        <td data-label="Plano">${(PLANS[r.plan] || PLANS.basico).name}${r.billing_status !== 'trial' && !r.complimentary ? html` <span class="muted">· ${r.billing_cycle}</span>` : ''}${adminMRR(r) ? html`<div class="cell-sub tnum">${fmtMoney(adminMRR(r))}/mês</div>` : ''}</td>
+        <td class="td-main"><div class="cell-main ellipsis">${r.name || '(sem nome)'}</div><div class="cell-sub ellipsis">${r.owner_name || ''}${r.owner_email ? html` · <a href="mailto:${r.owner_email}">${r.owner_email}</a>` : ''}</div>${courtesyOn(r) && r.comp_note ? html`<div class="cell-sub ellipsis">${icon('star', 'i-sm')} ${r.comp_note}</div>` : ''}</td>
+        <td data-label="Plano">${(PLANS[r.plan] || PLANS.basico).name}${r.billing_status !== 'trial' && !courtesyOn(r) ? html` <span class="muted">· ${r.billing_cycle}</span>` : ''}${adminMRR(r) ? html`<div class="cell-sub tnum">${fmtMoney(adminMRR(r))}/mês</div>` : ''}</td>
         <td data-label="Situação"><span class="chip ${s.cls}">${icon(s.icon)}${s.label}</span></td>
-        <td data-label="Vence" class="tnum nowrap">${r.complimentary ? '—' : r.billing_status === 'trial' ? fmtDate(r.trial_ends_at) : r.current_period_end ? fmtDate(r.current_period_end) : '—'}</td>
+        <td data-label="Vence" class="tnum nowrap">${courtesyOn(r) || r.house ? (r.comp_until ? fmtDate(r.comp_until) : '—') : r.billing_status === 'trial' ? fmtDate(r.trial_ends_at) : r.current_period_end ? fmtDate(r.current_period_end) : '—'}</td>
         <td data-label="Clientes" class="num tnum">${fmtInt(r.clients)}</td>
         <td data-label="Último acesso" class="nowrap">${r.last_login_at ? timeAgo(Date.parse(r.last_login_at)) : html`<span class="muted">Nunca</span>`}</td>
         <td data-label="Cadastro" class="tnum nowrap">${fmtDate(String(r.created_at).slice(0, 10))}</td>
-        <td class="actions corner"><div class="row-wrap" style="gap:6px;justify-content:flex-end">${r.stripe_customer_id ? html`<a class="btn btn-ghost btn-xs" href="https://dashboard.stripe.com/customers/${r.stripe_customer_id}" target="_blank" rel="noopener" title="Abrir na Stripe">${icon('external')}Stripe</a>` : ''}${!r.complimentary && !(r.billing_status === 'canceled' && (!r.current_period_end || r.current_period_end <= todayISO())) ? html`<button type="button" class="btn btn-danger-outline btn-xs" data-act="adminRevoke" data-id="${r.id}">${icon('ban')}Cancelar e bloquear</button>` : ''}</div></td>
+        <td class="actions corner"><div class="row-wrap" style="gap:6px;justify-content:flex-end">${r.stripe_customer_id ? html`<a class="btn btn-ghost btn-xs" href="https://dashboard.stripe.com/customers/${r.stripe_customer_id}" target="_blank" rel="noopener" title="Abrir na Stripe">${icon('external')}Stripe</a>` : ''}${r.house ? '' : courtesyOn(r) ? html`<button type="button" class="btn btn-xs" data-act="adminComp" data-id="${r.id}">${icon('star')}Alterar cortesia</button><button type="button" class="btn btn-danger-outline btn-xs" data-act="adminCompRemove" data-id="${r.id}">Remover cortesia</button>` : html`<button type="button" class="btn btn-xs" data-act="adminComp" data-id="${r.id}">${icon('star')}Dar cortesia</button>${!(r.billing_status === 'canceled' && (!r.current_period_end || r.current_period_end <= todayISO())) ? html`<button type="button" class="btn btn-danger-outline btn-xs" data-act="adminRevoke" data-id="${r.id}">${icon('ban')}Cancelar e bloquear</button>` : ''}`}</div></td>
       </tr>`; })}</tbody></table></div>` : emptyMini('building', 'Nenhuma empresa aqui', st.q ? 'Nenhuma empresa combina com a busca.' : 'Quando alguém se cadastrar, aparece nesta lista.')}</div>
   </section>
   <section class="card">
@@ -7680,6 +7700,56 @@ function viewAdmin() {
   </section>`;
 }
 A.adminReload = () => adminLoad();
+const COMP_DURATIONS = [['1', '1 mês'], ['3', '3 meses'], ['6', '6 meses'], ['12', '1 ano'], ['data', 'Até uma data'], ['sempre', 'Sem prazo']];
+A.adminComp = (el) => {
+  const r = (ui.admin.rows || []).find((x) => x.id === el.dataset.id);
+  if (!r) return;
+  const editing = courtesyOn(r);
+  const paying = !editing && ['active', 'past_due'].includes(r.billing_status);
+  const cur = editing ? (r.comp_until ? 'data' : 'sempre') : '3';
+  openModal({
+    title: editing ? 'Alterar cortesia' : 'Dar cortesia', sub: r.name || r.owner_email || '',
+    body: html`<form id="f-comp" class="stack" data-form="adminComp" data-id="${r.id}" novalidate>
+      <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">Plano liberado</legend><div class="radio-cards">
+        ${PLAN_ORDER.map((id) => html`<label class="radio-card"><input type="radio" name="plan" value="${id}"${chk(id === (r.plan || 'pro'))}><span class="grow"><span class="rc-title">${PLANS[id].name}</span><br><span class="rc-sub">${Number.isFinite(PLANS[id].clients) ? `Até ${PLANS[id].clients} clientes` : 'Clientes ilimitados'} · ${fmtMoney(PLANS[id].price)}/mês</span></span></label>`)}
+      </div></fieldset>
+      <div class="field"><label for="cp-dur">Por quanto tempo</label><select id="cp-dur" name="dur" class="input" data-change="compDuration">${COMP_DURATIONS.map(([k, l]) => html`<option value="${k}"${raw(k === cur ? ' selected' : '')}>${l}</option>`)}</select></div>
+      <div class="field" id="cp-date-f"${raw(cur === 'data' ? '' : ' hidden')}><label for="cp-date">Cortesia até</label><input id="cp-date" name="until" type="date" class="input" min="${todayISO()}" value="${r.comp_until || addMonths(todayISO(), 1)}"></div>
+      <div class="field"><label for="cp-note">Motivo <span class="muted">(opcional, só você vê)</span></label><input id="cp-note" name="note" class="input" maxlength="120" placeholder="Ex.: parceiro contador, influenciador, compensação" value="${r.comp_note || ''}"></div>
+      <label class="check" for="cp-notify"><input id="cp-notify" type="checkbox" name="notify"${chk(!editing)}><span>Avisar o cliente por e-mail</span></label>
+      ${paying ? html`<div class="callout warn">${icon('alert')}<div>Esta empresa tem assinatura paga. Ela será <strong>encerrada no Asaas</strong> para não haver cobranças durante a cortesia. O que já foi pago não é devolvido automaticamente.</div></div>` : ''}
+      <p class="hint">Quando a cortesia acabar, o painel do cliente fica em modo leitura até ele assinar. Uma semana antes, ele vê um aviso no painel.</p>
+    </form>`,
+    foot: html`<button type="button" class="btn" data-act="modalCancel">Cancelar</button><button type="submit" form="f-comp" class="btn btn-primary">${editing ? 'Salvar cortesia' : 'Dar cortesia'}</button>`,
+  });
+};
+CH.compDuration = (el) => { const f = document.getElementById('cp-date-f'); if (f) f.hidden = el.value !== 'data'; };
+F.adminComp = async (f) => {
+  const v = formValues(f);
+  let until = null;
+  if (v.dur === 'data') {
+    if (!isISODate(v.until || '') || v.until < todayISO()) { showErrors(f, { until: 'Escolha uma data de hoje em diante.' }); return; }
+    until = v.until;
+  } else if (v.dur !== 'sempre') until = addMonths(todayISO(), Number(v.dur) || 1);
+  const btn = $('[form="f-comp"]');
+  setBusy(btn, true, 'Salvando…');
+  const res = await callFn('billing', { action: 'admin_comp', company_id: f.dataset.id, plan: v.plan || 'pro', until, note: (v.note || '').trim(), notify: !!v.notify });
+  setBusy(btn, false);
+  if (res.error) { formError(f, fnError(res.error)); return; }
+  closeModal(true);
+  toast(`Cortesia do plano ${PLANS[v.plan || 'pro'].name} ${until ? `liberada até ${fmtDate(until)}` : 'liberada sem prazo'}.${res.hadSubscription ? ' A assinatura paga foi encerrada no Asaas.' : ''}`, { timeout: 9000 });
+  adminLoad();
+};
+A.adminCompRemove = async (el) => {
+  const r = (ui.admin.rows || []).find((x) => x.id === el.dataset.id);
+  if (!r) return;
+  const ok = await confirmBox({ title: `Remover a cortesia de ${r.name || 'esta empresa'}?`, text: 'O acesso grátis termina agora: o painel do cliente fica em modo leitura até ele assinar. Os dados continuam guardados.', ok: 'Remover cortesia', danger: true });
+  if (!ok) return;
+  const res = await callFn('billing', { action: 'admin_comp_remove', company_id: r.id });
+  if (res.error) { toast(fnError(res.error), { type: 'bad' }); return; }
+  toast('Cortesia removida.');
+  adminLoad();
+};
 A.adminRevoke = async (el) => {
   const r = (ui.admin.rows || []).find((x) => x.id === el.dataset.id);
   if (!r) return;

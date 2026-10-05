@@ -1,6 +1,6 @@
 // Recebe os avisos do Asaas (checkout, assinaturas e cobranças) e mantém o plano da empresa em dia.
 import { admin } from '../_shared/common.ts';
-import { adoptFromCheckout, adoptSubscription, revokeCompany, syncCompany } from '../_shared/asaas.ts';
+import { adoptFromCheckout, adoptSubscription, courtesyForever, revokeCompany, syncCompany } from '../_shared/asaas.ts';
 import { billingMail } from '../_shared/billing-mail.ts';
 
 type Sub = { id: string; customer: string; status: string; billingType?: string; checkoutSession?: string | null };
@@ -9,7 +9,7 @@ type Ev = { id: string; event: string; checkout?: { id: string; customer?: strin
 
 async function companyBy(field: string, value: string | null | undefined) {
   if (!value) return null;
-  const { data } = await admin.from('companies').select('id,asaas_subscription_id,asaas_customer_id,complimentary').eq(field, value).maybeSingle();
+  const { data } = await admin.from('companies').select('id,asaas_subscription_id,asaas_customer_id,complimentary,comp_until').eq(field, value).maybeSingle();
   return data;
 }
 
@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     if (ev.event === 'CHECKOUT_PAID' && ev.checkout) {
       // a assinatura do Checkout traz o mesmo id em "checkoutSession"
       const c = await companyBy('asaas_checkout_id', ev.checkout.id);
-      if (c && !c.complimentary) {
+      if (c && !courtesyForever(c)) {
         await adoptFromCheckout(c.id);
         await syncCompany(c.id);
       }
@@ -37,13 +37,13 @@ Deno.serve(async (req) => {
       if (!c && s.checkoutSession) {
         // assinatura nova criada pelo Checkout de cartão
         c = await companyBy('asaas_checkout_id', s.checkoutSession);
-        if (c && !c.complimentary && s.status === 'ACTIVE') await adoptSubscription(c.id, s);
+        if (c && !courtesyForever(c) && s.status === 'ACTIVE') await adoptSubscription(c.id, s);
       }
-      if (c && !c.complimentary) await syncCompany(c.id);
+      if (c && !courtesyForever(c)) await syncCompany(c.id);
     } else if (ev.payment) {
       const p = ev.payment;
       const c = await companyBy('asaas_subscription_id', p.subscription);
-      if (c && !c.complimentary) {
+      if (c && !courtesyForever(c)) {
         if (ev.event === 'PAYMENT_REFUNDED' || ev.event === 'PAYMENT_CHARGEBACK_REQUESTED') {
           await revokeCompany(c.id, ev.event === 'PAYMENT_REFUNDED' ? 'reembolsada' : 'contestada', p.id);
         } else {

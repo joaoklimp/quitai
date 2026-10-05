@@ -1,7 +1,7 @@
 // E-mails da assinatura do Quitaí enviados pelo próprio Quitaí (Resend), no lugar das notificações pagas do Asaas.
 import { admin } from './common.ts';
 import { escapeHtml, sendEmail } from './mail.ts';
-import { GRACE_DAYS, planFromValue, PRICES } from './asaas.ts';
+import { courtesyActive, GRACE_DAYS, planFromValue, PRICES } from './asaas.ts';
 
 type Pay = { id: string; value: number; dueDate: string; billingType: string; invoiceUrl?: string; transactionReceiptUrl?: string | null; subscription?: string };
 
@@ -25,8 +25,8 @@ async function owner(companyId: string) {
 }
 
 /** Envia o e-mail certo para cada aviso de cobrança do Asaas. Não envia nada para contas cortesia. */
-export async function billingMail(event: string, p: Pay, company: { id: string; complimentary?: boolean; data?: { name?: string } }) {
-  if (company.complimentary) return;
+export async function billingMail(event: string, p: Pay, company: { id: string; complimentary?: boolean; comp_until?: string | null; data?: { name?: string } }) {
+  if (courtesyActive(company)) return;
   const o = await owner(company.id);
   if (!o?.email) return;
   const first = String(o.name || '').split(' ')[0] || 'tudo bem';
@@ -70,4 +70,20 @@ export async function billingMail(event: string, p: Pay, company: { id: string; 
     return;
   }
   await sendEmail({ to: [o.email], subject, html });
+}
+
+/** Avisa o dono da empresa que ele ganhou acesso de cortesia. */
+export async function courtesyMail(companyId: string, plan: string, until: string | null, hadSubscription: boolean) {
+  const o = await owner(companyId);
+  if (!o?.email) return;
+  const first = String(o.name || '').split(' ')[0] || 'tudo bem';
+  const planName = PRICES[plan]?.name ?? plan;
+  const html = layout('Você ganhou acesso de cortesia', [
+    `Olá, ${escapeHtml(first)}!`,
+    `Liberamos o <strong>plano ${escapeHtml(planName)}</strong> do Quitaí para a sua conta como cortesia, sem nenhuma cobrança${until ? `, até <strong>${br(until)}</strong>` : ''}.`,
+    hadSubscription ? 'Sua assinatura paga foi encerrada: não haverá novas cobranças enquanto a cortesia valer.' : '',
+    until ? 'Perto do fim, você verá um aviso no painel. Para continuar depois, é só assinar em Assinatura, e a primeira cobrança só vence quando a cortesia terminar.' : '',
+    'Bom uso!',
+  ].filter(Boolean), { label: 'Abrir o Quitaí', url: 'https://usequitai.com.br/#assinatura' });
+  await sendEmail({ to: [o.email], subject: `Cortesia liberada: plano ${planName} do Quitaí`, html });
 }
