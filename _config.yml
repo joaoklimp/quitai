@@ -1,0 +1,5 @@
+# O GitHub Pages publica o repositório inteiro em usequitai.com.br.
+# O que está aqui fica no repositório, mas não vai para o site.
+exclude:
+  - CLAUDE.md
+  - supabase

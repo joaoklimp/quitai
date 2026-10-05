@@ -8,6 +8,7 @@ O dono do produto é uma pessoa só; fale com ela em português do Brasil, de fo
 ```
 index.html                  site inteiro: página de vendas, cadastro, login e o painel (HTML + CSS + JS num arquivo só)
 CNAME, robots.txt, sitemap.xml
+_config.yml                 o que fica fora do site (o GitHub Pages publica o repositório inteiro)
 supabase/functions/         funções do servidor (Deno + TypeScript)
   billing/                  assinatura pelo Asaas: assinar, cancelar, "já paguei", health, admin_revoke
   asaas-webhook/            avisos do Asaas → plano, situação e faturas da empresa
@@ -66,6 +67,7 @@ Formulário (`support`) ou e-mail (`support-inbound`) → `handleIncoming` em `a
 ## Publicar
 
 - **Site:** GitHub Pages a partir da `main` (domínio no `CNAME`). Push na `main` = site no ar.
+  - O Pages publica todo arquivo do repositório. Arquivo ou pasta nova que não é do site (documentação, código do servidor, notas) entra em `exclude` no `_config.yml`, senão fica público em usequitai.com.br.
 - **Funções:** publicadas à mão (Supabase CLI ou ferramenta `deploy_edge_function` do Supabase). Todas estão com `verify_jwt: false`, porque o login é conferido no código por `caller()` e os webhooks conferem token ou assinatura próprios. Ao republicar, mantenha `verify_jwt` desligado (`--no-verify-jwt`) e inclua os arquivos de `_shared/` que a função importa.
 - **Banco:** as migrations **não** são rastreadas pelo Supabase (`list_migrations` vem vazio). Elas são aplicadas à mão (SQL Editor ou `execute_sql`). Por isso:
   - toda migration precisa poder rodar de novo sem quebrar (`if not exists`, `create or replace`, `drop ... if exists`);
