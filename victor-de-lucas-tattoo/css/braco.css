@@ -35,7 +35,6 @@
 .skin__state .is-b{opacity:0;transform:translateY(6px);color:var(--amber)}
 .is-inked .skin__state .is-a{opacity:0;transform:translateY(-6px)}
 .is-inked .skin__state .is-b{opacity:1;transform:none}
-.skin__num{font-family:var(--font-display);font-style:italic;font-size:22px;line-height:1;color:var(--bone);text-shadow:0 2px 12px rgba(0,0,0,.6)}
 
 .skin__hint{position:absolute;left:50%;bottom:18px;z-index:2;transform:translateX(-50%);display:inline-flex;align-items:center;gap:10px;
   padding:11px 16px;border-radius:999px;background:rgba(15,13,11,.76);border:1px solid var(--line-2);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
@@ -48,7 +47,8 @@
   border:1px solid rgba(239,231,217,.75);box-shadow:0 0 0 1px rgba(0,0,0,.15);transition:opacity .4s}
 .skin__pulse::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--amber)}
 .motion .skin__pulse{animation:skinPulse 2.6s var(--ease-out) infinite}
-.is-inked .skin__pulse,.skin__stage.is-over-arm .skin__pulse{opacity:0}
+/* a animação venceria o opacity:0; então ela também para quando a tinta aparece ou o mouse está no braço */
+.is-inked .skin__pulse,.skin__stage.is-over-arm .skin__pulse{opacity:0;animation:none}
 @keyframes skinPulse{0%{transform:scale(.55);opacity:0}25%{opacity:1}100%{transform:scale(1.35);opacity:0}}
 
 .skin__fig figcaption{margin-top:14px;font-size:13px;color:var(--smoke);line-height:1.5}

@@ -151,7 +151,7 @@
   function setState(v) {
     stage.classList.toggle('is-inked', v);
     if (btn) { btn.setAttribute('aria-pressed', v && full ? 'true' : 'false'); btn.querySelector('[data-skin-label]').textContent = v && full ? 'Esconder a tatuagem' : 'Ver a tatuagem'; }
-    if (status) status.textContent = v ? 'Tatuagem aparecendo: leão em realismo preto e cinza.' : 'Braço sem tatuagem.';
+    if (status) status.textContent = v ? 'Tatuagem aparecendo: leão em realismo preto e cinza (foto real).' : 'Braço sem tatuagem (simulação digital).';
   }
 
   /* ---------- mouse: pinta por onde passa ---------- */

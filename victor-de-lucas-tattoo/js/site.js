@@ -358,15 +358,18 @@
     var hero = $('.hero'), gallery = $('.gallery'), tilt = $('.gallery__tilt');
     var toggle = $('.motion-toggle'), toggleLabel = $('.motion-toggle__label');
     var axis = mobileMQ.matches ? 'x' : 'y';
+    // Constantes do movimento: vêm do script em linha logo depois da galeria (index.html). Ele monta as
+    // cópias e já pinta cada coluna na posição de partida, antes da primeira pintura (sem salto de layout).
+    var K = w.__vdlHero || { baseY: 30, baseX: 24, introMs: 2200, introGain: 12 };
 
     var cols = $$('.col', gallery).map(function (el) {
       var track = $('.track', el);
-      var items = $$('.shot', track);
+      var items = $$('.shot:not([data-clone])', track);
       // Trilha = [cópias A][originais][cópias B]. Com cópias dos dois lados, qualquer foto original
       // pode ser centralizada quando recebe foco de teclado, e o loop continua sem emenda.
       // As cópias são aria-hidden, fora do Tab, usam a mesma URL (cache de memória) e continuam lazy.
-      var cloneA = null;
-      if (!reduce) {
+      var cloneA = reduce ? null : $('.shot[data-clone]', track);
+      if (!cloneA && !reduce) { // o script em linha não rodou: monta as cópias aqui
         var mk = function (n) {
           var c = n.cloneNode(true);
           c.setAttribute('aria-hidden', 'true');
@@ -379,15 +382,18 @@
         items.forEach(function (n) { track.appendChild(mk(n)); });
         cloneA = track.children[0];
       }
+      var off0 = parseFloat(el.getAttribute('data-off'));
       return {
         el: el, track: track, first: items[0], clone: cloneA, focusX: null,
         speed: parseFloat(el.dataset.speed) || 1, depth: parseFloat(el.dataset.depth) || 16,
-        start: parseFloat(el.dataset.start) || 0, off: 0, period: 1, factor: 1, target: 1
+        start: parseFloat(el.dataset.start) || 0, off: 0, period: 1, factor: 1, target: 1,
+        // posição já pintada pelo script em linha (só vale para o mesmo eixo)
+        off0: !isNaN(off0) && el.getAttribute('data-axis') === axis ? off0 : null
       };
     });
 
-    var BASE = function () { return axis === 'y' ? 30 : 24; }; // px/s
-    var INTRO_MS = 2200, INTRO_GAIN = 12;
+    var BASE = function () { return axis === 'y' ? K.baseY : K.baseX; }; // px/s
+    var INTRO_MS = K.introMs, INTRO_GAIN = K.introGain;
     // distância extra percorrida durante a intro (integral da curva de aceleração), em segundos de cruzeiro
     var INTRO_EXTRA = INTRO_GAIN * (INTRO_MS / 1000) / 4;
 
@@ -409,6 +415,8 @@
     }
     function placeStart(withIntro) {
       cols.forEach(function (c) {
+        if (withIntro && c.off0 !== null) { c.off = c.off0; c.off0 = null; render(c); return; }
+        c.off0 = null;
         var travel = withIntro ? BASE() * dirOf(c) * INTRO_EXTRA : 0;
         if (axis === 'x') {
           // celular: a peça em destaque termina a intro a ~20% da faixa, bem visível
@@ -419,9 +427,110 @@
       });
     }
 
+    /* ----- teclado: Tab entra numa foto; setas percorrem; Enter amplia (foco = estado de hover) -----
+       Registrado antes da saída do movimento reduzido: as setas funcionam nos dois modos. */
+    // Foto "alcançável": está na tela. Com movimento reduzido as colunas não andam, então só entram no
+    // Tab/setas as fotos que estão à vista (fora das máscaras de borda da galeria).
+    function reachable(a) {
+      var fig = a.closest('.shot');
+      if (!fig || fig.offsetParent === null) return false;
+      if (!reduce) return true;
+      var r = fig.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      if (axis === 'y') {
+        var g = gallery.getBoundingClientRect();
+        return cx > g.left + g.width * 0.16 && cx < g.right && cy > g.top + g.height * 0.16 && cy < g.bottom - g.height * 0.2;
+      }
+      var b = a.closest('.col').getBoundingClientRect();
+      return cx > b.left + b.width * 0.17 && cx < b.right - b.width * 0.17;
+    }
+    var origLinks = function () { return $$('.shot:not([data-clone]) .shot__a', gallery).filter(reachable); };
+    function bringIntoView(a) {
+      var fig = a.closest('.shot'), col = a.closest('.col');
+      var c = cols.find(function (x) { return x.el === col; });
+      if (!c || !c.clone) return;
+      var gr = (axis === 'y' ? gallery : col).getBoundingClientRect(), fr = fig.getBoundingClientRect();
+      var delta = axis === 'y' ? (fr.top + fr.height / 2) - (gr.top + gr.height / 2) : (fr.left + fr.width / 2) - (gr.left + gr.width / 2);
+      var p = c.period, cur = c.focusX !== null ? c.focusX : ((c.off % p) + p) % p;
+      if (c.focusX === null) c.focusX = cur;
+      if (Math.abs(delta) < 4) return;
+      if (hasGsap) gsap.to(c, { focusX: cur + delta, duration: 0.8, ease: 'expo.out', overwrite: true, onUpdate: function () { render(c); } });
+      else { c.focusX = cur + delta; render(c); }
+    }
+    // foco saiu da galeria: o loop continua exatamente de onde a foto focada ficou (cópia idêntica)
+    function releaseFocus() {
+      cols.forEach(function (c) {
+        if (c.focusX === null) return;
+        if (hasGsap) gsap.killTweensOf(c);
+        c.off = c.focusX; c.focusX = null; render(c);
+      });
+    }
+    // Ao entrar com Tab, a foto que recebe o foco é a mais próxima do centro da galeria (visível).
+    function pickVisible() {
+      var gr = gallery.getBoundingClientRect(), cy = gr.top + gr.height / 2, cx = gr.left + gr.width / 2, best = null, bd = 1e9;
+      var list = origLinks();
+      list.forEach(function (x) {
+        var r = x.getBoundingClientRect(), dd = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
+        if (dd < bd) { bd = dd; best = x; }
+      });
+      if (best) { $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', x === best ? '0' : '-1'); }); }
+    }
+    // Só o foco que veio do teclado mexe na galeria. Um toque também foca o link (Android, WebView do
+    // Instagram): nesse caso não se mexe em nada e o clique abre a foto normalmente.
+    // tabY: rolagem antes deste Tab; se o navegador rolar para "mostrar" o foco, a rolagem é desfeita.
+    var kbFocus = false, tabY = null, tabT = 0;
+    d.addEventListener('keydown', function (e) {
+      kbFocus = true;
+      if (e.key !== 'Tab') return;
+      tabY = w.scrollY; clearTimeout(tabT); tabT = setTimeout(function () { tabY = null; }, 300);
+      if (!gallery.contains(d.activeElement)) pickVisible();
+    }, true);
+    d.addEventListener('pointerdown', function () { kbFocus = false; tabY = null; }, true);
+    gallery.addEventListener('focusin', function (e) {
+      var a = e.target.closest('.shot__a');
+      if (!a || !kbFocus) return;
+      var visible = true; try { visible = a.matches(':focus-visible'); } catch (_) {}
+      if (!visible) return;
+      gallery.classList.add('is-focusing');
+      if (reduce || !a.closest('.col') || !cols[0].clone) return; // nada anda: o foco basta
+      if (tabY !== null && Math.abs(w.scrollY - tabY) > 2) { if (lenis) lenis.scrollTo(tabY, { immediate: true, force: true }); w.scrollTo(0, tabY); }
+      // o navegador pode "rolar" contêineres com overflow ao focar; zera isso (quem posiciona é o loop)
+      [gallery, tilt, a.closest('.col'), hero].forEach(function (el) { if (el) { el.scrollTop = 0; el.scrollLeft = 0; } });
+      var t = a.closest('.shot').getAttribute('data-theme');
+      if (t !== null) goTo(+t);
+      bringIntoView(a);
+    });
+    gallery.addEventListener('focusout', function (e) {
+      if (!gallery.contains(e.relatedTarget)) { gallery.classList.remove('is-focusing'); releaseFocus(); }
+    });
+    gallery.addEventListener('keydown', function (e) {
+      var a = e.target.closest('.shot__a');
+      if (!a) return;
+      var list = origLinks(), i = list.indexOf(a), n = i;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = i + 1;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = i - 1;
+      else if (e.key === 'Home') n = 0;
+      else if (e.key === 'End') n = list.length - 1;
+      else if (e.key === ' ') { e.preventDefault(); a.click(); return; }
+      else return;
+      e.preventDefault();
+      if (!list.length) return;
+      n = (n + list.length) % list.length;
+      $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', '-1'); });
+      list[n].setAttribute('tabindex', '0');
+      list[n].focus({ preventScroll: true });
+    });
+    // tabindex itinerante: só uma foto da galeria entra na ordem do Tab; as setas fazem o resto
+    function resetRoving() {
+      var first = origLinks()[0];
+      if (!first) return;
+      $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', '-1'); });
+      first.setAttribute('tabindex', '0');
+    }
+
     /* ----- pausa: botão (WCAG 2.2.2), foco dentro da hero, fora da tela, aba oculta, menu/lightbox ----- */
-    var userPaused = false, focusIn = false, offscreen = false;
-    function isPaused() { return userPaused || focusIn || offscreen || d.hidden || state.menuOpen || state.lbOpen; }
+    // noControl: se o botão de pausa não está desenhado (algum layout o esconde), nada anda sozinho.
+    var userPaused = false, focusIn = false, offscreen = false, noControl = false;
+    function isPaused() { return userPaused || noControl || focusIn || offscreen || d.hidden || state.menuOpen || state.lbOpen; }
 
     var run = 1, runTarget = 1, introStart = 0, introOn = false;
     var tmx = 0, tmy = 0, mx = 0, my = 0, boost = 0, boostT = 0, lastPX = null, lastPY = 0, lastPT = 0;
@@ -502,6 +611,7 @@
 
     /* ----- sincroniza tudo com o estado de pausa ----- */
     function sync() {
+      noControl = !reduce && !!toggle && toggle.offsetParent === null;
       var p = isPaused();
       runTarget = p ? 0 : 1;
       if (!p) wake();
@@ -511,12 +621,18 @@
     }
     heroApi.sync = sync;
 
-    if (reduce) { measure(); return; }
+    if (reduce) {
+      measure(); resetRoving();
+      var rr = 0;
+      w.addEventListener('resize', function () { clearTimeout(rr); rr = setTimeout(resetRoving, 140); });
+      return;
+    }
 
     toggle.hidden = false;
+    // Um padrão só: o rótulo muda (Pausar/Retomar), sem aria-pressed (os dois juntos se contradizem)
     toggle.addEventListener('click', function () {
       userPaused = !userPaused;
-      toggle.setAttribute('aria-pressed', String(userPaused));
+      toggle.setAttribute('data-paused', String(userPaused));
       toggleLabel.textContent = userPaused ? 'Retomar' : 'Pausar';
       sync();
     });
@@ -527,7 +643,6 @@
       focusIn = kb; sync();
     });
     hero.addEventListener('focusout', function (e) {
-      if (!gallery.contains(e.relatedTarget)) { gallery.classList.remove('is-focusing'); releaseFocus(); }
       if (!hero.contains(e.relatedTarget)) { focusIn = false; sync(); }
     });
     d.addEventListener('visibilitychange', sync);
@@ -567,77 +682,9 @@
       });
     });
 
-    // teclado: Tab entra numa foto; setas percorrem; Enter amplia (foco = estado de hover)
-    var origLinks = function () { return $$('.shot:not([data-clone]) .shot__a', gallery).filter(function (a) { return a.offsetParent !== null; }); };
-    function bringIntoView(a) {
-      var fig = a.closest('.shot'), col = a.closest('.col');
-      var c = cols.find(function (x) { return x.el === col; });
-      if (!c) return;
-      var gr = (axis === 'y' ? gallery : col).getBoundingClientRect(), fr = fig.getBoundingClientRect();
-      var delta = axis === 'y' ? (fr.top + fr.height / 2) - (gr.top + gr.height / 2) : (fr.left + fr.width / 2) - (gr.left + gr.width / 2);
-      var p = c.period, cur = c.focusX !== null ? c.focusX : ((c.off % p) + p) % p;
-      if (c.focusX === null) c.focusX = cur;
-      if (Math.abs(delta) < 4) return;
-      if (hasGsap) gsap.to(c, { focusX: cur + delta, duration: 0.8, ease: 'expo.out', overwrite: true, onUpdate: function () { render(c); } });
-      else { c.focusX = cur + delta; render(c); }
-    }
-    // foco saiu da galeria: o loop continua exatamente de onde a foto focada ficou (cópia idêntica)
-    function releaseFocus() {
-      cols.forEach(function (c) {
-        if (c.focusX === null) return;
-        if (hasGsap) gsap.killTweensOf(c);
-        c.off = c.focusX; c.focusX = null; render(c);
-      });
-    }
-    // Ao entrar com Tab, a foto que recebe o foco é a mais próxima do centro da galeria (visível),
-    // e qualquer rolagem automática que o navegador faça para "mostrar" o foco é desfeita.
-    var beforeY = w.scrollY;
-    function pickVisible() {
-      var gr = gallery.getBoundingClientRect(), cy = gr.top + gr.height / 2, cx = gr.left + gr.width / 2, best = null, bd = 1e9;
-      origLinks().forEach(function (x) {
-        var r = x.getBoundingClientRect(), dd = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
-        if (dd < bd) { bd = dd; best = x; }
-      });
-      if (best) { origLinks().forEach(function (x) { x.setAttribute('tabindex', x === best ? '0' : '-1'); }); }
-    }
-    d.addEventListener('keydown', function (e) {
-      if (e.key !== 'Tab') return;
-      beforeY = w.scrollY;
-      if (!gallery.contains(d.activeElement)) pickVisible();
-    }, true);
-    gallery.addEventListener('focusin', function (e) {
-      var a = e.target.closest('.shot__a');
-      if (!a) return;
-      if (Math.abs(w.scrollY - beforeY) > 2) { if (lenis) lenis.scrollTo(beforeY, { immediate: true, force: true }); w.scrollTo(0, beforeY); }
-      // o navegador pode "rolar" contêineres com overflow ao focar; zera isso (quem posiciona é o loop)
-      [gallery, tilt, a.closest('.col'), hero].forEach(function (el) { if (el) { el.scrollTop = 0; el.scrollLeft = 0; } });
-      gallery.classList.add('is-focusing');
-      var t = a.closest('.shot').getAttribute('data-theme');
-      if (t !== null) goTo(+t);
-      bringIntoView(a);
-    });
-    gallery.addEventListener('keydown', function (e) {
-      var a = e.target.closest('.shot__a');
-      if (!a) return;
-      var list = origLinks(), i = list.indexOf(a), n = i;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = i + 1;
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = i - 1;
-      else if (e.key === 'Home') n = 0;
-      else if (e.key === 'End') n = list.length - 1;
-      else if (e.key === ' ') { e.preventDefault(); a.click(); return; }
-      else return;
-      e.preventDefault();
-      n = (n + list.length) % list.length;
-      list.forEach(function (x) { x.setAttribute('tabindex', '-1'); });
-      list[n].setAttribute('tabindex', '0');
-      list[n].focus({ preventScroll: true });
-    });
-
-    // medidas, troca celular/desktop
+    // medidas, troca celular/desktop (e o botão de pausa pode aparecer/sumir com o layout)
     var rT = 0;
-    w.addEventListener('resize', function () { clearTimeout(rT); rT = setTimeout(function () { measure(); cols.forEach(render); measureWords(); }, 140); });
-    // tabindex itinerante: só uma foto da galeria entra na ordem do Tab; as setas fazem o resto
-    function resetRoving() { var first = origLinks()[0]; if (first) { $$('.shot__a', gallery).forEach(function (x) { x.setAttribute('tabindex', '-1'); }); first.setAttribute('tabindex', '0'); } }
+    w.addEventListener('resize', function () { clearTimeout(rT); rT = setTimeout(function () { measure(); cols.forEach(render); measureWords(); sync(); }, 140); });
     resetRoving();
     var onMQ = function () { measure(); placeStart(false); measureWords(); resetRoving(); };
     mobileMQ.addEventListener ? mobileMQ.addEventListener('change', onMQ) : mobileMQ.addListener(onMQ);
@@ -654,7 +701,7 @@
     else w.addEventListener('load', function () { setTimeout(warm, 300); });
     mobileMQ.addEventListener ? mobileMQ.addEventListener('change', warm) : mobileMQ.addListener(warm);
 
-    // início: a "bobina" gira rápido e assenta (~2,2 s), sem esconder nada do texto
+    // início: a "bobina" gira rápido e assenta (~2,2 s), a partir da posição que já está pintada
     measure();
     placeStart(true);
     introStart = performance.now(); introOn = true;
@@ -684,9 +731,10 @@
       });
     }
     splitNode(p);
-    gsap.fromTo(words, { opacity: 0.16 }, {
+    // começa em 40% (3,3:1 sobre o fundo, legível para este texto grande) e termina antes do meio da tela
+    gsap.fromTo(words, { opacity: 0.4 }, {
       opacity: 1, ease: 'none', stagger: 0.1,
-      scrollTrigger: { trigger: p, start: 'top 86%', end: 'bottom 68%', scrub: 0.6 }
+      scrollTrigger: { trigger: p, start: 'top 86%', end: 'bottom 78%', scrub: 0.6 }
     });
   });
 
@@ -701,13 +749,38 @@
       var n = f === 'todos' ? works.length : works.filter(function (x) { return x.cats.indexOf(f) > -1; }).length;
       var sup = $('[data-count]', b); if (sup) sup.textContent = n;
     });
+    // Ritmo da grade: posição de cada foto no ciclo (desktop 12 / tablet 6 / celular 5), ver css/site.css.
+    // Uma foto que ficaria sozinha na última linha vira um "fecho" centralizado (data-*="end").
+    var CYCLE = { d: 12, t: 6, m: 5 }, ROW_START = { d: [0, 3, 6, 9], t: [0, 2, 4], m: [1, 3] };
+    // colunas ocupadas por posição (iguais às do CSS), para o sizes de cada foto pedir o arquivo certo
+    var SPAN = {
+      d: { 0: 5, 1: 3, 2: 3, 3: 3, 4: 4, 5: 3, 6: 3, 7: 3, 8: 5, 9: 4, 10: 3, 11: 3, end: 4 },
+      t: { 0: 3, 1: 2, 2: 2, 3: 3, 4: 2, 5: 3, end: 2 }
+    };
+    function slot(i, n, k) {
+      var pos = i % CYCLE[k];
+      return i === n - 1 && ROW_START[k].indexOf(pos) > -1 ? 'end' : String(pos);
+    }
+    function sizesFor(dd, tt, mm) {
+      var sd = SPAN.d[dd], st = SPAN.t[tt];
+      return '(max-width: 640px) ' + (mm === '0' || mm === 'end' ? 92 : 46) + 'vw, (max-width: 1024px) ' + Math.round(st / 6 * 93) +
+        'vw, (max-width: 1459px) ' + Math.round(sd / 12 * 93) + 'vw, ' + Math.round(sd * 91.3 + (sd - 1) * 24) + 'px';
+    }
+    function layout(list) {
+      list.forEach(function (x, i) {
+        var dd = slot(i, list.length, 'd'), tt = slot(i, list.length, 't'), mm = slot(i, list.length, 'm');
+        x.el.dataset.d = dd; x.el.dataset.t = tt; x.el.dataset.m = mm;
+        if (x.img) x.img.sizes = sizesFor(dd, tt, mm);
+      });
+    }
+    layout(works);
     function apply(f) {
       btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-filter') === f)); });
       var show = works.filter(function (x) { return f === 'todos' || x.cats.indexOf(f) > -1; });
       function swap() {
         works.forEach(function (x) { x.el.hidden = show.indexOf(x) < 0; });
+        layout(show);
         show.forEach(function (x, i) {
-          x.el.dataset.d = i % 12; x.el.dataset.t = i % 6; x.el.dataset.m = i % 5;
           if (root.classList.contains('motion') && w.__revealIO) {
             x.el.classList.remove('is-in');
             x.el.style.setProperty('--d', (Math.min(i, 8) * 0.07).toFixed(2) + 's');
@@ -805,7 +878,13 @@
     if (!fineMQ.matches || reduce || !hasGsap) return;
     var pv = $('.svc-preview'), cur = 0, onRow = null;
     // as duas imagens da prévia (troca cruzada) só existem no desktop
-    var imgs = [0, 1].map(function () { var im = d.createElement('img'); im.alt = ''; im.width = 277; im.height = 371; im.decoding = 'async'; pv.appendChild(im); return im; });
+    var imgs = [0, 1].map(function () { var im = d.createElement('img'); im.alt = ''; im.width = 554; im.height = 742; im.decoding = 'async'; pv.appendChild(im); return im; });
+    // as fotos da prévia (arquivos inteiros, 220 px na tela) começam a baixar quando o ponteiro chega na lista
+    var warmed = false;
+    $$('.svc-list').forEach(function (l) { l.addEventListener('pointerenter', function () {
+      if (warmed) return; warmed = true;
+      $$('.svc[data-preview]').forEach(function (r) { var p = new Image(); p.src = r.getAttribute('data-preview'); });
+    }); });
     var xTo = gsap.quickTo(pv, 'x', { duration: 0.55, ease: 'power3' });
     var yTo = gsap.quickTo(pv, 'y', { duration: 0.55, ease: 'power3' });
     var rTo = gsap.quickTo(pv, 'rotation', { duration: 0.8, ease: 'power3' });
@@ -817,7 +896,7 @@
       rTo(clamp((e.clientX - lastX) * 0.4, -6, 6)); lastX = e.clientX;
     }
     $$('.svc').forEach(function (row) {
-      var src = row.getAttribute('data-preview');
+      var src = row.getAttribute('data-preview'), pos = row.getAttribute('data-preview-pos') || '';
       var btn = $('.svc__btn', row);
       btn.addEventListener('pointerenter', function (e) {
         if (e.pointerType !== 'mouse') return;
@@ -825,7 +904,7 @@
         if (!src || row.classList.contains('is-open')) { pv.classList.remove('is-on'); onRow = null; return; }
         if (onRow !== src) {
           var next = imgs[1 - cur];
-          next.src = src; next.classList.add('is-on'); imgs[cur].classList.remove('is-on'); cur = 1 - cur;
+          next.src = src; next.style.objectPosition = pos; next.classList.add('is-on'); imgs[cur].classList.remove('is-on'); cur = 1 - cur;
         }
         var wasOff = !pv.classList.contains('is-on');
         onRow = src; pv.classList.add('is-on'); place(e, wasOff);
@@ -873,16 +952,23 @@
       if (!val('ideia')) html += '<p class="muted">Sua ideia aparece aqui…</p>';
       bubble.innerHTML = html;
     }
-    var t = 0;
+    var t = 0, floatHref = waFloat ? waFloat.getAttribute('href') : '';
     function update() {
       var text = build();
       send.href = WA + encodeURIComponent(text); // link real, atualizado a cada digitação
+      // com a ideia preenchida, o botão flutuante também leva o pedido montado (nada do que foi digitado se perde)
+      if (waFloat) waFloat.href = val('ideia') ? send.href : floatHref;
       clearTimeout(t); t = setTimeout(function () { renderPreview(text); }, 120);
       if (val('ideia') && ideia.getAttribute('aria-invalid') === 'true') { ideia.removeAttribute('aria-invalid'); err.textContent = ''; }
     }
     form.addEventListener('input', update);
     form.addEventListener('change', update);
-    form.addEventListener('submit', function (e) { e.preventDefault(); send.click(); });
+    // Enter no Nome (o único campo de uma linha) não envia: passa para a ideia
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (d.activeElement === form.elements.nome) { ideia.focus(); return; }
+      send.click();
+    });
     send.addEventListener('click', function (e) {
       if (!val('ideia')) {
         e.preventDefault();
@@ -923,7 +1009,8 @@
     $$('[data-copy]').forEach(function (btn) {
       var label = $('[data-copy-label]', btn), status = $('[data-copy-status]'), orig = label.textContent, t = 0;
       btn.addEventListener('click', function () {
-        var text = $(btn.getAttribute('data-copy')).textContent.replace(/\s+/g, ' ').trim();
+        // espaços e hífens que não quebram linha (só para o layout) voltam a ser comuns ao copiar
+        var text = $(btn.getAttribute('data-copy')).textContent.replace(/\u2011/g, '-').replace(/\s+/g, ' ').trim();
         function done(ok) {
           label.textContent = ok ? 'Endereço copiado' : 'Selecione e copie';
           btn.classList.toggle('is-done', ok);
@@ -943,8 +1030,25 @@
         else fallback();
       });
     });
-    var frame = $('.map__frame');
-    if (frame) frame.addEventListener('load', function () { frame.classList.add('is-loaded'); });
+    // Mapa sob demanda: o fundo desenhado fica à vista e o Google Maps só carrega quando a pessoa pede.
+    // (Se o Google estiver bloqueado ou sem rede, o iframe mostraria uma página de erro por cima do fundo.)
+    var map = $('.map'), frame = $('.map__frame', map), open = $('[data-map-open]', map);
+    if (map && frame && open) {
+      var src = frame.getAttribute('src');
+      frame.remove(); // ainda não carregou (loading=lazy, longe da primeira dobra)
+      frame.removeAttribute('src');
+      open.hidden = false;
+      map.classList.add('is-facade');
+      open.addEventListener('click', function () {
+        frame.addEventListener('load', function () { frame.classList.add('is-loaded'); }, { once: true });
+        frame.setAttribute('src', src);
+        frame.removeAttribute('loading');
+        map.insertBefore(frame, open);
+        map.classList.remove('is-facade');
+        open.remove();
+        frame.focus({ preventScroll: true });
+      });
+    }
   });
 
   /* =============== Cursor customizado (mouse, sem movimento reduzido) =============== */
