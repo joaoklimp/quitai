@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VetClin · Clínica Veterinária 24 horas no Gama - DF</title>
+<meta name="description" content="Clínica veterinária aberta 24 horas no Setor Leste do Gama (DF). Consultas, exames, vacinas, cirurgias, internação, banho & tosa e pet shop. Fale pelo WhatsApp (61) 99841-4031.">
+<meta name="theme-color" content="#F26A1B">
+<meta name="color-scheme" content="light">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="VetClin Clínica Veterinária">
+<meta property="og:title" content="VetClin · Clínica Veterinária 24 horas no Gama - DF">
+<meta property="og:description" content="Consultas, exames, vacinas, cirurgias, internação, banho & tosa e pet shop. Aberta 24 horas no Setor Leste do Gama.">
+<meta property="og:image" content="imagens/equipe-vetclin.jpg">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&amp;family=Nunito+Sans:wght@400;600;700;800&amp;family=Poppins:wght@600;700;800&amp;display=swap">
+<script>document.documentElement.classList.add('js');</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "VeterinaryCare",
+  "name": "VetClin Clínica Veterinária",
+  "slogan": "A clínica veterinária do seu pet",
+  "description": "Clínica veterinária 24 horas no Gama (DF): consultas, exames, vacinas, cirurgias, internação, banho & tosa e pet shop.",
+  "image": "imagens/equipe-vetclin.jpg",
+  "telephone": "+55 61 3967-2416",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Quadra 45, Lote 82 - Setor Leste",
+    "addressLocality": "Gama",
+    "addressRegion": "DF",
+    "addressCountry": "BR"
+  },
+  "openingHoursSpecification": [{
+    "@type": "OpeningHoursSpecification",
+    "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "opens": "00:00",
+    "closes": "23:59"
+  }],
+  "contactPoint": [{
+    "@type": "ContactPoint",
+    "telephone": "+55 61 99841-4031",
+    "contactType": "customer service",
+    "availableLanguage": "Portuguese"
+  }],
+  "sameAs": ["https://www.instagram.com/vetclingama/"]
+}
+</script>
+<style>
+/* ==== Cores e base ==== */
+:root{
+  --laranja:#F26A1B;--laranja-escuro:#D9530B;--laranja-claro:#FFD9C0;--laranja-50:#FFF2E8;
+  --verde:#1AA39C;--verde-escuro:#0E7F79;--verde-claro:#D9F3F0;
+  --tinta:#1D2333;--texto:#4A5164;--suave:#7A8195;
+  --fundo:#FFFAF5;--creme:#FFF4EA;--branco:#fff;--borda:#F0E3D6;
+  --ouro:#FFB82E;--whats:#25D366;
+  --raio:26px;
+  --sombra:0 24px 50px -30px rgba(29,35,51,.38);
+  --mola:cubic-bezier(.2,.8,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'Nunito Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:1.0625rem;line-height:1.65;color:var(--texto);background:var(--fundo);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg,video,iframe{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:'Poppins',system-ui,sans-serif;color:var(--tinta);line-height:1.15;margin:0;letter-spacing:-.02em;text-wrap:balance}
+p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+:focus-visible{outline:3px solid var(--verde);outline-offset:3px;border-radius:8px}
+.container{width:min(1200px,100% - 40px);margin-inline:auto}
+section{scroll-margin-top:84px;position:relative}
+.icone{width:1.25em;height:1.25em;flex:none}
+.pular{position:absolute;left:-9999px;top:10px;z-index:100;background:var(--tinta);color:#fff;padding:.7rem 1rem;border-radius:10px;font-weight:800}
+.pular:focus{left:10px}
+em{font-style:normal}
+.fone{white-space:nowrap}
+
+/* ==== Botões ==== */
+.botao{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;padding:.95rem 1.5rem;border-radius:999px;font-weight:800;font-size:1rem;line-height:1.1;border:2px solid transparent;position:relative;overflow:hidden;white-space:nowrap;isolation:isolate;transition:transform .3s var(--mola),box-shadow .3s,background-color .3s,color .3s,border-color .3s}
+.botao:hover{transform:translateY(-3px)}
+.botao:active{transform:translateY(-1px)}
+.botao-laranja{background:linear-gradient(135deg,#F7862C,#E4560C);color:#fff;box-shadow:0 14px 28px -12px rgba(228,86,12,.75)}
+.botao-laranja:hover{box-shadow:0 20px 34px -12px rgba(228,86,12,.8)}
+.botao-laranja::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.4) 50%,transparent 65%);transform:translateX(-130%);animation:reflexo 4.2s ease-in-out infinite}
+@keyframes reflexo{0%,62%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+.botao-branco{background:#fff;color:var(--tinta);border-color:#EBDDCF;box-shadow:0 12px 26px -18px rgba(29,35,51,.45)}
+.botao-branco:hover{border-color:var(--laranja);color:var(--laranja-escuro)}
+.botao-verde{background:var(--verde);color:#fff;box-shadow:0 14px 28px -12px rgba(14,127,121,.7)}
+.botao-verde:hover{background:var(--verde-escuro)}
+.botao-escuro{background:var(--tinta);color:#fff;box-shadow:0 14px 28px -14px rgba(29,35,51,.7)}
+.botao-escuro:hover{background:#2C3449}
+.botao-vidro{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.28)}
+.botao-vidro:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5)}
+.botao-pequeno{padding:.7rem 1.15rem;font-size:.93rem}
+
+/* ==== Títulos de seção ==== */
+.selo{display:inline-flex;align-items:center;gap:.5rem;font-weight:800;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--laranja-escuro);background:var(--laranja-50);border:1px solid #FBD8C0;padding:.42rem .9rem;border-radius:999px}
+.selo .icone{width:16px;height:16px}
+.titulo-secao{text-align:center;max-width:740px;margin:0 auto clamp(2.4rem,4vw,3.4rem)}
+.titulo-secao h2,.h2{font-size:clamp(1.9rem,3.4vw,2.85rem);margin:1rem 0 .9rem}
+.titulo-secao p{font-size:1.1rem}
+h2 em,h1 em{color:var(--laranja)}
+h2 em{white-space:nowrap}
+.ponto{width:9px;height:9px;border-radius:50%;background:#22C55E;flex:none;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulsar 1.8s infinite}
+@keyframes pulsar{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+
+/* ==== Revelar ao rolar ==== */
+.js .revelar{opacity:0;transform:translateY(30px);transition:opacity .9s var(--mola),transform .9s var(--mola);transition-delay:var(--atraso,0s)}
+.js .revelar.visivel{opacity:1;transform:none}
+
+/* ==== Espaço das fotos (fica em branco até a imagem existir) ==== */
+.foto{position:relative;overflow:hidden;background:#FDF8F3 repeating-linear-gradient(-45deg,transparent 0 14px,rgba(242,106,27,.045) 14px 28px);border:2px dashed #F0C9AC}
+.foto img,.foto video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease,transform .8s var(--mola)}
+.foto img.ok,.foto video.ok{opacity:1}
+.foto:has(img.ok){border-color:transparent}
+.foto-vazia{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;padding:1rem;text-align:center;color:#B0703F;font-size:.84rem;line-height:1.35;font-weight:600}
+.foto-vazia .icone{width:34px;height:34px;opacity:.7;margin-bottom:.15rem}
+.foto-vazia code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8rem;font-weight:700;color:#93511F;background:#fff;border:1px solid #F1D3BD;padding:.22rem .55rem;border-radius:7px;overflow-wrap:anywhere;max-width:100%}
+.foto-vazia small{font-size:.75rem;opacity:.8;font-weight:700}
+.foto img.ok~.foto-vazia{display:none}
+
+/* ==== Barra de cima ==== */
+.barra-topo{background:var(--tinta);color:#E8EAF0;font-size:.86rem;font-weight:600}
+.barra-topo .container{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:42px}
+.barra-topo .lado{display:flex;align-items:center;gap:1.4rem}
+.barra-topo a,.barra-topo span{display:inline-flex;align-items:center;gap:.45rem}
+.barra-topo a:hover{color:#FFB27A}
+.barra-topo .icone{width:15px;height:15px;color:#FF9A57}
+.barra-topo .aberto{color:#fff;font-weight:800}
+
+/* ==== Cabeçalho ==== */
+.cabecalho{position:sticky;top:0;z-index:60;background:rgba(255,250,245,.86);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid transparent;transition:box-shadow .3s,border-color .3s,background-color .3s}
+.cabecalho.rolou{background:rgba(255,255,255,.94);border-color:var(--borda);box-shadow:0 12px 30px -22px rgba(29,35,51,.45)}
+.cabecalho .container{display:flex;align-items:center;gap:1.2rem;height:78px}
+.marca{display:flex;align-items:center;gap:.75rem;flex:none}
+.marca-icone{width:48px;height:48px;border-radius:14px;box-shadow:0 10px 20px -10px rgba(242,106,27,.85);transition:transform .5s var(--mola)}
+.marca:hover .marca-icone{transform:rotate(-8deg) scale(1.05)}
+.marca-nome{font-family:'Poppins',sans-serif;font-weight:700;font-size:1.5rem;line-height:1;color:var(--tinta);letter-spacing:-.025em}
+.marca-nome small{display:block;font-family:'Nunito Sans',sans-serif;font-size:.74rem;font-weight:800;letter-spacing:.05em;color:var(--suave);margin-top:.28rem}
+.menu{display:flex;align-items:center;gap:.15rem;margin-left:auto}
+.menu a{position:relative;padding:.55rem .8rem;border-radius:999px;font-weight:700;font-size:.95rem;color:var(--tinta);transition:background-color .25s,color .25s}
+.menu a:hover{background:var(--laranja-50);color:var(--laranja-escuro)}
+.menu a.ativo{color:var(--laranja-escuro)}
+.menu a.ativo::after{content:'';position:absolute;left:50%;bottom:.15rem;width:5px;height:5px;border-radius:50%;background:var(--laranja);transform:translateX(-50%)}
+.menu .so-celular{display:none}
+.cab-acoes{display:flex;align-items:center;gap:.55rem}
+.botao-icone{width:46px;height:46px;border-radius:14px;display:none;place-items:center;background:#fff;border:1px solid var(--borda);color:var(--tinta)}
+.botao-icone .icone{width:22px;height:22px}
+.menu-botao .fechar{display:none}
+.menu-aberto .menu-botao .abrir{display:none}
+.menu-aberto .menu-botao .fechar{display:block}
+
+/* ==== Hero ==== */
+.hero{overflow:hidden;padding:clamp(2.2rem,5vw,4.2rem) 0 clamp(7rem,11vw,9.5rem);background:
+  radial-gradient(900px 520px at 88% 8%,#FFE1CB 0%,transparent 62%),
+  radial-gradient(760px 480px at -5% 95%,#D8F2EE 0%,transparent 62%),var(--fundo)}
+.hero-luzes span{position:absolute;border-radius:50%;filter:blur(2px);opacity:.55;pointer-events:none}
+.hero-luzes .l1{width:14px;height:14px;background:var(--laranja);top:18%;left:46%;animation:vagar 9s ease-in-out infinite}
+.hero-luzes .l2{width:10px;height:10px;background:var(--verde);top:72%;left:6%;animation:vagar 11s ease-in-out infinite reverse}
+.hero-luzes .l3{width:18px;height:18px;background:var(--ouro);top:10%;left:8%;animation:vagar 13s ease-in-out infinite}
+@keyframes vagar{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-22px)}66%{transform:translate(-18px,16px)}}
+.hero-grid{display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(2rem,5vw,4.5rem);align-items:center;position:relative;z-index:2}
+.hero-aberto{display:inline-flex;align-items:center;gap:.6rem;background:#fff;border:1px solid var(--borda);padding:.5rem 1rem .5rem .8rem;border-radius:999px;font-weight:800;font-size:.9rem;color:var(--tinta);box-shadow:0 10px 26px -18px rgba(29,35,51,.5)}
+.hero-aberto b{color:var(--verde-escuro)}
+.hero h1{font-size:clamp(2.3rem,4.3vw,3.6rem);line-height:1.08;font-weight:800;margin:1.3rem 0 1.25rem}
+.sublinhado{white-space:nowrap;color:var(--laranja);background:linear-gradient(transparent 64%,rgba(255,184,46,.42) 64% 92%,transparent 92%) no-repeat 0 0/0% 100%;animation:marcar 1.1s .9s var(--mola) forwards}
+@keyframes marcar{to{background-size:100% 100%}}
+.h24{display:inline-block;background:var(--verde);color:#fff;padding:0 .28em .04em;border-radius:.3em;transform:rotate(-2deg);box-shadow:0 12px 24px -12px rgba(14,127,121,.85);animation:balanco 5s ease-in-out infinite}
+@keyframes balanco{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(1.5deg) translateY(-2px)}}
+.hero-sub{font-size:clamp(1.05rem,1.4vw,1.2rem);max-width:560px}
+.hero-acoes{display:flex;flex-wrap:wrap;gap:.8rem;margin-top:2rem}
+.hero-provas{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem;margin-top:2rem;font-weight:700;font-size:.93rem;color:var(--tinta)}
+.hero-provas li{display:flex;align-items:center;gap:.45rem}
+.hero-provas .icone{color:var(--laranja);width:18px;height:18px}
+.estrelas{display:inline-flex;gap:1px;color:var(--ouro)}
+.estrelas .icone{width:17px;height:17px;color:var(--ouro)}
+
+.hero-arte{position:relative;width:100%;max-width:540px;aspect-ratio:1/1;justify-self:center;perspective:1100px}
+.hero-palco{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .5s var(--mola)}
+.hero-anel{position:absolute;inset:-1%;animation:girar 46s linear infinite}
+.hero-anel circle{fill:none;stroke:var(--laranja);stroke-width:.45;stroke-dasharray:.9 2.6;stroke-linecap:round;opacity:.55}
+.hero-anel .pontinho{fill:var(--laranja);stroke:none;opacity:1}
+@keyframes girar{to{transform:rotate(360deg)}}
+.hero-blob{position:absolute;inset:7%;border-radius:62% 38% 55% 45%/48% 58% 42% 52%;overflow:hidden;background:linear-gradient(150deg,#2DB8AE,#0F8A84);box-shadow:0 44px 80px -34px rgba(14,127,121,.7);animation:blob 14s ease-in-out infinite alternate;isolation:isolate}
+.hero-blob::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 9px rgba(255,255,255,.9);pointer-events:none;z-index:3}
+@keyframes blob{0%{border-radius:62% 38% 55% 45%/48% 58% 42% 52%}33%{border-radius:46% 54% 41% 59%/57% 43% 57% 43%}66%{border-radius:56% 44% 62% 38%/42% 53% 47% 58%}100%{border-radius:41% 59% 48% 52%/53% 45% 55% 47%}}
+.foto-hero{position:absolute;inset:0;border:0;background:transparent}
+.foto-hero img,.foto-hero video{animation:respirar 7s ease-in-out infinite}
+@keyframes respirar{0%,100%{transform:scale(1.02)}50%{transform:scale(1.07)}}
+.foto-hero .foto-vazia{color:#E9FFFC;inset:18%;border:2px dashed rgba(255,255,255,.55);border-radius:28px}
+.foto-hero .foto-vazia code{background:rgba(255,255,255,.95);border-color:transparent;color:#0B6A65}
+.foto-hero .foto-vazia .icone{opacity:.9}
+
+.selo-giratorio{position:absolute;top:1%;left:-1%;width:128px;height:128px;border-radius:50%;background:var(--tinta);display:grid;place-items:center;box-shadow:0 22px 40px -18px rgba(29,35,51,.75);translate:0 0 60px;z-index:5}
+.selo-giratorio svg{position:absolute;inset:6px;width:calc(100% - 12px);height:calc(100% - 12px);animation:girar 18s linear infinite}
+.selo-giratorio text{font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:10.5px;fill:#fff;letter-spacing:.5px}
+.selo-centro{text-align:center;line-height:1;color:#fff}
+.selo-centro strong{display:block;font-family:'Poppins',sans-serif;font-size:2.05rem;font-weight:800;color:#FFB27A;letter-spacing:-.04em}
+.selo-centro span{font-size:.62rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
+
+.cartao-flutuante{position:absolute;display:flex;align-items:center;gap:.7rem;background:rgba(255,255,255,.97);padding:.7rem 1.05rem .7rem .7rem;border-radius:18px;box-shadow:0 22px 44px -20px rgba(29,35,51,.45);z-index:6;translate:0 0 80px;animation:flutuar 6.5s ease-in-out infinite;white-space:nowrap}
+.cartao-flutuante .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--verde-claro);color:var(--verde-escuro);flex:none}
+.cartao-flutuante .ic .icone{width:22px;height:22px}
+.cartao-flutuante strong{display:block;font-family:'Poppins',sans-serif;font-size:.93rem;color:var(--tinta);line-height:1.25}
+.cartao-flutuante small{display:block;font-size:.78rem;color:var(--suave);font-weight:700}
+.cf-1{top:31%;right:-4%;animation-delay:-1.2s}
+.cf-2{top:57%;left:-9%;animation-delay:-3.4s}
+.cf-2 .ic{background:var(--laranja-50);color:var(--laranja-escuro)}
+.cf-3{bottom:2%;right:4%;animation-delay:-5s}
+.cf-3 .nota{font-family:'Poppins',sans-serif;font-weight:800;font-size:1.5rem;color:var(--tinta);line-height:1}
+@keyframes flutuar{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+
+.baloes{position:absolute;top:-7%;right:9%;width:130px;height:150px;z-index:4;translate:0 0 30px;pointer-events:none}
+.balao{position:absolute;border-radius:50% 50% 48% 52%/56% 56% 44% 44%;animation:balao 5.5s ease-in-out infinite;transform-origin:50% 160%}
+.balao::before{content:'';position:absolute;top:16%;left:21%;width:24%;height:30%;border-radius:50%;background:rgba(255,255,255,.55);transform:rotate(28deg)}
+.balao::after{content:'';position:absolute;top:100%;left:50%;width:1.5px;height:62px;background:linear-gradient(rgba(29,35,51,.4),transparent)}
+.balao i{position:absolute;left:50%;top:97%;width:8px;height:7px;transform:translateX(-50%);background:inherit;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.b-laranja{width:52px;height:62px;left:0;top:30px;background:radial-gradient(circle at 34% 28%,#FFAE6E,#E8590C 72%)}
+.b-verde{width:60px;height:71px;left:40px;top:0;background:radial-gradient(circle at 34% 28%,#69DBD2,#0E7F79 72%);animation-delay:-1.8s}
+.b-branco{width:44px;height:53px;left:84px;top:40px;background:radial-gradient(circle at 34% 28%,#fff,#DCE2EA 76%);animation-delay:-3.3s}
+@keyframes balao{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-14px) rotate(5deg)}}
+
+.coracoes{position:absolute;left:50%;bottom:22%;z-index:5;translate:0 0 40px;pointer-events:none}
+.coracoes .icone{position:absolute;left:0;bottom:0;width:22px;height:22px;color:#F2546B;opacity:0;animation:subir 6s ease-in infinite}
+.coracoes .icone:nth-child(2){color:var(--laranja);width:16px;height:16px;animation-delay:1.5s;--x:-60px}
+.coracoes .icone:nth-child(3){color:#fff;width:18px;height:18px;animation-delay:3s;--x:50px}
+.coracoes .icone:nth-child(4){color:#F2546B;width:14px;height:14px;animation-delay:4.4s;--x:-20px}
+@keyframes subir{0%{transform:translate(0,0) scale(.3);opacity:0}15%{opacity:1}100%{transform:translate(var(--x,30px),-250px) scale(1.15) rotate(12deg);opacity:0}}
+.brilho{position:absolute;color:var(--ouro);width:22px;height:22px;z-index:5;animation:piscar 3.2s ease-in-out infinite;translate:0 0 50px}
+.brilho.b1{top:6%;left:52%}
+.brilho.b2{bottom:16%;right:-2%;width:16px;height:16px;color:var(--verde);animation-delay:-1.1s}
+.brilho.b3{top:44%;left:-4%;width:14px;height:14px;color:var(--laranja);animation-delay:-2.2s}
+@keyframes piscar{0%,100%{transform:scale(.6) rotate(0);opacity:.35}50%{transform:scale(1.15) rotate(45deg);opacity:1}}
+
+.pegadas{position:absolute;left:0;right:0;bottom:62px;height:70px;z-index:1;pointer-events:none}
+.pegadas .icone{position:absolute;width:24px;height:24px;color:rgba(242,106,27,.22);opacity:0;animation:pisar 9s linear infinite}
+@keyframes pisar{0%,4%{opacity:0;transform:scale(.6) rotate(var(--r,90deg))}8%,26%{opacity:1;transform:scale(1) rotate(var(--r,90deg))}34%,100%{opacity:0;transform:scale(1) rotate(var(--r,90deg))}}
+
+/* ==== Faixas que correm ==== */
+.faixas{position:relative;height:150px;margin-top:-96px;z-index:7;overflow:hidden;pointer-events:none}
+.faixa{position:absolute;left:-4%;right:-4%;top:50%;display:flex;overflow:hidden;padding:.95rem 0}
+.faixa-1{background:var(--laranja);transform:translateY(-50%) rotate(-2.4deg);z-index:2;box-shadow:0 16px 30px -16px rgba(228,86,12,.75)}
+.faixa-2{background:var(--tinta);transform:translateY(-50%) rotate(2deg)}
+.faixa-trilho{display:flex;align-items:center;gap:2rem;padding-right:2rem;flex:none;font-family:'Poppins',sans-serif;font-weight:700;font-size:1.12rem;color:#fff;white-space:nowrap;animation:correr 42s linear infinite}
+.faixa-2 .faixa-trilho{color:#FFCBA6;animation-direction:reverse;animation-duration:50s}
+.faixa-trilho .icone{width:20px;height:20px;color:#FFE1CC}
+.faixa-2 .faixa-trilho .icone{color:var(--laranja)}
+@keyframes correr{to{transform:translateX(-100%)}}
+
+/* ==== Números ==== */
+.numeros{padding:clamp(1.5rem,3vw,2.5rem) 0 0}
+.numeros-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border:1px solid var(--borda);border-radius:var(--raio);box-shadow:var(--sombra)}
+.numero{display:flex;align-items:center;gap:1rem;padding:1.6rem 1.5rem}
+.numero+.numero{border-left:1px solid var(--borda)}
+.numero .ic{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;flex:none;background:var(--laranja-50);color:var(--laranja-escuro)}
+.numero:nth-child(even) .ic{background:var(--verde-claro);color:var(--verde-escuro)}
+.numero .ic .icone{width:26px;height:26px}
+.numero strong{display:block;font-family:'Poppins',sans-serif;font-size:1.85rem;font-weight:800;color:var(--tinta);line-height:1.05;letter-spacing:-.03em}
+.numero strong small{font-size:1.05rem;color:var(--laranja);margin-left:.2rem;letter-spacing:0}
+.numero .rotulo{display:block;font-size:.88rem;line-height:1.35;font-weight:600}
+.numero strong.texto{font-size:1.4rem;white-space:nowrap}
+
+/* ==== Serviços ==== */
+.servicos{padding:clamp(4.5rem,8vw,7rem) 0}
+.servicos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem}
+.servico{display:flex;flex-direction:column;background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:12px 12px 1.6rem;box-shadow:var(--sombra);transition:transform .45s var(--mola),box-shadow .45s}
+.servico:hover{transform:translateY(-8px);box-shadow:0 36px 60px -32px rgba(29,35,51,.5)}
+.servico .foto{aspect-ratio:3/2;border-radius:18px}
+.servico:hover .foto img.ok{transform:scale(1.06)}
+.servico-icone{width:60px;height:60px;border-radius:18px;display:grid;place-items:center;background:var(--laranja);color:#fff;margin:-32px 0 0 1rem;position:relative;z-index:2;border:4px solid #fff;box-shadow:0 12px 22px -10px rgba(228,86,12,.8);transition:transform .5s var(--mola)}
+.servico-icone .icone{width:26px;height:26px}
+.servico:nth-child(even) .servico-icone,.servico-icone.verde{background:var(--verde);box-shadow:0 12px 22px -10px rgba(14,127,121,.8)}
+.servico:hover .servico-icone{transform:rotate(-9deg) scale(1.08)}
+.servico h3{font-size:1.32rem;margin:1rem 1rem .5rem}
+.servico p{margin:0 1rem 1.2rem;font-size:1rem}
+.link-seta{margin:auto 1rem 0;display:inline-flex;align-items:center;gap:.45rem;font-weight:800;color:var(--laranja-escuro);align-self:flex-start}
+.link-seta .icone{width:18px;height:18px;transition:transform .3s var(--mola)}
+.link-seta:hover .icone{transform:translateX(5px)}
+.servico-cta{background:linear-gradient(150deg,#F7862C,#DD4F08);border:0;color:#fff;padding:2rem 1.8rem;position:relative;overflow:hidden;justify-content:center}
+.servico-cta h3{color:#fff;font-size:1.55rem;margin:1rem 0 .7rem}
+.servico-cta p{margin:0 0 1.5rem;color:#FFE8D8}
+.servico-cta .botao{align-self:flex-start}
+.cta-pata{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:rgba(255,255,255,.18);animation:acenar 2.8s ease-in-out infinite;transform-origin:50% 90%}
+.cta-pata .icone{width:34px;height:34px}
+@keyframes acenar{0%,100%{transform:rotate(0)}15%{transform:rotate(-14deg)}30%{transform:rotate(10deg)}45%{transform:rotate(-6deg)}60%{transform:rotate(0)}}
+.servico-cta .marca-dagua{position:absolute;right:-30px;bottom:-30px;width:190px;height:190px;color:rgba(255,255,255,.1);transform:rotate(-20deg)}
+
+/* ==== Plantão 24 horas ==== */
+.plantao{background:radial-gradient(1000px 600px at 80% 0%,#2A3552 0%,transparent 60%),linear-gradient(180deg,#1A2030,#141927);color:#C9CEDB;padding:clamp(4.5rem,8vw,7rem) 0 clamp(6rem,9vw,8rem);overflow:hidden}
+.ceu{position:absolute;inset:0;pointer-events:none}
+.ceu i{position:absolute;width:var(--t,2px);height:var(--t,2px);border-radius:50%;background:#fff;opacity:.2;animation:cintilar var(--d,3s) ease-in-out infinite;animation-delay:var(--a,0s)}
+@keyframes cintilar{0%,100%{opacity:.15}50%{opacity:.9}}
+.plantao-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(2rem,6vw,5rem);align-items:center;position:relative;z-index:2}
+.selo-escuro{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#fff}
+.plantao h2{color:#fff;font-size:clamp(2rem,3.8vw,3.1rem);margin:1.1rem 0 1rem}
+.plantao h2 span{color:#FF9A57}
+.plantao-texto>p{font-size:1.1rem;max-width:560px}
+.agora{display:flex;align-items:center;gap:.85rem;margin:1.8rem 0 2rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);padding:.85rem 1.2rem;border-radius:18px;max-width:560px;color:#E4E7EF;font-weight:600}
+.agora .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:rgba(255,154,87,.16);color:#FF9A57;flex:none}
+.agora .ic .icone{width:24px;height:24px}
+.agora strong{font-family:'Poppins',sans-serif;color:#fff;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.agora b{color:#4ADE80}
+.plantao-acoes{display:flex;flex-wrap:wrap;gap:.8rem}
+
+.relogio-caixa{position:relative;width:min(100%,400px);aspect-ratio:1;justify-self:center;display:grid;place-items:center}
+.onda-pulso{position:absolute;inset:8%;border-radius:50%;border:2px solid rgba(255,154,87,.5);animation:onda 3.6s ease-out infinite}
+.onda-pulso.p2{animation-delay:1.2s}
+.onda-pulso.p3{animation-delay:2.4s}
+@keyframes onda{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+.relogio{position:relative;width:78%;height:78%;filter:drop-shadow(0 30px 50px rgba(0,0,0,.45))}
+.relogio .face{fill:#fff}
+.relogio .aro{fill:none;stroke:var(--laranja);stroke-width:5}
+.relogio .tracos line{stroke:#CDD2DE;stroke-width:1.4;stroke-linecap:round}
+.relogio .tracos line.forte{stroke:var(--tinta);stroke-width:3}
+.relogio text{font-family:'Poppins',sans-serif;font-weight:700;font-size:15px;fill:var(--tinta);text-anchor:middle;dominant-baseline:central}
+.relogio .rotulo{font-size:9.5px;font-weight:800;fill:var(--laranja);letter-spacing:1.5px}
+.ponteiro{transform-origin:100px 100px;transition:transform .45s cubic-bezier(.4,2.2,.4,1)}
+.ponteiro.sem-transicao{transition:none}
+.relogio .p-hora{stroke:var(--tinta);stroke-width:6;stroke-linecap:round}
+.relogio .p-min{stroke:var(--tinta);stroke-width:4;stroke-linecap:round}
+.relogio .p-seg{stroke:var(--laranja);stroke-width:2;stroke-linecap:round}
+.relogio .centro{fill:var(--laranja);stroke:#fff;stroke-width:2}
+.astro{position:absolute;top:4%;right:6%;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#FFD27A;animation:flutuar 6s ease-in-out infinite}
+.astro .icone{width:30px;height:30px}
+.astro .sol{display:none}
+.dia .astro .sol{display:block}
+.dia .astro .lua{display:none}
+.selo-24h{position:absolute;bottom:6%;left:2%;background:var(--laranja);color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:1.3rem;padding:.55rem 1rem;border-radius:16px;box-shadow:0 16px 30px -12px rgba(228,86,12,.8);transform:rotate(-6deg);animation:balanco 4.5s ease-in-out infinite}
+
+.sinais{position:relative;z-index:2;margin-top:clamp(3rem,6vw,4.5rem);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--raio);padding:clamp(1.5rem,3vw,2.2rem)}
+.sinais h3{color:#fff;font-size:1.2rem;display:flex;align-items:center;gap:.6rem;margin-bottom:1.2rem}
+.sinais h3 .icone{color:#FF7A7A;width:26px;height:26px}
+.sinais ul{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+.sinais li{display:flex;align-items:flex-start;gap:.6rem;font-weight:600;font-size:.97rem;color:#E1E4EC;background:rgba(255,255,255,.04);border-radius:14px;padding:.8rem .95rem}
+.sinais li .icone{color:#FF9A57;width:20px;height:20px;margin-top:.15rem}
+.ecg{position:absolute;left:0;right:0;bottom:22px;width:100%;height:80px;pointer-events:none;z-index:1}
+.ecg path{fill:none;stroke-linejoin:round;stroke-linecap:round}
+.ecg .base{stroke:rgba(255,154,87,.12);stroke-width:2}
+.ecg .pulso{stroke:#FF9A57;stroke-width:2.6;stroke-dasharray:240 1960;stroke-dashoffset:2200;filter:drop-shadow(0 0 6px rgba(255,154,87,.9));animation:batimento 4s linear infinite}
+@keyframes batimento{to{stroke-dashoffset:0}}
+
+/* ==== Banho & Tosa e Pet Shop ==== */
+.cuidados{padding:clamp(4.5rem,8vw,7rem) 0;background:#fff}
+.cuidados-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.8rem}
+.cuidado{position:relative;display:flex;flex-direction:column;border-radius:30px;padding:14px 14px 2rem;background:var(--creme);border:1px solid var(--borda);overflow:hidden}
+.cuidado-shop{background:#EEF8F6;border-color:#D3ECE8}
+.cuidado .foto{aspect-ratio:3/2;border-radius:22px}
+.cuidado:hover .foto img.ok{transform:scale(1.05)}
+.cuidado-corpo{padding:1.6rem 1.2rem 0;display:flex;flex-direction:column;flex:1}
+.cuidado-topo{display:flex;align-items:center;gap:.9rem;margin-bottom:.9rem}
+.cuidado-topo .servico-icone{margin:0;border:0;width:56px;height:56px}
+.cuidado h3{font-size:1.65rem}
+.cuidado p{font-size:1.04rem}
+.etiquetas{display:flex;flex-wrap:wrap;gap:.5rem;margin:1.2rem 0 1.6rem}
+.etiquetas li{background:#fff;border:1px solid var(--borda);padding:.38rem .85rem;border-radius:999px;font-weight:700;font-size:.88rem;color:var(--tinta);display:flex;align-items:center;gap:.35rem}
+.etiquetas .icone{width:15px;height:15px;color:var(--laranja)}
+.cuidado-shop .etiquetas .icone{color:var(--verde)}
+.cuidado .botao{margin-top:auto;align-self:flex-start}
+.bolhas{position:absolute;left:14px;right:14px;top:14px;aspect-ratio:3/2;pointer-events:none;overflow:hidden;border-radius:22px;z-index:2}
+.bolhas span{position:absolute;bottom:-40px;left:var(--x);width:var(--t);height:var(--t);border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 12%,rgba(255,255,255,.25) 13% 55%,rgba(173,232,255,.45) 75%,rgba(255,255,255,.7) 100%);box-shadow:inset 0 0 4px rgba(255,255,255,.8);animation:bolha var(--d) ease-in infinite;animation-delay:var(--a)}
+@keyframes bolha{0%{transform:translate(0,0) scale(.6);opacity:0}10%{opacity:1}100%{transform:translate(var(--v,20px),-360px) scale(1.1);opacity:0}}
+.etiqueta-flutuante{position:absolute;top:30px;right:30px;z-index:3;background:#fff;border-radius:16px;padding:.55rem .9rem;font-weight:800;font-size:.86rem;color:var(--tinta);box-shadow:0 16px 30px -16px rgba(29,35,51,.5);display:flex;align-items:center;gap:.45rem;animation:flutuar 5s ease-in-out infinite}
+.etiqueta-flutuante .icone{width:18px;height:18px;color:var(--verde)}
+.cuidado-banho .etiqueta-flutuante .icone{color:var(--laranja)}
+
+/* ==== Sobre ==== */
+.sobre{padding:clamp(4.5rem,8vw,7rem) 0}
+.sobre-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2.5rem,6vw,5rem);align-items:center}
+.sobre-foto{position:relative;padding:18px 18px 34px}
+.sobre-foto::before{content:'';position:absolute;inset:0 40px 60px 0;border-radius:32px;background:linear-gradient(150deg,var(--laranja),#FF9A57);transform:rotate(-4deg);z-index:0}
+.moldura{position:relative;z-index:1;border-radius:26px;overflow:hidden;border:8px solid #fff;box-shadow:0 40px 70px -36px rgba(29,35,51,.6);transform:rotate(1.5deg);transition:transform .6s var(--mola)}
+.sobre-foto:hover .moldura{transform:rotate(0) scale(1.01)}
+.moldura img{width:100%;height:auto;aspect-ratio:1006/890;object-fit:cover}
+.etiqueta-galera{position:absolute;z-index:2;right:-6px;top:-8px;background:#FFF4E2;color:var(--laranja-escuro);font-family:'Caveat',cursive;font-size:2.1rem;line-height:1;padding:.45rem 1.1rem .55rem;border-radius:14px;box-shadow:0 18px 30px -16px rgba(29,35,51,.45);transform:rotate(5deg);animation:balanco-etiqueta 5s ease-in-out infinite}
+@keyframes balanco-etiqueta{0%,100%{transform:rotate(5deg)}50%{transform:rotate(1deg) translateY(-6px)}}
+.selo-endereco{position:absolute;z-index:2;left:-4px;bottom:6px;display:flex;align-items:center;gap:.5rem;background:var(--tinta);color:#fff;font-weight:800;font-size:.9rem;padding:.7rem 1.1rem;border-radius:16px;box-shadow:0 18px 30px -16px rgba(29,35,51,.7)}
+.selo-endereco .icone{color:#FF9A57;width:18px;height:18px}
+.sobre-texto p{margin-bottom:1rem;font-size:1.07rem}
+.diferenciais{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.8rem}
+.diferenciais li{display:flex;gap:.85rem;align-items:flex-start;background:#fff;border:1px solid var(--borda);border-radius:20px;padding:1rem;transition:transform .35s var(--mola),box-shadow .35s}
+.diferenciais li:hover{transform:translateY(-4px);box-shadow:var(--sombra)}
+.diferenciais .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--laranja-50);color:var(--laranja-escuro)}
+.diferenciais li:nth-child(even) .ic{background:var(--verde-claro);color:var(--verde-escuro)}
+.diferenciais .ic .icone{width:22px;height:22px}
+.diferenciais strong{display:block;font-family:'Poppins',sans-serif;color:var(--tinta);font-size:1rem;line-height:1.3;margin-bottom:.2rem}
+.diferenciais span{display:block;font-size:.9rem;line-height:1.45}
+
+/* ==== Como agendar ==== */
+.passos{padding:clamp(4.5rem,8vw,7rem) 0;background:#fff}
+.passos-lista{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;position:relative;counter-reset:passo}
+.trilha{position:absolute;left:16%;right:16%;top:46px;height:4px;z-index:0}
+.trilha::before{content:'';position:absolute;left:0;right:0;top:0;border-top:3px dotted #F0BF9C}
+.trilha .icone{position:absolute;top:-12px;width:24px;height:24px;color:var(--laranja);animation:caminhar 6s linear infinite}
+@keyframes caminhar{0%{left:0;opacity:0;transform:rotate(90deg)}8%{opacity:1}92%{opacity:1}100%{left:calc(100% - 24px);opacity:0;transform:rotate(90deg)}}
+.passo{position:relative;z-index:1;text-align:center;padding:0 1rem}
+.passo-num{width:92px;height:92px;margin:0 auto 1.4rem;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--borda);box-shadow:var(--sombra);position:relative;transition:transform .5s var(--mola)}
+.passo:hover .passo-num{transform:translateY(-6px) rotate(-6deg)}
+.passo-num .icone{width:38px;height:38px;color:var(--laranja)}
+.passo:nth-child(3) .passo-num .icone{color:var(--verde)}
+.passo-num b{position:absolute;top:-6px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--tinta);color:#fff;font-family:'Poppins',sans-serif;font-size:.95rem;display:grid;place-items:center;border:3px solid #fff}
+.passo h3{font-size:1.25rem;margin-bottom:.55rem}
+.passo p{font-size:1rem;max-width:320px;margin:0 auto}
+.passos-cta{display:flex;justify-content:center;flex-wrap:wrap;gap:.8rem;margin-top:3rem}
+
+/* ==== Google e Instagram ==== */
+.social{padding:clamp(4.5rem,8vw,7rem) 0}
+.social-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:1.6rem}
+.cartao-google{background:#fff;border:1px solid var(--borda);border-radius:30px;padding:clamp(1.8rem,4vw,2.8rem);box-shadow:var(--sombra);position:relative;overflow:hidden}
+.cartao-google .topo{display:flex;align-items:center;gap:.6rem;font-weight:800;color:var(--tinta)}
+.cartao-google .topo .icone{color:var(--ouro);width:22px;height:22px}
+.nota-grande{display:flex;align-items:center;gap:1.2rem;margin:1.4rem 0 1.2rem}
+.nota-grande strong{font-family:'Poppins',sans-serif;font-size:clamp(3.6rem,7vw,5rem);font-weight:800;color:var(--tinta);line-height:.9;letter-spacing:-.05em}
+.nota-grande .estrelas .icone{width:28px;height:28px}
+.nota-grande small{display:block;margin-top:.35rem;font-weight:700;color:var(--suave)}
+.estrelas-parciais{position:relative;display:inline-flex}
+.estrelas-parciais .vazias,.estrelas-parciais .cheias{display:flex;gap:1px}
+.estrelas-parciais .cheias{position:absolute;left:0;top:0;bottom:0;width:var(--pct,96%);overflow:hidden}
+.estrelas-parciais .cheias .icone{flex:none}
+.estrelas-parciais .vazias{color:#E9E1D8}
+.cartao-google p{max-width:520px}
+.cartao-google .acoes{display:flex;flex-wrap:wrap;gap:.8rem;margin-top:1.6rem}
+.cartao-google .enfeite{position:absolute;right:-26px;top:-26px;width:160px;height:160px;color:rgba(255,184,46,.13);animation:girar 30s linear infinite}
+.cartao-insta{position:relative;overflow:hidden;border-radius:30px;padding:clamp(1.8rem,4vw,2.6rem);color:#fff;background:linear-gradient(140deg,#F26A1B 0%,#E8467C 55%,#7B4BD6 100%);display:flex;flex-direction:column;justify-content:space-between;gap:1.4rem;box-shadow:0 30px 60px -34px rgba(123,75,214,.8)}
+.cartao-insta .arroba{display:inline-flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.05rem;background:rgba(255,255,255,.16);padding:.5rem 1rem;border-radius:999px;align-self:flex-start}
+.cartao-insta .arroba .icone{width:22px;height:22px}
+.cartao-insta h3{color:#fff;font-size:clamp(1.5rem,2.6vw,1.9rem);margin:1rem 0 .6rem}
+.cartao-insta p{color:#FFEDF3}
+.cartao-insta .botao{align-self:flex-start;color:#B83A6C;border-color:transparent}
+.insta-enfeites .icone{position:absolute;color:rgba(255,255,255,.22);animation:flutuar 6s ease-in-out infinite}
+.insta-enfeites .e1{width:70px;height:70px;right:24px;top:24px}
+.insta-enfeites .e2{width:40px;height:40px;right:110px;top:92px;animation-delay:-2s}
+.insta-enfeites .e3{width:54px;height:54px;right:34px;bottom:40px;animation-delay:-4s}
+
+/* ==== Dúvidas ==== */
+.duvidas{padding:clamp(4.5rem,8vw,7rem) 0;background:#fff}
+.duvidas-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(2rem,5vw,4.5rem);align-items:start}
+.duvidas-intro{position:sticky;top:110px}
+.duvidas-intro p{margin:0 0 1.6rem;font-size:1.07rem}
+.pergunta{border:1px solid var(--borda);border-radius:20px;background:var(--fundo);margin-bottom:.85rem;transition:background-color .3s,box-shadow .3s,border-color .3s}
+.pergunta[open]{background:#fff;box-shadow:var(--sombra);border-color:#F3D3BB}
+.pergunta summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.15rem 1.3rem;font-family:'Poppins',sans-serif;font-weight:600;font-size:1.04rem;color:var(--tinta)}
+.pergunta summary::-webkit-details-marker{display:none}
+.pergunta .mais{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--laranja-50);color:var(--laranja-escuro);transition:transform .4s var(--mola),background-color .3s,color .3s}
+.pergunta .mais .icone{width:18px;height:18px}
+.pergunta[open] .mais{transform:rotate(45deg);background:var(--laranja);color:#fff}
+.pergunta p{padding:0 1.3rem 1.25rem;animation:aparecer .45s var(--mola)}
+@keyframes aparecer{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* ==== Contato ==== */
+.contato{padding:clamp(4.5rem,8vw,7rem) 0}
+.contato-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:1.6rem;align-items:stretch}
+.contato-cartao{background:#fff;border:1px solid var(--borda);border-radius:30px;padding:clamp(1.6rem,3vw,2.3rem);box-shadow:var(--sombra)}
+.contato-lista li{display:flex;gap:1rem;align-items:flex-start;padding:1rem 0}
+.contato-lista li+li{border-top:1px dashed var(--borda)}
+.contato-lista .ic{width:46px;height:46px;border-radius:14px;flex:none;display:grid;place-items:center;background:var(--laranja-50);color:var(--laranja-escuro)}
+.contato-lista li:nth-child(even) .ic{background:var(--verde-claro);color:var(--verde-escuro)}
+.contato-lista .ic .icone{width:22px;height:22px}
+.contato-lista strong{display:block;font-family:'Poppins',sans-serif;color:var(--tinta);font-size:.98rem}
+.contato-lista a,.contato-lista span{font-weight:600;color:var(--texto)}
+.contato-lista a:hover{color:var(--laranja-escuro)}
+.aberto-agora{display:inline-flex !important;align-items:center;gap:.4rem;margin-left:.5rem;background:#E8FBEF;color:#15803D !important;font-size:.78rem;font-weight:800 !important;padding:.15rem .6rem;border-radius:999px;vertical-align:middle}
+.aberto-agora .ponto{width:7px;height:7px}
+.contato-acoes{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.4rem}
+.mapa{position:relative;border-radius:30px;overflow:hidden;min-height:440px;border:8px solid #fff;box-shadow:var(--sombra);background:#EDEAE4}
+.mapa iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* ==== Rodapé ==== */
+.rodape{background:#141927;color:#AEB4C4;padding:0 0 1.6rem;margin-top:clamp(5rem,8vw,7rem);position:relative}
+.cta-final{position:relative;top:-70px;margin-bottom:-20px;display:flex;align-items:center;justify-content:space-between;gap:2rem;flex-wrap:wrap;border-radius:32px;padding:clamp(2rem,4vw,3rem) clamp(1.6rem,4vw,3.4rem);background:linear-gradient(135deg,#F7862C,#DD4F08);color:#FFE8D8;overflow:hidden;box-shadow:0 40px 70px -40px rgba(221,79,8,.9)}
+.cta-final>div:not(.patas):not(.cta-final-acoes){flex:1 1 480px;position:relative;z-index:2}
+.cta-final h2{color:#fff;font-size:clamp(1.6rem,3vw,2.35rem);max-width:640px}
+.cta-final h2 span{color:#FFE0C7}
+.cta-final p{margin-top:.6rem;font-size:1.08rem}
+.cta-final-acoes{display:flex;flex-wrap:wrap;gap:.8rem;position:relative;z-index:2}
+.cta-final .patas{position:absolute;inset:0;pointer-events:none}
+.cta-final .patas .icone{position:absolute;color:rgba(255,255,255,.12);width:46px;height:46px}
+.cta-final .patas .icone:nth-child(1){left:42%;top:12%;transform:rotate(-20deg)}
+.cta-final .patas .icone:nth-child(2){left:50%;bottom:10%;transform:rotate(10deg);width:34px;height:34px}
+.cta-final .patas .icone:nth-child(3){right:4%;top:-8px;transform:rotate(25deg);width:90px;height:90px}
+.rodape-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:2rem;padding-bottom:2.4rem;border-bottom:1px solid rgba(255,255,255,.08)}
+.rodape .marca-nome{color:#fff}
+.rodape .marca-nome small{color:#8C93A6}
+.rodape-sobre p{margin:1.1rem 0 1.2rem;max-width:300px;font-size:.98rem}
+.rodape h3{color:#fff;font-size:1rem;margin-bottom:1rem}
+.rodape-lista li{margin-bottom:.55rem}
+.rodape-lista a,.rodape-lista span{display:inline-flex;align-items:flex-start;gap:.5rem;font-size:.96rem;transition:color .25s}
+.rodape-lista a:hover{color:#FF9A57}
+.rodape-lista .icone{width:17px;height:17px;color:#FF9A57;margin-top:.22rem}
+.redes{display:flex;gap:.6rem}
+.redes a{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.07);color:#fff;transition:background-color .3s,transform .3s var(--mola)}
+.redes a:hover{background:var(--laranja);transform:translateY(-3px)}
+.redes .icone{width:21px;height:21px}
+.selo-rodape{display:inline-flex;align-items:center;gap:.55rem;background:rgba(74,222,128,.1);color:#86EFAC;border:1px solid rgba(74,222,128,.25);padding:.5rem .9rem;border-radius:999px;font-weight:800;font-size:.9rem}
+.rodape-base{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding-top:1.4rem;font-size:.88rem}
+.rodape-base a:hover{color:#fff}
+
+/* ==== WhatsApp flutuante ==== */
+.whats-flutuante{position:fixed;right:22px;bottom:22px;z-index:70;display:flex;align-items:center;gap:.7rem}
+.whats-botao{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:var(--whats);color:#fff;box-shadow:0 16px 30px -10px rgba(37,211,102,.75);position:relative;transition:transform .35s var(--mola)}
+.whats-botao::before{content:'';position:absolute;inset:0;border-radius:50%;border:2px solid var(--whats);animation:onda-whats 2.2s ease-out infinite}
+@keyframes onda-whats{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.55);opacity:0}}
+.whats-botao .icone{width:32px;height:32px}
+.whats-flutuante:hover .whats-botao{transform:scale(1.08) rotate(-6deg)}
+.whats-balao{background:#fff;color:var(--tinta);padding:.65rem 1rem;border-radius:16px 16px 4px 16px;font-size:.9rem;font-weight:600;line-height:1.3;box-shadow:0 18px 34px -18px rgba(29,35,51,.6);opacity:0;transform:translateX(10px) scale(.95);transform-origin:right bottom;pointer-events:none;transition:opacity .4s,transform .4s var(--mola)}
+.whats-balao b{display:block;color:#128C4B}
+.whats-flutuante.mostrar .whats-balao,.whats-flutuante:hover .whats-balao{opacity:1;transform:none}
+
+/* ==== Telas menores ==== */
+@media (max-width:1100px){
+  .menu a{padding:.5rem .6rem;font-size:.9rem}
+  .numeros-grid{grid-template-columns:repeat(2,1fr)}
+  .numero:nth-child(3){border-left:0}
+  .numero:nth-child(n+3){border-top:1px solid var(--borda)}
+  .rodape-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:980px){
+  .barra-topo .some-medio{display:none}
+  .menu{position:fixed;left:0;right:0;top:78px;flex-direction:column;align-items:stretch;gap:.2rem;padding:1rem 20px 1.4rem;background:#fff;border-bottom:1px solid var(--borda);box-shadow:0 30px 40px -30px rgba(29,35,51,.4);transform:translateY(-12px);opacity:0;visibility:hidden;transition:transform .35s var(--mola),opacity .3s,visibility 0s .35s;margin:0;max-height:calc(100vh - 78px);overflow:auto}
+  .menu-aberto .menu{transform:none;opacity:1;visibility:visible;transition:transform .35s var(--mola),opacity .3s}
+  .menu a{padding:.85rem 1rem;font-size:1.05rem;border-radius:14px}
+  .menu a.ativo::after{display:none}
+  .menu .so-celular{display:flex;margin-top:.6rem}
+  .botao-icone{display:grid}
+  .cab-acoes .botao-agendar{display:none}
+  .hero-grid,.plantao-grid,.sobre-grid,.social-grid,.duvidas-grid,.contato-grid{grid-template-columns:1fr}
+  .hero-texto{text-align:left}
+  .hero-arte{max-width:500px;margin-top:1rem}
+  .servicos-grid{grid-template-columns:repeat(2,1fr)}
+  .cuidados-grid{grid-template-columns:1fr}
+  .sinais ul{grid-template-columns:repeat(2,1fr)}
+  .duvidas-intro{position:static}
+  .sobre-foto{width:100%;max-width:560px;margin:0 auto}
+  .relogio-caixa{width:min(100%,340px)}
+  .passos-lista{grid-template-columns:1fr;gap:2.4rem}
+  .trilha{display:none}
+}
+@media (max-width:640px){
+  body{font-size:1rem}
+  .container{width:calc(100% - 32px)}
+  .barra-topo{display:none}
+  .cabecalho .container{height:68px}
+  .menu{top:68px;max-height:calc(100vh - 68px)}
+  .marca-icone{width:42px;height:42px;border-radius:12px}
+  .marca-nome{font-size:1.32rem}
+  .marca-nome small{font-size:.68rem}
+  .hero{padding-top:1.6rem}
+  .hero-acoes .botao{width:100%}
+  .hero-provas{gap:.5rem 1rem;font-size:.88rem}
+  .hero-arte{width:94%}
+  .selo-giratorio{width:96px;height:96px;left:-3%;top:-2%}
+  .selo-giratorio text{font-size:13px}
+  .selo-centro strong{font-size:1.5rem}
+  .selo-centro span{font-size:.52rem}
+  .cartao-flutuante{padding:.5rem .75rem .5rem .5rem;border-radius:14px;gap:.5rem}
+  .cartao-flutuante .ic{width:34px;height:34px;border-radius:10px}
+  .cartao-flutuante .ic .icone{width:18px;height:18px}
+  .cartao-flutuante strong{font-size:.82rem}
+  .cartao-flutuante small{display:none}
+  .cf-1{right:-2%;top:7%}
+  .cf-2{left:-3%;top:auto;bottom:9%}
+  .cf-3{display:none}
+  .foto-hero .foto-vazia{inset:15%;font-size:.76rem}
+  .foto-hero .foto-vazia code{font-size:.66rem}
+  .baloes{display:none}
+  .faixas{height:120px;margin-top:-80px}
+  .faixa-trilho{font-size:.98rem;gap:1.4rem;padding-right:1.4rem}
+  .numeros-grid{grid-template-columns:1fr 1fr}
+  .numero{flex-direction:column;align-items:flex-start;gap:.6rem;padding:1.2rem 1rem}
+  .numero .ic{width:44px;height:44px;border-radius:13px}
+  .numero strong{font-size:1.55rem}
+  .numero .rotulo{font-size:.8rem}
+  .servicos-grid{grid-template-columns:1fr}
+  .sinais ul{grid-template-columns:1fr}
+  .plantao-acoes .botao,.contato-acoes .botao,.cta-final-acoes .botao{width:100%}
+  .agora{font-size:.95rem}
+  .diferenciais{grid-template-columns:1fr}
+  .etiqueta-galera{font-size:1.7rem;right:0}
+  .mapa{min-height:340px}
+  .cta-final{top:-56px}
+  .rodape-grid{grid-template-columns:1fr}
+  .whats-flutuante{right:16px;bottom:16px}
+  .whats-botao{width:56px;height:56px}
+  .whats-balao{display:none}
+}
+
+/* ==== Menos movimento para quem pede ==== */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .sublinhado{background-size:100% 100%}
+}
+</style>
+</head>
+<body>
+
+<!-- Ícones usados no site -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#F26A1B"/><svg x="8" y="12.2" width="48" height="39.8" viewBox="69 11 446 370" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M78 124V48q0-28 28-28h372q28 0 28 28v296q0 28-28 28H106q-28 0-28-28v-68" stroke="#fff" stroke-width="22"/><g stroke="#1D2333" stroke-width="20"><path d="M214 120l28-76 41 50 51-50c-1 36-3 66-4 106-1 30 0 55 3 72"/><path d="M214 120c-38 12-78 30-90 56-8 20 0 44 22 56 40 18 106 20 150 26 28 4 46 18 50 40"/><path d="M333 222c13 20 45 27 71 26 32-1 58-16 62-44 2-34-4-72-12-104l-30 28c-20-2-40 0-58 6l-12-30-14 30"/></g><g fill="#1D2333"><ellipse cx="178" cy="200" rx="17" ry="12" transform="rotate(-18 178 200)"/><circle cx="237" cy="155" r="9"/><circle cx="266" cy="160" r="9"/><circle cx="376" cy="181" r="9"/><circle cx="418" cy="176" r="9"/><circle cx="400" cy="207" r="8.5"/></g></svg></symbol>
+    <symbol id="i-whats" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M12 3.2a8.8 8.8 0 0 0-7.6 13.2L3.2 20.8l4.5-1.2A8.8 8.8 0 1 0 12 3.2Z"/><path fill="currentColor" d="M8.9 7.9c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.4l.8 1.9c.1.2.1.4 0 .6l-.5.7c-.1.2-.1.3 0 .5.6 1 1.4 1.8 2.4 2.4.2.1.3.1.5 0l.7-.8c.2-.2.3-.2.5-.1l1.9.9c.2.1.3.2.3.4v.4c0 .6-.4 1.2-1 1.5-.8.4-2 .3-3.4-.3-1.7-.8-3.2-2.2-4.1-3.9-.6-1.1-.7-2.1-.5-2.8.1-.3.3-.7.6-1.2Z"/></symbol>
+    <symbol id="i-fone" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M5.6 3.5h2.9l1.6 4.2-2.1 1.3a11.5 11.5 0 0 0 5.9 5.9l1.3-2.1 4.2 1.6v2.9a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 3.6 5.6a2 2 0 0 1 2-2.1Z"/></symbol>
+    <symbol id="i-pino" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21.5s-7-6.1-7-11.8a7 7 0 0 1 14 0c0 5.7-7 11.8-7 11.8Z"/><circle cx="12" cy="9.7" r="2.6"/></g></symbol>
+    <symbol id="i-relogio" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></g></symbol>
+    <symbol id="i-insta" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/></g><circle cx="17.2" cy="6.8" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-estetoscopio" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5H5a1 1 0 0 0-1 1v4a5 5 0 0 0 10 0v-4a1 1 0 0 0-1-1h-1"/><path d="M9 13.5v1a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="10.5" r="2"/></g></symbol>
+    <symbol id="i-exame" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6.2L4.9 18.3A1.8 1.8 0 0 0 6.5 21h11a1.8 1.8 0 0 0 1.6-2.7L14 9.2V3"/><path d="M7.3 15h9.4"/></g></symbol>
+    <symbol id="i-vacina" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17.5 2.5 4 4"/><path d="m19.5 4.5-3 3"/><path d="M14.5 5.5l4 4-9.5 9.5H5v-4Z"/><path d="m5 19-2.5 2.5"/><path d="m10.5 9.5 2 2M13 7l2 2"/></g></symbol>
+    <symbol id="i-cirurgia" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5c3-1.6 10-1.6 13 0v4.3c-1.4 3.3-4 5-6.5 5s-5.1-1.7-6.5-5Z"/><path d="M5.5 9.5H4a2 2 0 0 0 0 4h2M18.5 9.5H20a2 2 0 0 1 0 4h-2"/><path d="M9 11h6M9.5 14h5"/></g></symbol>
+    <symbol id="i-internacao" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M3 15h18v4"/><path d="M21 15v-2.5A3.5 3.5 0 0 0 17.5 9H11v6"/><circle cx="7" cy="11.5" r="2"/></g></symbol>
+    <symbol id="i-banho" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h17v1.5a5.5 5.5 0 0 1-5.5 5.5H9a5.5 5.5 0 0 1-5.5-5.5Z"/><path d="M6.5 12V6.3A2.3 2.3 0 0 1 8.8 4c.9 0 1.7.5 2 1.3"/><path d="m7 19-1 2M17 19l1 2"/><circle cx="14.5" cy="7.5" r="1.2"/><circle cx="18" cy="5" r="1.6"/></g></symbol>
+    <symbol id="i-sacola" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8h13l-1 12.5h-11Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/></g></symbol>
+    <symbol id="i-pata" viewBox="0 0 24 24"><g fill="currentColor"><ellipse cx="5.8" cy="10.4" rx="2.2" ry="2.8" transform="rotate(-20 5.8 10.4)"/><ellipse cx="9.6" cy="6" rx="2.3" ry="2.9" transform="rotate(-6 9.6 6)"/><ellipse cx="14.4" cy="6" rx="2.3" ry="2.9" transform="rotate(6 14.4 6)"/><ellipse cx="18.2" cy="10.4" rx="2.2" ry="2.8" transform="rotate(20 18.2 10.4)"/><path d="M12 11.3c2.7 0 5.7 3.4 5.7 6.1 0 1.8-1.4 2.8-3 2.8-1.2 0-1.8-.6-2.7-.6s-1.5.6-2.7.6c-1.6 0-3-1-3-2.8 0-2.7 3-6.1 5.7-6.1Z"/></g></symbol>
+    <symbol id="i-coracao" viewBox="0 0 24 24"><path fill="currentColor" d="M12 20.6s-7.6-4.6-9.5-9.4C1.2 7.9 3.4 4.4 6.9 4.4c2.1 0 3.6 1.2 5.1 3 1.5-1.8 3-3 5.1-3 3.5 0 5.7 3.5 4.4 6.8-1.9 4.8-9.5 9.4-9.5 9.4Z"/></symbol>
+    <symbol id="i-estrela" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.6 2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8Z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-seta" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8.6A2.6 2.6 0 0 1 6.6 6h1.7l1.5-2.2h4.4L15.7 6h1.7A2.6 2.6 0 0 1 20 8.6v7.8a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 16.4Z"/><circle cx="12" cy="12.4" r="3.5"/></g></symbol>
+    <symbol id="i-rota" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3.5 10.6 20.5 3.5l-7.1 17-2.1-8Z"/></symbol>
+    <symbol id="i-calendario" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4" stroke-linejoin="round"/></g></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s7.5-3.2 7.5-9.5V5.6L12 3 4.5 5.6v5.9C4.5 17.8 12 21 12 21Z"/><path d="M12 15.6s-3.3-2-3.3-4.2a1.7 1.7 0 0 1 3.3-.7 1.7 1.7 0 0 1 3.3.7c0 2.2-3.3 4.2-3.3 4.2Z"/></g></symbol>
+    <symbol id="i-equipe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.1c2.6.2 4.5 2 4.5 4.9"/></g></symbol>
+    <symbol id="i-pulso" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M2.5 12h4l2.2-5.5 4.3 11 2.3-5.5h6.2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-fechar" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-mais" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-brilho" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c.7 5.4 4.6 9.3 10 10-5.4.7-9.3 4.6-10 10-.7-5.4-4.6-9.3-10-10 5.4-.7 9.3-4.6 10-10Z"/></symbol>
+    <symbol id="i-lua" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14.6A8.5 8.5 0 1 1 9.4 4a7 7 0 0 0 10.6 10.6Z"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.3 2.6 17.6A2 2 0 0 0 4.3 20.6h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.2M12 17.2h.01"/></g></symbol>
+  </defs>
+</svg>
+
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- ==== Barra de cima ==== -->
+<div class="barra-topo">
+  <div class="container">
+    <div class="lado">
+      <span class="aberto"><span class="ponto"></span> Aberto agora · 24 horas</span>
+      <a class="some-medio" href="https://www.google.com/maps/dir/?api=1&amp;destination=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%2C%20Q%2045%20Lt%2082%2C%20Setor%20Leste%2C%20Gama%20-%20DF" target="_blank" rel="noopener"><svg class="icone"><use href="#i-pino"/></svg> Q 45, Lt 82 – Setor Leste, Gama - DF</a>
+    </div>
+    <div class="lado">
+      <a href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> <span class="fone">(61) 3967-2416</span></a>
+      <a href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> <span class="fone">(61) 99841-4031</span></a>
+      <a class="some-medio" href="https://www.instagram.com/vetclingama/" target="_blank" rel="noopener"><svg class="icone"><use href="#i-insta"/></svg> @vetclingama</a>
+    </div>
+  </div>
+</div>
+
+<!-- ==== Cabeçalho ==== -->
+<header class="cabecalho">
+  <div class="container">
+    <a class="marca" href="#inicio" aria-label="VetClin Clínica Veterinária, voltar ao início">
+      <svg class="marca-icone" aria-hidden="true"><use href="#logo"/></svg>
+      <span class="marca-nome">VetClin<small>Clínica Veterinária</small></span>
+    </a>
+    <nav class="menu" id="menu" aria-label="Menu principal">
+      <a href="#servicos">Serviços</a>
+      <a href="#atendimento-24h">24 horas</a>
+      <a href="#banho-e-tosa">Banho &amp; Tosa</a>
+      <a href="#pet-shop">Pet Shop</a>
+      <a href="#sobre">Sobre</a>
+      <a href="#contato">Contato</a>
+      <a class="so-celular botao botao-laranja" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Agendar pelo WhatsApp</a>
+      <a class="so-celular botao botao-branco" href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> Ligar: <span class="fone">(61) 3967-2416</span></a>
+    </nav>
+    <div class="cab-acoes">
+      <a class="botao botao-laranja botao-pequeno botao-agendar" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Agendar</a>
+      <a class="botao-icone" href="tel:+556139672416" aria-label="Ligar para a VetClin"><svg class="icone"><use href="#i-fone"/></svg></a>
+      <button class="botao-icone menu-botao" type="button" aria-expanded="false" aria-controls="menu" aria-label="Abrir menu">
+        <svg class="icone abrir"><use href="#i-menu"/></svg><svg class="icone fechar"><use href="#i-fechar"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo">
+
+  <!-- ==== Hero (topo animado) ==== -->
+  <section class="hero" id="inicio">
+    <div class="hero-luzes" aria-hidden="true"><span class="l1"></span><span class="l2"></span><span class="l3"></span></div>
+    <div class="pegadas" aria-hidden="true"></div>
+    <div class="container hero-grid">
+      <div class="hero-texto">
+        <p class="hero-aberto revelar"><span class="ponto"></span> <span><b>Aberto agora</b> · Atendimento 24 horas</span></p>
+        <h1 class="revelar" style="--atraso:.08s">A clínica veterinária <span class="sublinhado">do seu pet</span>, aberta <span class="h24">24&nbsp;horas</span>.</h1>
+        <p class="hero-sub revelar" style="--atraso:.16s">Consultas, exames, vacinas, cirurgias e internação, além de banho &amp; tosa e pet shop. Tudo no Setor Leste do Gama, com o carinho que o seu melhor amigo merece — de dia, de noite e de madrugada.</p>
+        <div class="hero-acoes revelar" style="--atraso:.24s">
+          <a class="botao botao-laranja" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Agendar pelo WhatsApp</a>
+          <a class="botao botao-branco" href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> Emergência? Ligue agora</a>
+        </div>
+        <ul class="hero-provas revelar" style="--atraso:.32s">
+          <li><span class="estrelas" aria-hidden="true"><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg></span> 4,8 no Google</li>
+          <li><svg class="icone"><use href="#i-relogio"/></svg> Aberto dia e noite</li>
+          <li><svg class="icone"><use href="#i-pino"/></svg> Setor Leste · Gama</li>
+        </ul>
+      </div>
+
+      <div class="hero-arte revelar" style="--atraso:.2s">
+        <div class="hero-palco">
+          <svg class="hero-anel" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48"/><circle class="pontinho" cx="50" cy="2" r="1.3"/><circle class="pontinho" cx="2" cy="50" r=".9"/></svg>
+          <div class="hero-blob">
+            <!-- FOTO DO TOPO: cachorro e gato reais, juntos (1024 x 1024). Vídeo opcional: imagens/hero-cachorro-e-gato.mp4 -->
+            <div class="foto foto-hero">
+              <img src="imagens/hero-cachorro-e-gato.jpg" alt="Cachorro e gato juntos, felizes e bem cuidados" fetchpriority="high" onload="this.classList.add('ok')" onerror="this.remove()">
+              <video class="hero-video" data-src="imagens/hero-cachorro-e-gato.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+              <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>hero-cachorro-e-gato.jpg</code><span>Foto real: cachorro e gato juntos</span><small>1024 × 1024</small></div>
+            </div>
+          </div>
+          <div class="selo-giratorio" aria-hidden="true">
+            <svg viewBox="0 0 120 120"><defs><path id="circulo-selo" d="M60 60m-47 0a47 47 0 1 1 94 0a47 47 0 1 1-94 0"/></defs><text><textPath href="#circulo-selo" textLength="290" lengthAdjust="spacing">ATENDIMENTO 24 HORAS • DIA E NOITE • </textPath></text></svg>
+            <div class="selo-centro"><strong>24h</strong><span>Aberto</span></div>
+          </div>
+          <div class="baloes" aria-hidden="true"><span class="balao b-laranja"><i></i></span><span class="balao b-verde"><i></i></span><span class="balao b-branco"><i></i></span></div>
+          <div class="cartao-flutuante cf-1"><span class="ic"><svg class="icone"><use href="#i-estetoscopio"/></svg></span><span><strong>Clínica completa</strong><small>Consultas, exames e cirurgias</small></span></div>
+          <div class="cartao-flutuante cf-2"><span class="ic"><svg class="icone"><use href="#i-banho"/></svg></span><span><strong>Banho &amp; Tosa</strong><small>Cheirinho de pet feliz</small></span></div>
+          <div class="cartao-flutuante cf-3"><span class="nota">4,8</span><span><span class="estrelas" aria-hidden="true"><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg></span><small>Nota no Google</small></span></div>
+          <div class="coracoes" aria-hidden="true"><svg class="icone"><use href="#i-coracao"/></svg><svg class="icone"><use href="#i-coracao"/></svg><svg class="icone"><use href="#i-coracao"/></svg><svg class="icone"><use href="#i-coracao"/></svg></div>
+          <svg class="brilho b1" aria-hidden="true"><use href="#i-brilho"/></svg>
+          <svg class="brilho b2" aria-hidden="true"><use href="#i-brilho"/></svg>
+          <svg class="brilho b3" aria-hidden="true"><use href="#i-brilho"/></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Faixas que correm ==== -->
+  <div class="faixas" aria-hidden="true">
+    <div class="faixa faixa-2">
+      <div class="faixa-trilho">A clínica veterinária do seu pet <svg class="icone"><use href="#i-coracao"/></svg> Setor Leste · Gama - DF <svg class="icone"><use href="#i-coracao"/></svg> Atendimento 24 horas <svg class="icone"><use href="#i-coracao"/></svg> A clínica veterinária do seu pet <svg class="icone"><use href="#i-coracao"/></svg> Setor Leste · Gama - DF <svg class="icone"><use href="#i-coracao"/></svg> Atendimento 24 horas <svg class="icone"><use href="#i-coracao"/></svg></div>
+      <div class="faixa-trilho">A clínica veterinária do seu pet <svg class="icone"><use href="#i-coracao"/></svg> Setor Leste · Gama - DF <svg class="icone"><use href="#i-coracao"/></svg> Atendimento 24 horas <svg class="icone"><use href="#i-coracao"/></svg> A clínica veterinária do seu pet <svg class="icone"><use href="#i-coracao"/></svg> Setor Leste · Gama - DF <svg class="icone"><use href="#i-coracao"/></svg> Atendimento 24 horas <svg class="icone"><use href="#i-coracao"/></svg></div>
+    </div>
+    <div class="faixa faixa-1">
+      <div class="faixa-trilho">Consultas <svg class="icone"><use href="#i-pata"/></svg> Exames <svg class="icone"><use href="#i-pata"/></svg> Vacinas <svg class="icone"><use href="#i-pata"/></svg> Cirurgias <svg class="icone"><use href="#i-pata"/></svg> Internação <svg class="icone"><use href="#i-pata"/></svg> Banho &amp; Tosa <svg class="icone"><use href="#i-pata"/></svg> Pet Shop <svg class="icone"><use href="#i-pata"/></svg> Aberto 24 horas <svg class="icone"><use href="#i-pata"/></svg></div>
+      <div class="faixa-trilho">Consultas <svg class="icone"><use href="#i-pata"/></svg> Exames <svg class="icone"><use href="#i-pata"/></svg> Vacinas <svg class="icone"><use href="#i-pata"/></svg> Cirurgias <svg class="icone"><use href="#i-pata"/></svg> Internação <svg class="icone"><use href="#i-pata"/></svg> Banho &amp; Tosa <svg class="icone"><use href="#i-pata"/></svg> Pet Shop <svg class="icone"><use href="#i-pata"/></svg> Aberto 24 horas <svg class="icone"><use href="#i-pata"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ==== Números ==== -->
+  <section class="numeros" aria-label="A VetClin em números">
+    <div class="container">
+      <div class="numeros-grid revelar">
+        <div class="numero"><span class="ic"><svg class="icone"><use href="#i-relogio"/></svg></span><div><strong><span data-contar="24">24</span><small>h</small></strong><span class="rotulo">Aberto dia e noite, inclusive para emergências</span></div></div>
+        <div class="numero"><span class="ic"><svg class="icone"><use href="#i-estrela"/></svg></span><div><strong><span data-contar="4.8" data-casas="1">4,8</span><small>★</small></strong><span class="rotulo">Nota no Google, com mais de 50 avaliações</span></div></div>
+        <div class="numero"><span class="ic"><svg class="icone"><use href="#i-pata"/></svg></span><div><strong><span data-contar="7">7</span><small>serviços</small></strong><span class="rotulo">Da consulta ao pet shop, no mesmo endereço</span></div></div>
+        <div class="numero"><span class="ic"><svg class="icone"><use href="#i-coracao"/></svg></span><div><strong class="texto">Cães &amp; gatos</strong><span class="rotulo">Atendidos com carinho, do filhote ao idoso</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Serviços ==== -->
+  <section class="servicos" id="servicos">
+    <div class="container">
+      <header class="titulo-secao revelar">
+        <span class="selo"><svg class="icone"><use href="#i-pata"/></svg> Nossos serviços</span>
+        <h2>Tudo o que o seu pet precisa, <em>em um só lugar</em></h2>
+        <p>Da prevenção à emergência: cuidamos da saúde do seu melhor amigo com estrutura completa e atendimento 24 horas.</p>
+      </header>
+
+      <div class="servicos-grid">
+        <article class="servico revelar">
+          <div class="foto">
+            <img src="imagens/consultas.jpg" alt="Veterinária examinando um cachorro durante a consulta" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>consultas.jpg</code><span>Foto real: consulta veterinária</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="servico-icone"><svg class="icone"><use href="#i-estetoscopio"/></svg></span>
+          <h3>Consultas</h3>
+          <p>Avaliação completa, com tempo para ouvir você e examinar seu pet com atenção — da prevenção ao tratamento.</p>
+          <a class="link-seta" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20uma%20consulta." target="_blank" rel="noopener">Agendar consulta <svg class="icone"><use href="#i-seta"/></svg></a>
+        </article>
+
+        <article class="servico revelar" style="--atraso:.08s">
+          <div class="foto">
+            <img src="imagens/exames.jpg" alt="Exame veterinário sendo feito em um gato" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>exames.jpg</code><span>Foto real: exames</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="servico-icone"><svg class="icone"><use href="#i-exame"/></svg></span>
+          <h3>Exames</h3>
+          <p>Exames para um diagnóstico rápido e seguro, ajudando a definir o melhor tratamento para o seu pet.</p>
+          <a class="link-seta" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20informa%C3%A7%C3%B5es%20sobre%20exames." target="_blank" rel="noopener">Saber mais <svg class="icone"><use href="#i-seta"/></svg></a>
+        </article>
+
+        <article class="servico revelar" style="--atraso:.16s">
+          <div class="foto">
+            <img src="imagens/vacinas.jpg" alt="Filhote de cachorro recebendo vacina" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>vacinas.jpg</code><span>Foto real: vacinação</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="servico-icone"><svg class="icone"><use href="#i-vacina"/></svg></span>
+          <h3>Vacinas</h3>
+          <p>Vacinação para cães e gatos, com orientação sobre o calendário certo para cada fase da vida.</p>
+          <a class="link-seta" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20informa%C3%A7%C3%B5es%20sobre%20vacinas." target="_blank" rel="noopener">Ver vacinas <svg class="icone"><use href="#i-seta"/></svg></a>
+        </article>
+
+        <article class="servico revelar">
+          <div class="foto">
+            <img src="imagens/cirurgias.jpg" alt="Equipe veterinária preparada no centro cirúrgico" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>cirurgias.jpg</code><span>Foto real: cirurgia</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="servico-icone"><svg class="icone"><use href="#i-cirurgia"/></svg></span>
+          <h3>Cirurgias</h3>
+          <p>Procedimentos cirúrgicos feitos com segurança, cuidado e acompanhamento antes, durante e depois.</p>
+          <a class="link-seta" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20informa%C3%A7%C3%B5es%20sobre%20cirurgias." target="_blank" rel="noopener">Saber mais <svg class="icone"><use href="#i-seta"/></svg></a>
+        </article>
+
+        <article class="servico revelar" style="--atraso:.08s">
+          <div class="foto">
+            <img src="imagens/internacao.jpg" alt="Cachorro descansando na internação, com cuidado da equipe" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>internacao.jpg</code><span>Foto real: internação</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="servico-icone"><svg class="icone"><use href="#i-internacao"/></svg></span>
+          <h3>Internação</h3>
+          <p>Estrutura para internação, com acompanhamento de perto, dia e noite, durante toda a recuperação.</p>
+          <a class="link-seta" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20informa%C3%A7%C3%B5es%20sobre%20interna%C3%A7%C3%A3o." target="_blank" rel="noopener">Saber mais <svg class="icone"><use href="#i-seta"/></svg></a>
+        </article>
+
+        <article class="servico servico-cta revelar" style="--atraso:.16s">
+          <svg class="marca-dagua" aria-hidden="true"><use href="#i-pata"/></svg>
+          <span class="cta-pata" aria-hidden="true"><svg class="icone"><use href="#i-pata"/></svg></span>
+          <h3>Não achou o que procurava?</h3>
+          <p>Chama a gente no WhatsApp! Nossa equipe tira suas dúvidas e indica o melhor cuidado para o seu pet.</p>
+          <a class="botao botao-branco" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20saber%20sobre%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Falar no WhatsApp</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Plantão 24 horas ==== -->
+  <section class="plantao" id="atendimento-24h">
+    <div class="ceu" aria-hidden="true"></div>
+    <div class="container plantao-grid">
+      <div class="plantao-texto revelar">
+        <span class="selo selo-escuro"><span class="ponto"></span> Plantão 24 horas</span>
+        <h2>Emergência não marca hora. <span>A VetClin fica aberta 24 horas.</span></h2>
+        <p>De dia, de noite ou de madrugada: se o seu pet precisar, nossa equipe está aqui para atender. Em caso de urgência, venha direto — ou ligue no caminho para a gente já se preparar.</p>
+        <div class="agora">
+          <span class="ic"><svg class="icone"><use href="#i-relogio"/></svg></span>
+          <span>Agora em Brasília são <strong data-hora>24h</strong> e a VetClin está <b>aberta</b>.</span>
+        </div>
+        <div class="plantao-acoes">
+          <a class="botao botao-laranja" href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> Ligar: <span class="fone">(61) 3967-2416</span></a>
+          <a class="botao botao-vidro" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20meu%20pet%20precisa%20de%20atendimento%20urgente." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Chamar no WhatsApp</a>
+        </div>
+      </div>
+
+      <div class="relogio-caixa revelar" style="--atraso:.15s" aria-hidden="true">
+        <span class="onda-pulso"></span><span class="onda-pulso p2"></span><span class="onda-pulso p3"></span>
+        <svg class="relogio" viewBox="0 0 200 200">
+          <circle class="face" cx="100" cy="100" r="96"/>
+          <circle class="aro" cx="100" cy="100" r="88"/>
+          <g class="tracos"></g>
+          <text x="100" y="42">12</text><text x="158" y="100">3</text><text x="100" y="158">6</text><text x="42" y="100">9</text>
+          <text class="rotulo" x="100" y="70">VETCLIN</text>
+          <text class="rotulo" x="100" y="131">24 HORAS</text>
+          <line class="ponteiro p-hora" x1="100" y1="100" x2="100" y2="56"/>
+          <line class="ponteiro p-min" x1="100" y1="100" x2="100" y2="34"/>
+          <g class="ponteiro p-seg-grupo"><line class="p-seg" x1="100" y1="116" x2="100" y2="26"/></g>
+          <circle class="centro" cx="100" cy="100" r="6"/>
+        </svg>
+        <span class="astro"><svg class="icone lua"><use href="#i-lua"/></svg><svg class="icone sol"><use href="#i-sol"/></svg></span>
+        <span class="selo-24h">24h</span>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="sinais revelar">
+        <h3><svg class="icone"><use href="#i-alerta"/></svg> Sinais de alerta: procure atendimento na hora se o seu pet…</h3>
+        <ul>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Está com dificuldade para respirar</li>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Teve convulsão ou desmaio</li>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Vomita ou tem diarreia várias vezes ou com sangue</li>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Sofreu atropelamento, queda ou ferimento</li>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Engoliu veneno, remédio ou algum objeto</li>
+          <li><svg class="icone"><use href="#i-pulso"/></svg> Não consegue fazer xixi ou faz força sem sair nada</li>
+        </ul>
+      </div>
+    </div>
+
+    <svg class="ecg" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
+      <path class="base" d="M0 50H140l12-14 10 14h26l14-40 16 64 12-38 8 14H420l12-14 10 14h26l14-40 16 64 12-38 8 14H700l12-14 10 14h26l14-40 16 64 12-38 8 14H980l12-14 10 14h26l14-40 16 64 12-38 8 14H1200"/>
+      <path class="pulso" d="M0 50H140l12-14 10 14h26l14-40 16 64 12-38 8 14H420l12-14 10 14h26l14-40 16 64 12-38 8 14H700l12-14 10 14h26l14-40 16 64 12-38 8 14H980l12-14 10 14h26l14-40 16 64 12-38 8 14H1200"/>
+    </svg>
+  </section>
+
+  <!-- ==== Banho & Tosa e Pet Shop ==== -->
+  <section class="cuidados" id="banho-e-tosa">
+    <div class="container">
+      <header class="titulo-secao revelar">
+        <span class="selo"><svg class="icone"><use href="#i-brilho"/></svg> Bem-estar e beleza</span>
+        <h2>Banho &amp;&nbsp;Tosa e Pet&nbsp;Shop <em>no mesmo endereço</em></h2>
+        <p>Enquanto cuida da saúde, seu pet também pode sair cheiroso, lindo e com tudo o que precisa para o dia a dia.</p>
+      </header>
+
+      <div class="cuidados-grid">
+        <article class="cuidado cuidado-banho revelar">
+          <div class="foto">
+            <img src="imagens/banho-e-tosa.jpg" alt="Cachorro tomando banho com espuma no banho e tosa" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>banho-e-tosa.jpg</code><span>Foto real: banho &amp; tosa</span><small>1536 × 1024</small></div>
+          </div>
+          <div class="bolhas" aria-hidden="true">
+            <span style="--x:8%;--t:26px;--d:7s;--a:0s;--v:18px"></span><span style="--x:22%;--t:14px;--d:6s;--a:-2s;--v:-12px"></span>
+            <span style="--x:38%;--t:34px;--d:8s;--a:-4s;--v:24px"></span><span style="--x:55%;--t:18px;--d:6.5s;--a:-1s;--v:-20px"></span>
+            <span style="--x:70%;--t:28px;--d:7.5s;--a:-3s;--v:14px"></span><span style="--x:86%;--t:16px;--d:6s;--a:-5s;--v:-10px"></span>
+            <span style="--x:46%;--t:12px;--d:5.5s;--a:-2.5s;--v:10px"></span><span style="--x:92%;--t:22px;--d:8.5s;--a:-6s;--v:-24px"></span>
+          </div>
+          <span class="etiqueta-flutuante"><svg class="icone"><use href="#i-brilho"/></svg> Cheirinho garantido</span>
+          <div class="cuidado-corpo">
+            <div class="cuidado-topo"><span class="servico-icone"><svg class="icone"><use href="#i-banho"/></svg></span><h3>Banho &amp; Tosa</h3></div>
+            <p>Banho caprichado, tosa feita com paciência e aquele cheirinho de pet feliz. Seu amigo é tratado com carinho do começo ao fim e volta para casa lindo e confortável.</p>
+            <ul class="etiquetas"><li><svg class="icone"><use href="#i-check"/></svg> Banho</li><li><svg class="icone"><use href="#i-check"/></svg> Tosa</li><li><svg class="icone"><use href="#i-check"/></svg> Muito carinho</li></ul>
+            <a class="botao botao-laranja" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20banho%20%26%20tosa." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Agendar banho &amp; tosa</a>
+          </div>
+        </article>
+
+        <article class="cuidado cuidado-shop revelar" id="pet-shop" style="--atraso:.12s">
+          <div class="foto">
+            <img src="imagens/pet-shop.jpg" alt="Prateleiras do pet shop com rações, brinquedos e acessórios" loading="lazy" onload="this.classList.add('ok')" onerror="this.remove()">
+            <div class="foto-vazia" aria-hidden="true"><svg class="icone"><use href="#i-camera"/></svg><code>imagens/<wbr>pet-shop.jpg</code><span>Foto real: pet shop</span><small>1536 × 1024</small></div>
+          </div>
+          <span class="etiqueta-flutuante"><svg class="icone"><use href="#i-sacola"/></svg> Tudo para o seu pet</span>
+          <div class="cuidado-corpo">
+            <div class="cuidado-topo"><span class="servico-icone verde"><svg class="icone"><use href="#i-sacola"/></svg></span><h3>Pet Shop</h3></div>
+            <p>Rações, petiscos, brinquedos, acessórios e produtos de higiene para o dia a dia do seu pet. Aproveite a visita à clínica e já leve tudo o que ele precisa.</p>
+            <ul class="etiquetas"><li><svg class="icone"><use href="#i-check"/></svg> Rações</li><li><svg class="icone"><use href="#i-check"/></svg> Petiscos</li><li><svg class="icone"><use href="#i-check"/></svg> Brinquedos</li><li><svg class="icone"><use href="#i-check"/></svg> Acessórios</li></ul>
+            <a class="botao botao-verde" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20consultar%20produtos%20do%20pet%20shop." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Consultar produtos</a>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Sobre ==== -->
+  <section class="sobre" id="sobre">
+    <div class="container sobre-grid">
+      <div class="sobre-foto revelar">
+        <div class="moldura"><img src="imagens/equipe-vetclin.jpg" alt="Equipe da VetClin reunida em frente à clínica, no Setor Leste do Gama" width="1006" height="890" loading="lazy"></div>
+        <span class="etiqueta-galera">Nossa galera 💪</span>
+        <span class="selo-endereco"><svg class="icone"><use href="#i-pino"/></svg> Setor Leste · Gama - DF</span>
+      </div>
+      <div class="sobre-texto revelar" style="--atraso:.12s">
+        <span class="selo"><svg class="icone"><use href="#i-coracao"/></svg> Sobre a VetClin</span>
+        <h2 class="h2">Gente que ama bicho, <em>cuidando do seu</em></h2>
+        <p>A VetClin é a clínica veterinária do seu pet: um lugar com estrutura completa e uma equipe que recebe cada animal com paciência, respeito e muito carinho.</p>
+        <p>Aqui você encontra consultas, exames, vacinas, cirurgias e internação, além de banho &amp; tosa e pet shop. Tudo no mesmo endereço — e aberto 24 horas.</p>
+        <ul class="diferenciais">
+          <li><span class="ic"><svg class="icone"><use href="#i-relogio"/></svg></span><div><strong>Aberta 24 horas</strong><span>Para o dia a dia e para as emergências, a qualquer hora.</span></div></li>
+          <li><span class="ic"><svg class="icone"><use href="#i-escudo"/></svg></span><div><strong>Cuidado completo</strong><span>Da vacina à cirurgia, com acompanhamento em cada etapa.</span></div></li>
+          <li><span class="ic"><svg class="icone"><use href="#i-equipe"/></svg></span><div><strong>Equipe dedicada</strong><span>Gente apaixonada por animais, que trata seu pet como família.</span></div></li>
+          <li><span class="ic"><svg class="icone"><use href="#i-sacola"/></svg></span><div><strong>Tudo em um só lugar</strong><span>Clínica, banho &amp; tosa e pet shop no mesmo endereço.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Como agendar ==== -->
+  <section class="passos" id="como-agendar">
+    <div class="container">
+      <header class="titulo-secao revelar">
+        <span class="selo"><svg class="icone"><use href="#i-calendario"/></svg> Como agendar</span>
+        <h2>Atendimento fácil, <em>em 3 passos</em></h2>
+        <p>Sem complicação: fale com a gente do jeito que for melhor para você.</p>
+      </header>
+      <ol class="passos-lista">
+        <li class="trilha" aria-hidden="true"><svg class="icone"><use href="#i-pata"/></svg></li>
+        <li class="passo revelar"><span class="passo-num"><svg class="icone"><use href="#i-whats"/></svg><b>1</b></span><h3>Chame no WhatsApp</h3><p>Mande uma mensagem para <span class="fone">(61) 99841-4031</span> ou ligue para o fixo <span class="fone">(61) 3967-2416</span>.</p></li>
+        <li class="passo revelar" style="--atraso:.12s"><span class="passo-num"><svg class="icone"><use href="#i-calendario"/></svg><b>2</b></span><h3>Combine o atendimento</h3><p>Tire suas dúvidas e escolha o melhor horário. Em emergências, venha direto: estamos abertos 24 horas.</p></li>
+        <li class="passo revelar" style="--atraso:.24s"><span class="passo-num"><svg class="icone"><use href="#i-pata"/></svg><b>3</b></span><h3>Traga seu pet</h3><p>Quadra 45, Lote 82 – Setor Leste, Gama. Seu amigo será recebido com todo o carinho.</p></li>
+      </ol>
+      <div class="passos-cta revelar">
+        <a class="botao botao-laranja" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Agendar agora</a>
+        <a class="botao botao-branco" href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> <span class="fone">(61) 3967-2416</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Google e Instagram ==== -->
+  <section class="social" id="avaliacoes">
+    <div class="container social-grid">
+      <div class="cartao-google revelar">
+        <svg class="enfeite" aria-hidden="true"><use href="#i-estrela"/></svg>
+        <div class="topo"><svg class="icone"><use href="#i-estrela"/></svg> Avaliações no Google</div>
+        <div class="nota-grande">
+          <strong>4,8</strong>
+          <div>
+            <span class="estrelas estrelas-parciais" style="--pct:96%" role="img" aria-label="Nota 4,8 de 5">
+              <span class="vazias"><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg></span>
+              <span class="cheias"><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg><svg class="icone"><use href="#i-estrela"/></svg></span>
+            </span>
+            <small>Mais de 50 avaliações de tutores</small>
+          </div>
+        </div>
+        <p>A confiança de quem já trouxe o seu pet até a VetClin é o nosso maior orgulho. Veja o que os tutores dizem — e, se você já é nosso cliente, conte como foi a sua experiência.</p>
+        <div class="acoes">
+          <a class="botao botao-escuro" href="https://www.google.com/maps/search/?api=1&amp;query=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%20Gama%20DF" target="_blank" rel="noopener"><svg class="icone"><use href="#i-estrela"/></svg> Ver avaliações no Google</a>
+        </div>
+      </div>
+
+      <div class="cartao-insta revelar" style="--atraso:.12s">
+        <div class="insta-enfeites" aria-hidden="true"><svg class="icone e1"><use href="#i-coracao"/></svg><svg class="icone e2"><use href="#i-pata"/></svg><svg class="icone e3"><use href="#i-camera"/></svg></div>
+        <div>
+          <span class="arroba"><svg class="icone"><use href="#i-insta"/></svg> @vetclingama</span>
+          <h3>Siga a VetClin no Instagram</h3>
+          <p>Bastidores da clínica, dicas de cuidados e os pacientes mais fofos do Gama.</p>
+        </div>
+        <a class="botao botao-branco" href="https://www.instagram.com/vetclingama/" target="_blank" rel="noopener"><svg class="icone"><use href="#i-insta"/></svg> Seguir @vetclingama</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Dúvidas ==== -->
+  <section class="duvidas" id="duvidas">
+    <div class="container duvidas-grid">
+      <div class="duvidas-intro revelar">
+        <span class="selo"><svg class="icone"><use href="#i-check"/></svg> Dúvidas frequentes</span>
+        <h2 class="h2">Perguntas que <em>todo tutor faz</em></h2>
+        <p>Não encontrou a sua dúvida? Chame no WhatsApp que a nossa equipe te ajuda.</p>
+        <a class="botao botao-laranja" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20tenho%20uma%20d%C3%BAvida." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Tirar dúvida no WhatsApp</a>
+      </div>
+      <div class="duvidas-lista revelar" style="--atraso:.1s">
+        <details class="pergunta" open><summary>A VetClin funciona 24 horas? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>Sim! A clínica fica aberta 24 horas por dia. Em caso de emergência, venha direto ou ligue para <span class="fone">(61) 3967-2416</span> no caminho.</p></details>
+        <details class="pergunta"><summary>Como faço para agendar uma consulta? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>É só chamar no WhatsApp <span class="fone">(61) 99841-4031</span> ou ligar para o fixo <span class="fone">(61) 3967-2416</span>. Nossa equipe te ajuda a encontrar o melhor horário.</p></details>
+        <details class="pergunta"><summary>Quais serviços vocês oferecem? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>Consultas, exames, vacinas, cirurgias e internação, além de banho &amp; tosa e pet shop — tudo no mesmo endereço.</p></details>
+        <details class="pergunta"><summary>Onde fica a clínica? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>Na Quadra 45, Lote 82, Setor Leste, no Gama (DF). Na seção de contato, use os botões do Google Maps ou do Waze para traçar o caminho.</p></details>
+        <details class="pergunta"><summary>Preciso agendar o banho &amp; tosa? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>Recomendamos agendar pelo WhatsApp para garantir o melhor horário para o seu pet.</p></details>
+        <details class="pergunta"><summary>Vocês vendem ração e acessórios? <span class="mais"><svg class="icone"><use href="#i-mais"/></svg></span></summary><p>Sim! No nosso pet shop você encontra rações, petiscos, brinquedos, acessórios e produtos de higiene.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Contato ==== -->
+  <section class="contato" id="contato">
+    <div class="container">
+      <header class="titulo-secao revelar">
+        <span class="selo"><svg class="icone"><use href="#i-pino"/></svg> Contato</span>
+        <h2>Venha conhecer <em>a VetClin</em></h2>
+        <p>Estamos no Setor Leste do Gama, de portas abertas 24 horas.</p>
+      </header>
+      <div class="contato-grid">
+        <div class="contato-cartao revelar">
+          <ul class="contato-lista">
+            <li><span class="ic"><svg class="icone"><use href="#i-pino"/></svg></span><div><strong>Endereço</strong><span>Quadra 45, Lote 82 – Setor Leste<br>Gama - DF</span></div></li>
+            <li><span class="ic"><svg class="icone"><use href="#i-relogio"/></svg></span><div><strong>Horário</strong><span>Aberto 24 horas <span class="aberto-agora"><span class="ponto"></span> aberto agora</span></span></div></li>
+            <li><span class="ic"><svg class="icone"><use href="#i-whats"/></svg></span><div><strong>WhatsApp</strong><a href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><span class="fone">(61) 99841-4031</span></a></div></li>
+            <li><span class="ic"><svg class="icone"><use href="#i-fone"/></svg></span><div><strong>Telefone fixo</strong><a href="tel:+556139672416"><span class="fone">(61) 3967-2416</span></a></div></li>
+            <li><span class="ic"><svg class="icone"><use href="#i-insta"/></svg></span><div><strong>Instagram</strong><a href="https://www.instagram.com/vetclingama/" target="_blank" rel="noopener">@vetclingama</a></div></li>
+          </ul>
+          <div class="contato-acoes">
+            <a class="botao botao-laranja" href="https://www.google.com/maps/dir/?api=1&amp;destination=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%2C%20Q%2045%20Lt%2082%2C%20Setor%20Leste%2C%20Gama%20-%20DF" target="_blank" rel="noopener"><svg class="icone"><use href="#i-rota"/></svg> Abrir no Google Maps</a>
+            <a class="botao botao-branco" href="https://waze.com/ul?q=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%20Gama%20DF&amp;navigate=yes" target="_blank" rel="noopener"><svg class="icone"><use href="#i-rota"/></svg> Ir com o Waze</a>
+          </div>
+        </div>
+        <div class="mapa revelar" style="--atraso:.12s">
+          <iframe title="Mapa com a localização da VetClin no Setor Leste do Gama" src="https://www.google.com/maps?q=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%2C%20Q%2045%20Lt%2082%2C%20Setor%20Leste%2C%20Gama%20-%20DF&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ==== Rodapé ==== -->
+<footer class="rodape">
+  <div class="container">
+    <div class="cta-final revelar">
+      <div class="patas" aria-hidden="true"><svg class="icone"><use href="#i-pata"/></svg><svg class="icone"><use href="#i-pata"/></svg><svg class="icone"><use href="#i-pata"/></svg></div>
+      <div>
+        <h2>Seu pet merece cuidado de verdade. <span>A gente está aqui 24 horas.</span></h2>
+        <p>Fale agora com a VetClin pelo WhatsApp ou pelo telefone.</p>
+      </div>
+      <div class="cta-final-acoes">
+        <a class="botao botao-branco" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> Chamar no WhatsApp</a>
+        <a class="botao botao-escuro" href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> Ligar agora</a>
+      </div>
+    </div>
+
+    <div class="rodape-grid">
+      <div class="rodape-sobre">
+        <a class="marca" href="#inicio" aria-label="VetClin Clínica Veterinária, voltar ao início">
+          <svg class="marca-icone" aria-hidden="true"><use href="#logo"/></svg>
+          <span class="marca-nome">VetClin<small>Clínica Veterinária</small></span>
+        </a>
+        <p>A clínica veterinária do seu pet. Saúde, carinho e cuidado completo no Gama, 24 horas por dia.</p>
+        <div class="redes">
+          <a href="https://www.instagram.com/vetclingama/" target="_blank" rel="noopener" aria-label="Instagram da VetClin"><svg class="icone"><use href="#i-insta"/></svg></a>
+          <a href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener" aria-label="WhatsApp da VetClin"><svg class="icone"><use href="#i-whats"/></svg></a>
+          <a href="tel:+556139672416" aria-label="Ligar para a VetClin"><svg class="icone"><use href="#i-fone"/></svg></a>
+        </div>
+      </div>
+      <div>
+        <h3>Serviços</h3>
+        <ul class="rodape-lista">
+          <li><a href="#servicos">Consultas e exames</a></li>
+          <li><a href="#servicos">Vacinas</a></li>
+          <li><a href="#servicos">Cirurgias e internação</a></li>
+          <li><a href="#banho-e-tosa">Banho &amp; Tosa</a></li>
+          <li><a href="#pet-shop">Pet Shop</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Contato</h3>
+        <ul class="rodape-lista">
+          <li><a href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener"><svg class="icone"><use href="#i-whats"/></svg> <span class="fone">(61) 99841-4031</span></a></li>
+          <li><a href="tel:+556139672416"><svg class="icone"><use href="#i-fone"/></svg> <span class="fone">(61) 3967-2416</span></a></li>
+          <li><a href="https://www.google.com/maps/dir/?api=1&amp;destination=VetClin%20Cl%C3%ADnica%20Veterin%C3%A1ria%2C%20Q%2045%20Lt%2082%2C%20Setor%20Leste%2C%20Gama%20-%20DF" target="_blank" rel="noopener"><svg class="icone"><use href="#i-pino"/></svg> Q 45, Lt 82 – Setor Leste, Gama - DF</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Horário</h3>
+        <p class="selo-rodape"><span class="ponto"></span> Aberto 24 horas</p>
+        <p style="margin-top:.9rem;font-size:.95rem">Emergências a qualquer hora do dia ou da noite.</p>
+      </div>
+    </div>
+
+    <div class="rodape-base">
+      <span>© <span data-ano>2026</span> VetClin Clínica Veterinária · Gama - DF</span>
+      <!-- Se a clínica quiser, coloque aqui o responsável técnico: "Responsável técnico: Dr(a). Nome · CRMV-DF nº 0000" -->
+      <a href="#inicio">Voltar ao topo ↑</a>
+    </div>
+  </div>
+</footer>
+
+<a class="whats-flutuante" href="https://wa.me/556198414031?text=Ol%C3%A1%2C%20VetClin!%20Vim%20pelo%20site%20e%20gostaria%20de%20agendar%20um%20atendimento." target="_blank" rel="noopener" aria-label="Conversar com a VetClin no WhatsApp">
+  <span class="whats-balao" aria-hidden="true">Precisa de ajuda? <b>Fale com a gente!</b></span>
+  <span class="whats-botao"><svg class="icone"><use href="#i-whats"/></svg></span>
+</a>
+
+<script>
+(function () {
+  'use strict';
+  const doc = document;
+  const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Cabeçalho ganha sombra ao rolar
+  const cab = doc.querySelector('.cabecalho');
+  const aoRolar = () => cab.classList.toggle('rolou', window.scrollY > 8);
+  aoRolar();
+  window.addEventListener('scroll', aoRolar, { passive: true });
+
+  // Menu do celular
+  const botaoMenu = doc.querySelector('.menu-botao');
+  const menu = doc.getElementById('menu');
+  const abrirMenu = (abrir) => {
+    botaoMenu.setAttribute('aria-expanded', String(abrir));
+    botaoMenu.setAttribute('aria-label', abrir ? 'Fechar menu' : 'Abrir menu');
+    doc.body.classList.toggle('menu-aberto', abrir);
+  };
+  botaoMenu.addEventListener('click', () => abrirMenu(botaoMenu.getAttribute('aria-expanded') !== 'true'));
+  menu.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => abrirMenu(false)));
+  doc.addEventListener('keydown', (e) => { if (e.key === 'Escape') abrirMenu(false); });
+
+  // Marca no menu a seção que está na tela
+  const links = [...menu.querySelectorAll('a[href^="#"]')];
+  const secoes = links.map((a) => doc.querySelector(a.getAttribute('href'))).filter(Boolean);
+  if ('IntersectionObserver' in window) {
+    const obsMenu = new IntersectionObserver((itens) => {
+      itens.forEach((it) => {
+        if (it.isIntersecting) links.forEach((a) => a.classList.toggle('ativo', a.getAttribute('href') === '#' + it.target.id));
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    secoes.forEach((s) => obsMenu.observe(s));
+  }
+
+  // Elementos aparecem ao rolar
+  const revelar = doc.querySelectorAll('.revelar');
+  if ('IntersectionObserver' in window && !semMovimento) {
+    const obs = new IntersectionObserver((itens) => {
+      itens.forEach((it) => { if (it.isIntersecting) { it.target.classList.add('visivel'); obs.unobserve(it.target); } });
+    }, { threshold: 0.12, rootMargin: '0px 0px -30px 0px' });
+    revelar.forEach((el) => obs.observe(el));
+  } else revelar.forEach((el) => el.classList.add('visivel'));
+
+  // Números contam até o valor quando aparecem
+  const contadores = doc.querySelectorAll('[data-contar]');
+  const formatar = (v, casas) => v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+  const contar = (el) => {
+    const alvo = parseFloat(el.dataset.contar), casas = +(el.dataset.casas || 0), t0 = performance.now(), dur = 1500;
+    const passo = (t) => {
+      const p = Math.min(1, (t - t0) / dur), suave = 1 - Math.pow(1 - p, 3);
+      el.textContent = formatar(alvo * suave, casas);
+      if (p < 1) requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  };
+  if ('IntersectionObserver' in window && !semMovimento) {
+    const obsNum = new IntersectionObserver((itens) => {
+      itens.forEach((it) => { if (it.isIntersecting) { contar(it.target); obsNum.unobserve(it.target); } });
+    }, { threshold: 0.6 });
+    contadores.forEach((el) => obsNum.observe(el));
+  }
+
+  // Fotos que já estavam no cache (garante a classe "ok")
+  doc.querySelectorAll('.foto img').forEach((img) => { if (img.complete && img.naturalWidth) img.classList.add('ok'); });
+
+  // Vídeo opcional do topo: só aparece se o arquivo existir
+  const video = doc.querySelector('.hero-video');
+  if (video && !semMovimento) {
+    video.addEventListener('canplay', () => { video.classList.add('ok'); video.play().catch(() => {}); }, { once: true });
+    video.addEventListener('error', () => video.remove(), { once: true });
+    video.src = video.dataset.src;
+    video.load();
+  } else if (video) video.remove();
+
+  // Pegadas que atravessam o topo
+  const pegadas = doc.querySelector('.pegadas');
+  if (pegadas) {
+    for (let i = 0; i < 12; i++) {
+      const p = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      p.setAttribute('class', 'icone');
+      p.innerHTML = '<use href="#i-pata"/>';
+      p.style.left = (4 + i * 8) + '%';
+      p.style.top = (i % 2 ? 6 : 34) + 'px';
+      p.style.animationDelay = (i * 0.45) + 's';
+      pegadas.appendChild(p);
+    }
+  }
+
+  // Inclinação 3D do topo acompanhando o mouse
+  const hero = doc.querySelector('.hero');
+  const palco = doc.querySelector('.hero-palco');
+  if (hero && palco && !semMovimento && window.matchMedia('(pointer: fine)').matches) {
+    let quadro = 0;
+    hero.addEventListener('pointermove', (e) => {
+      if (quadro) return;
+      quadro = requestAnimationFrame(() => {
+        quadro = 0;
+        const r = hero.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        palco.style.setProperty('--ry', (x * 12).toFixed(2) + 'deg');
+        palco.style.setProperty('--rx', (-y * 9).toFixed(2) + 'deg');
+      });
+    });
+    hero.addEventListener('pointerleave', () => { palco.style.setProperty('--ry', '0deg'); palco.style.setProperty('--rx', '0deg'); });
+  }
+
+  // Estrelas no céu do plantão
+  const ceu = doc.querySelector('.ceu');
+  if (ceu) {
+    let html = '';
+    for (let i = 0; i < 60; i++) {
+      const t = (Math.random() * 2 + 1).toFixed(1);
+      html += '<i style="left:' + (Math.random() * 100).toFixed(2) + '%;top:' + (Math.random() * 100).toFixed(2) + '%;--t:' + t + 'px;--d:' + (2 + Math.random() * 4).toFixed(1) + 's;--a:-' + (Math.random() * 5).toFixed(1) + 's"></i>';
+    }
+    ceu.innerHTML = html;
+  }
+
+  // Relógio: hora de Brasília, ponteiros e dia/noite
+  const tracos = doc.querySelector('.relogio .tracos');
+  if (tracos) {
+    let linhas = '';
+    for (let i = 0; i < 60; i++) {
+      const a = i * 6 * Math.PI / 180, forte = i % 5 === 0, r1 = forte ? 70 : 74, r2 = 80;
+      linhas += '<line' + (forte ? ' class="forte"' : '') + ' x1="' + (100 + r1 * Math.sin(a)).toFixed(2) + '" y1="' + (100 - r1 * Math.cos(a)).toFixed(2) + '" x2="' + (100 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (100 - r2 * Math.cos(a)).toFixed(2) + '"/>';
+    }
+    tracos.innerHTML = linhas;
+  }
+  const ponteiros = { h: doc.querySelector('.p-hora'), m: doc.querySelector('.p-min'), s: doc.querySelector('.p-seg-grupo') };
+  const voltas = { h: 0, m: 0, s: 0 }, ultimo = { h: -1, m: -1, s: -1 };
+  const textoHora = doc.querySelector('[data-hora]');
+  const caixaRelogio = doc.querySelector('.relogio-caixa');
+  const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const girarPonteiro = (k, graus) => {
+    if (!ponteiros[k]) return;
+    if (graus < ultimo[k]) voltas[k] += 360; // virou a volta: continua no mesmo sentido
+    ultimo[k] = graus;
+    ponteiros[k].style.transform = 'rotate(' + (graus + voltas[k]) + 'deg)';
+  };
+  const atualizarRelogio = () => {
+    const partes = {};
+    fmt.formatToParts(new Date()).forEach((p) => { partes[p.type] = p.value; });
+    const h = +partes.hour % 24, m = +partes.minute, s = +partes.second;
+    if (textoHora) textoHora.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    girarPonteiro('h', (h % 12) * 30 + m * 0.5);
+    girarPonteiro('m', m * 6 + s * 0.1);
+    girarPonteiro('s', s * 6);
+    if (caixaRelogio) caixaRelogio.classList.toggle('dia', h >= 6 && h < 18);
+  };
+  Object.values(ponteiros).forEach((p) => p && p.classList.add('sem-transicao'));
+  atualizarRelogio();
+  requestAnimationFrame(() => requestAnimationFrame(() => Object.values(ponteiros).forEach((p) => p && p.classList.remove('sem-transicao'))));
+  setInterval(atualizarRelogio, 1000);
+
+  // Ano atual no rodapé
+  doc.querySelectorAll('[data-ano]').forEach((el) => { el.textContent = new Date().getFullYear(); });
+
+  // Balão do WhatsApp aparece um pouco depois
+  const whats = doc.querySelector('.whats-flutuante');
+  if (whats) {
+    setTimeout(() => whats.classList.add('mostrar'), 4000);
+    setTimeout(() => whats.classList.remove('mostrar'), 12000);
+  }
+})();
+</script>
+</body>
+</html>
