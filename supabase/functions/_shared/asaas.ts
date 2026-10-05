@@ -101,7 +101,8 @@ export async function grantCourtesy(companyId: string, opts: { plan: string; unt
   const after = opts.until ? (paidEnd && paidEnd > opts.until ? paidEnd : opts.until) : '2099-12-31';
   const { error } = await admin.from('companies').update({
     complimentary: true, comp_until: opts.until, comp_note: opts.note, plan: opts.plan,
-    billing_status: 'canceled', current_period_end: after, canceled_at: null, access_revoked: false,
+    // sem prazo: fica "ativa" (como a conta da casa); com prazo: "cancelada até" a data, para bloquear quando vencer
+    billing_status: opts.until ? 'canceled' : 'active', current_period_end: after, canceled_at: null, access_revoked: false,
     asaas_subscription_id: null, asaas_checkout_id: null, updated_at: new Date().toISOString(),
   }).eq('id', companyId);
   if (error) throw new Error(`não consegui salvar a cortesia: ${error.message}`);
