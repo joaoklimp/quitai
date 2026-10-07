@@ -5,3 +5,4 @@ exclude:
   - CNAME
   - CLAUDE.md
   - supabase
+  - skills-lock.json

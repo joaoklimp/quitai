@@ -1,4 +1,5 @@
 Novo(a) Documento de Texto.txt
-.claude/
+.claude/*
+!.claude/skills/
 supabase/.temp/
 aguarde/
