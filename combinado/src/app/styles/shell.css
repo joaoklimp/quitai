@@ -148,3 +148,9 @@
 .update-bar { background: var(--blue-soft); }
 .update-bar > svg { color: var(--blue-ink); }
 @media (max-width: 640px) { .update-bar { flex-wrap: wrap; } .update-bar .grow { flex: 1 1 calc(100% - 40px); } }
+
+/* cabeçalho do menu da sua conta, com a foto */
+.user-head { display: flex; gap: 12px; align-items: center; padding: 10px 12px 8px; }
+.menu .user-head-av { width: auto; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; flex: none; }
+.menu .user-head-av:hover { background: none; }
+.menu .user-head-av:hover .avatar { box-shadow: 0 0 0 3px var(--blue-soft); }

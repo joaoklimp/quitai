@@ -434,6 +434,21 @@ describe('segurança', () => {
     await expect(db.as(user(ana), (q) => q.rows(`select * from rate_limits`))).rejects.toThrow(/permission denied/);
   });
 
+  it('foto de perfil: cada um troca a sua; só imagem pequena embutida, sem endereço de fora', async () => {
+    const png = 'data:image/jpeg;base64,' + 'A'.repeat(4000);
+    await db.as(user(carla), (q) => q.exec(`update members set avatar_url = $1 where user_id = $2`, [png, carla]));
+    const mine = await db.as(user(ana), (q) => q.one<{ avatar_url: string }>(`select avatar_url from members where user_id = $1`, [carla]));
+    expect(mine.avatar_url).toBe(png); // a equipe vê a foto
+    // a atendente não troca a foto de outra pessoa
+    await expect(db.as(user(carla), (q) => q.exec(`update members set avatar_url = $1 where user_id = $2`, [png, ana]))).resolves.toBe(0);
+    // endereço externo ou imagem grande demais: recusado
+    await expect(db.as(user(carla), (q) => q.exec(`update members set avatar_url = 'https://rastreador.com/foto.png' where user_id = $1`, [carla]))).rejects.toThrow(/check constraint/);
+    await expect(db.as(user(carla), (q) => q.exec(`update members set avatar_url = $1 where user_id = $2`, ['data:image/jpeg;base64,' + 'A'.repeat(200001), carla]))).rejects.toThrow(/check constraint/);
+    // remover a foto
+    await db.as(user(carla), (q) => q.exec(`update members set avatar_url = null where user_id = $1`, [carla]));
+    expect((await db.as(user(carla), (q) => q.one<{ avatar_url: string | null }>(`select avatar_url from members where user_id = $1`, [carla]))).avatar_url).toBeNull();
+  });
+
   it('verificação em duas etapas: com o código ativado, a senha sozinha não abre nada', async () => {
     const peek = (who: { user: string; aal?: 'aal1' | 'aal2' }) => db.as(who, (q) => q.one<{ cid: string | null; contacts: number; members: number; role: string | null; admin: boolean }>(`
       select public.my_company() as cid, (select count(*)::int from contacts) as contacts, (select count(*)::int from members) as members,

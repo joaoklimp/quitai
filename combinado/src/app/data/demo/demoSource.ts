@@ -21,7 +21,7 @@ export class DemoSource implements DataSource {
     const sess = demoSession();
     if (sess.state === 'off') return null;
     const d = demoDb();
-    const base = { user_id: DEMO_USER_ID, email: sess.email || 'voce@brilholar.com.br', name: sess.name || 'Você (demonstração)', role: 'dono' as const, isPlatformAdmin: true };
+    const base = { user_id: DEMO_USER_ID, email: sess.email || 'voce@brilholar.com.br', name: sess.name || 'Você (demonstração)', role: 'dono' as const, isPlatformAdmin: true, avatar_url: d.members.find((m) => m.user_id === DEMO_USER_ID)?.avatar_url ?? null };
     if (sess.state === 'onboarding') return { ...base, company: null as unknown as Company };
     return { ...base, company: structuredClone(d.company) };
   }

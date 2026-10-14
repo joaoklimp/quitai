@@ -1,11 +1,11 @@
 // Configurações: empresa, assistente IA, WhatsApp, equipe, assinatura, app e notificações, segurança e conta.
 import { SPECIALTIES } from '../../shared/presets';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Bot, MessageCircle, Users, CreditCard, UserCog, Check, Copy, Plus, Trash2, ShieldCheck, Smartphone, Sparkles, Download, KeyRound, ExternalLink,
-  QrCode, Receipt, RefreshCw, Lock, CircleAlert, Link2, Unlink, BellRing,
+  QrCode, Receipt, RefreshCw, Lock, CircleAlert, Link2, Unlink, BellRing, Camera,
 } from 'lucide-react';
 import { api, isDemo } from '../data/api';
 import { SUPABASE_URL } from '../data/supabase/supaSource';
@@ -17,6 +17,7 @@ import { brl, fmtDate, fmtAgo, formatPhone, timeLeftLabel, WEEKDAYS } from '../.
 import { TEMPLATE_LIST } from '../../shared/templates';
 import { PLANS, PAID_PLANS, planPrice, monthlyEquivalent, type Cycle, type PaidPlanId } from '../../shared/plans';
 import { AppTab, SecurityTab } from './settings/AppSecurity';
+import { shrinkPhoto } from '../ui/pro';
 
 const TABS = [
   { id: 'empresa', label: 'Empresa', icon: Building2 },
@@ -421,7 +422,7 @@ function TeamTab() {
         <div className="card-head"><div><h3>Equipe</h3><div className="sub">{members.length} de {limit} pessoas no plano {PLANS[me.company.plan].name}</div></div>{owner && <Button variant="solid" icon={<Plus />} disabled={members.length >= limit} onClick={() => setOpen(true)}>Convidar pessoa</Button>}</div>
         {isLoading ? <Loader /> : members.map((m: Member) => (
           <div key={m.user_id} className="member">
-            <Avatar name={m.name} />
+            <Avatar name={m.name} src={m.avatar_url} />
             <div className="grow" style={{ minWidth: 0 }}><b>{m.name}{m.user_id === me.user_id && <span className="muted"> (você)</span>}</b><div className="muted small">{m.email}{m.phone_verified_at ? ` · WhatsApp ${formatPhone(m.phone)} verificado` : ''}{m.invited ? ' · convite pendente' : ''}</div></div>
             {owner && m.role !== 'dono' && m.user_id !== me.user_id ? (
               <Select value={m.role} onChange={async (e) => { await api.updateMember(m.user_id, { role: e.target.value as Role }); inv('members'); toast('Permissão atualizada'); }} style={{ width: 150 }} aria-label="Papel">{(['gerente', 'atendente'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</Select>
@@ -556,6 +557,42 @@ function Checkout({ plan, cycle, onClose }: { plan: PaidPlanId | null; cycle: Cy
 }
 
 /* ================= conta ================= */
+/** Foto de perfil: escolher, trocar ou remover (a imagem é cortada e reduzida no próprio aparelho). */
+function ProfilePhoto() {
+  const { me, refresh } = useMeCtx();
+  const toast = useToast();
+  const inv = useInvalidate();
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const save = async (avatar_url: string | null) => {
+    setBusy(true);
+    try { await api.updateMember(me.user_id, { avatar_url }); refresh(); inv('members'); toast(avatar_url ? 'Foto atualizada' : 'Foto removida'); }
+    catch (e) { toast((e as Error).message, 'err'); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const pick = async (file?: File | null) => {
+    if (!file) return;
+    try { await save(await shrinkPhoto(file, 256)); } catch (e) { toast((e as Error).message, 'err'); }
+  };
+  return (
+    <div className="pro-photo profile-photo">
+      <button type="button" className="pro-photo-btn" onClick={() => fileRef.current?.click()} aria-label={me.avatar_url ? 'Trocar foto' : 'Adicionar foto'} disabled={busy}>
+        <span className="profile-photo-av"><Avatar name={me.name || me.email} src={me.avatar_url} size="xl" /></span>
+        <span className="pro-photo-cam"><Camera /></span>
+      </button>
+      <div>
+        <b>Sua foto</b>
+        <p className="muted small" style={{ margin: '2px 0 10px' }}>Aparece no topo do painel e na lista da equipe. Use uma foto de rosto, de frente. Reduzimos o tamanho sozinhos.</p>
+        <div className="row" style={{ gap: 8 }}>
+          <Button size="sm" icon={<Camera />} loading={busy} onClick={() => fileRef.current?.click()}>{me.avatar_url ? 'Trocar foto' : 'Escolher foto'}</Button>
+          {me.avatar_url && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void save(null)}>Remover</Button>}
+        </div>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      </div>
+    </div>
+  );
+}
+
 function AccountTab() {
   const { me, refresh } = useMeCtx();
   const toast = useToast();
@@ -575,6 +612,7 @@ function AccountTab() {
     <>
       <section className="card set-section">
         <div className="card-head"><div><h3>Seu perfil</h3><div className="sub">{me.email}</div></div></div>
+        <ProfilePhoto />
         <div className="form-grid">
           <Field label="Seu nome"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Tema"><Select value={theme} onChange={(e) => setTheme(e.target.value as typeof theme)}><option value="auto">Automático (do aparelho)</option><option value="light">Claro</option><option value="dark">Escuro</option></Select></Field>

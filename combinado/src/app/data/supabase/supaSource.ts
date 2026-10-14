@@ -156,7 +156,7 @@ export class SupabaseSource implements DataSource {
     const { data: c, error: ce } = await this.sb.from('companies').select('*').eq('id', m.company_id).single();
     if (ce) throw friendly(ce);
     this.companyId = c.id;
-    return { user_id: user.id, email: user.email ?? m.email, name: m.name, role: m.role, company: c as Company, isPlatformAdmin: !!adm };
+    return { user_id: user.id, email: user.email ?? m.email, name: m.name, role: m.role, company: c as Company, isPlatformAdmin: !!adm, avatar_url: m.avatar_url ?? null };
   }
   async signIn(email: string, password: string, captchaToken?: string) {
     const { error } = await this.sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password, options: captchaToken ? { captchaToken } : undefined });
@@ -292,6 +292,7 @@ export class SupabaseSource implements DataSource {
     if (patch.active !== undefined) clean.active = patch.active;
     if (patch.name) clean.name = patch.name;
     if (patch.phone !== undefined) { clean.phone = patch.phone; }
+    if (patch.avatar_url !== undefined) clean.avatar_url = patch.avatar_url;
     const { error } = await this.sb.from('members').update(clean).eq('company_id', this.cid()).eq('user_id', user_id);
     if (error) throw friendly(error);
   }

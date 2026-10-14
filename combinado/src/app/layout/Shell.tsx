@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Stethoscope,
   BarChart3, Bell, CalendarDays, CheckCheck, ClipboardList, CreditCard, FileText, HelpCircle, History, LayoutGrid, LogOut, Menu as MenuIcon, MessageCircle,
   Monitor, Moon, Search, Settings, ShieldCheck, Smartphone, Sparkles, Sun, Tag, Users, Wallet, Workflow, CalendarCheck, CircleDollarSign, Bot, Info,
-  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight, Download, WifiOff, RefreshCw,
+  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight, Download, WifiOff, RefreshCw, UserRound,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
@@ -204,15 +204,21 @@ function UserMenu() {
   const qc = useQueryClient();
   const roleLabel = { dono: 'Dono', gerente: 'Gerente', atendente: 'Atendente' }[me.role];
   return (
-    <Menu trigger={({ toggle }) => <button className="user-btn" onClick={toggle} aria-label="Sua conta"><Avatar name={me.name || me.email} /></button>}>
+    <Menu trigger={({ toggle }) => <button className="user-btn" onClick={toggle} aria-label="Sua conta"><Avatar name={me.name || me.email} src={me.avatar_url} /></button>}>
       {(close) => (
         <>
-          <div style={{ padding: '10px 12px 8px' }}>
-            <div style={{ fontWeight: 700 }}>{me.name}</div>
-            <div className="muted small">{me.email}</div>
-            <div className="small" style={{ marginTop: 6 }}><span className="badge sm">{roleLabel}</span> <span className="muted">· {me.company.name}</span></div>
+          <div className="user-head">
+            <button type="button" className="user-head-av" onClick={() => { close(); nav('/configuracoes/conta'); }} aria-label={me.avatar_url ? 'Trocar sua foto' : 'Colocar sua foto'} title={me.avatar_url ? 'Trocar foto' : 'Colocar foto'}>
+              <Avatar name={me.name || me.email} src={me.avatar_url} size="lg" />
+            </button>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700 }}>{me.name}</div>
+              <div className="muted small truncate">{me.email}</div>
+              <div className="small" style={{ marginTop: 6 }}><span className="badge sm">{roleLabel}</span> <span className="muted">· {me.company.name}</span></div>
+            </div>
           </div>
           <div className="sep" />
+          <button onClick={() => { close(); nav('/configuracoes/conta'); }}><UserRound />Seu perfil e foto</button>
           <button onClick={() => { close(); nav('/configuracoes'); }}><Settings />Configurações</button>
           <button onClick={() => { close(); nav('/configuracoes/assinatura'); }}><CreditCard />Assinatura e faturas</button>
           <button onClick={() => { close(); nav('/ajuda'); }}><HelpCircle />Ajuda</button>

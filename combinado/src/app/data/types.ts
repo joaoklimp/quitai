@@ -88,6 +88,7 @@ export interface Member {
   active: boolean;
   invited?: boolean;
   last_assigned_at?: ISO | null; // última conversa recebida no rodízio
+  avatar_url?: string | null; // foto de perfil (imagem pequena embutida)
   created_at: ISO;
 }
 
@@ -417,6 +418,8 @@ export interface Me {
   role: Role;
   company: Company;
   isPlatformAdmin: boolean;
+  /** Foto de perfil (aparece no topo do painel e na lista da equipe). */
+  avatar_url?: string | null;
   /** Login feito com a senha, falta o código da verificação em duas etapas (nada da empresa é carregado antes). */
   mfaPending?: boolean;
 }

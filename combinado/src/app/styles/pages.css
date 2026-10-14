@@ -716,3 +716,6 @@ details.adv[open] > summary::before { transform: rotate(90deg); }
 .install-perks li { display: flex; gap: 10px; align-items: center; }
 .install-perks svg { width: 17px; height: 17px; color: var(--blue-ink); flex: none; }
 .install-card .auth-foot .btn svg { width: 16px; height: 16px; }
+
+/* foto de perfil */
+.profile-photo-av .avatar { --s: 84px; font-size: 30px; }
