@@ -15,8 +15,8 @@ language sql stable security definer set search_path = '' as $$
      and (coalesce(auth.jwt() ->> 'aal', '') = 'aal2'
           or not exists (select 1 from auth.mfa_factors f where f.user_id = auth.uid() and f.status = 'verified'))
 $$;
-revoke all on function public.session_ok() from public, anon;
-grant execute on function public.session_ok() to authenticated, service_role;
+revoke all on function public.session_ok() from public, anon, authenticated;
+grant execute on function public.session_ok() to service_role; -- as permissões usam por dentro (security definer)
 
 create or replace function public.my_company() returns uuid
 language sql stable security definer set search_path = public as $$
@@ -117,35 +117,28 @@ create trigger push_member_gone after update of active or delete on public.membe
 /* ---------- 3) avisos: o que é do financeiro fica com dono e gerente ---------- */
 -- Pagamentos recebidos, notas fiscais e assinatura aparecem só para quem já vê essas telas.
 -- (o login entra como "(select auth.uid())": o banco calcula uma vez por consulta, não uma vez por linha)
-drop policy notifications_read on public.notifications;
-create policy notifications_read on public.notifications for select to authenticated
+alter policy notifications_read on public.notifications
   using (company_id = public.my_company() and (user_id is null or user_id = (select auth.uid()))
          and (kind not in ('venda', 'financeiro', 'assinatura') or public.has_role('dono', 'gerente')));
-drop policy notifications_update on public.notifications;
-create policy notifications_update on public.notifications for update to authenticated
+alter policy notifications_update on public.notifications
   using (company_id = public.my_company() and (user_id is null or user_id = (select auth.uid()))
          and (kind not in ('venda', 'financeiro', 'assinatura') or public.has_role('dono', 'gerente')))
   with check (company_id = public.my_company());
 
-drop policy members_update on public.members;
-create policy members_update on public.members for update to authenticated
+alter policy members_update on public.members
   using (company_id = public.my_company() and (public.has_role('dono') or user_id = (select auth.uid())))
   with check (company_id = public.my_company());
 
-drop policy platform_admins_read on public.platform_admins;
-create policy platform_admins_read on public.platform_admins for select to authenticated using (user_id = (select auth.uid()));
+alter policy platform_admins_read on public.platform_admins using (user_id = (select auth.uid()));
 
-drop policy conversations_read on public.conversations;
-create policy conversations_read on public.conversations for select to authenticated
+alter policy conversations_read on public.conversations
   using (company_id = public.my_company() and (kind = 'cliente' or member_user_id = (select auth.uid())));
 
-drop policy messages_read on public.messages;
-create policy messages_read on public.messages for select to authenticated
+alter policy messages_read on public.messages
   using (company_id = public.my_company() and exists (
     select 1 from public.conversations c where c.id = conversation_id and (c.kind = 'cliente' or c.member_user_id = (select auth.uid()))));
 
-drop policy pending_read on public.pending_actions;
-create policy pending_read on public.pending_actions for select to authenticated
+alter policy pending_read on public.pending_actions
   using (company_id = public.my_company() and exists (
     select 1 from public.conversations c where c.id = conversation_id and (c.kind = 'cliente' or c.member_user_id = (select auth.uid()))));
 
@@ -159,7 +152,7 @@ create index if not exists charges_quote_idx on public.charges (quote_id);
 create index if not exists charges_sale_idx on public.charges (sale_id);
 create index if not exists companies_owner_idx on public.companies (owner_id);
 create index if not exists companies_plan_idx on public.companies (plan);
-create index if not exists conversations_assigned_idx on public.conversations (assigned_to);
+create index if not exists conversations_assigned_to_idx on public.conversations (assigned_to);
 create index if not exists conversations_contact_idx on public.conversations (contact_id);
 create index if not exists conversations_member_user_idx on public.conversations (member_user_id);
 create index if not exists finance_entries_contact_idx on public.finance_entries (contact_id);
