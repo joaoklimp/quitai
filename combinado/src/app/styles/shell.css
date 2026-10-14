@@ -143,3 +143,8 @@
 }
 @media (min-width: 861px) { .only-mobile { display: none !important; } }
 @media (max-width: 860px) { .only-desktop { display: none !important; } }
+
+/* aviso de versão nova */
+.update-bar { background: var(--blue-soft); }
+.update-bar > svg { color: var(--blue-ink); }
+@media (max-width: 640px) { .update-bar { flex-wrap: wrap; } .update-bar .grow { flex: 1 1 calc(100% - 40px); } }

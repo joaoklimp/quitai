@@ -76,9 +76,20 @@ function seoFiles(): Plugin {
   };
 }
 
+// Versão desta publicação: o painel aberto confere /version.json de tempos em tempos e, quando sai uma
+// versão nova, mostra o aviso "Nova versão disponível" com o botão de atualizar.
+const BUILD_ID = `${(process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7) || 'local'}-${Date.now().toString(36)}`;
+function versionFile(): Plugin {
+  return {
+    name: 'orbyta-version',
+    generateBundle() { this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: BUILD_ID }) }); },
+  };
+}
+
 // Site em várias páginas: landing estática, painel (SPA), orçamento público e páginas legais.
 export default defineConfig({
-  plugins: [react(), staticHtml(), seoFiles()],
+  plugins: [react(), staticHtml(), seoFiles(), versionFile()],
+  define: { __APP_VERSION__: JSON.stringify(BUILD_ID) },
   build: {
     target: 'es2022',
     rollupOptions: {

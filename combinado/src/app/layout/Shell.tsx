@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Stethoscope,
   BarChart3, Bell, CalendarDays, CheckCheck, ClipboardList, CreditCard, FileText, HelpCircle, History, LayoutGrid, LogOut, Menu as MenuIcon, MessageCircle,
   Monitor, Moon, Search, Settings, ShieldCheck, Smartphone, Sparkles, Sun, Tag, Users, Wallet, Workflow, CalendarCheck, CircleDollarSign, Bot, Info,
-  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight, Download, WifiOff,
+  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight, Download, WifiOff, RefreshCw,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
@@ -14,7 +14,7 @@ import { useAssistant, useMeCtx, useTheme } from '../context';
 import { useList, useInvalidate } from '../data/hooks';
 import { api, isDemo, leaveDemo, canUseRealAccount } from '../data/api';
 import { CommandPalette } from './CommandPalette';
-import { disablePush, enablePush, localNotify, pushState, setBadge, useInstall } from '../pwa';
+import { disablePush, enablePush, localNotify, pushState, reloadApp, setBadge, useInstall, useNewVersion } from '../pwa';
 import { InstallModal } from '../pages/install/InstallGuide';
 import type { ModuleKey, Notification, Role } from '../data/types';
 
@@ -73,6 +73,7 @@ export function Shell({ children }: { children: ReactNode }) {
   useEffect(() => { setMoreOpen(false); window.scrollTo({ top: 0 }); }, [loc.pathname]);
 
   const online = useOnline();
+  const update = useNewVersion();
   const trialDays = me.company.billing_status === 'trialing' ? Math.max(0, Math.ceil((Date.parse(me.company.trial_ends_at) - Date.now()) / 86400000)) : null;
   const blocked = !me.company.complimentary && (me.company.billing_status === 'canceled' || me.company.billing_status === 'blocked' || (me.company.billing_status === 'trialing' && trialDays === 0));
 
@@ -109,6 +110,14 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        {update.available && (
+          <div className="demo-bar update-bar" role="status">
+            <RefreshCw />
+            <span className="grow"><b>Nova versão da ORBYTA disponível.</b> Atualize para ver as novidades: leva só um segundo.</span>
+            <Button size="sm" variant="ghost" onClick={update.later}>Depois</Button>
+            <Button size="sm" variant="solid" icon={<RefreshCw />} onClick={() => void reloadApp()}>Atualizar</Button>
+          </div>
+        )}
         {isDemo && (
           <div className="demo-bar" role="note">
             <Info />

@@ -1,5 +1,5 @@
 // App instalável e notificações no aparelho: service worker, convite para instalar e inscrição para receber avisos.
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { api, isDemo } from './data/api';
 
 const FLAG = 'orbyta-push'; // id da pessoa que ativou as notificações neste aparelho
@@ -185,6 +185,47 @@ export async function localNotify(title: string, body?: string | null, link?: st
 export function setBadge(n: number) {
   const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
   try { if (n > 0) void nav.setAppBadge?.(n)?.catch(() => {}); else void nav.clearAppBadge?.()?.catch(() => {}); } catch { /* sem suporte */ }
+}
+
+/* ---------- aviso de versão nova ---------- */
+const VERSION_EVERY = 5 * 60_000;
+/** Recarrega na versão nova (o service worker busca a página nova primeiro, então o painel volta já atualizado). */
+export async function reloadApp() {
+  try { await (await navigator.serviceWorker?.getRegistration('/app/'))?.update(); } catch { /* sem service worker */ }
+  location.reload();
+}
+/** Confere de tempos em tempos (e ao voltar para o app) se saiu uma versão nova do painel. */
+export function useNewVersion(): { available: boolean; later: () => void } {
+  const [available, setAvailable] = useState(false);
+  const [snoozed, setSnoozed] = useState(false);
+  useEffect(() => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') return;
+    let alive = true;
+    const check = async () => {
+      if (document.hidden || !navigator.onLine) return;
+      try {
+        const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const { version } = (await r.json()) as { version?: string };
+        if (alive && version && version !== __APP_VERSION__) setAvailable(true);
+      } catch { /* sem internet agora: confere de novo depois */ }
+    };
+    const first = setTimeout(check, 15_000);
+    const every = setInterval(check, VERSION_EVERY);
+    const back = () => { if (!document.hidden) void check(); };
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('online', back);
+    window.addEventListener('focus', back);
+    return () => {
+      alive = false; clearTimeout(first); clearInterval(every);
+      document.removeEventListener('visibilitychange', back); window.removeEventListener('online', back); window.removeEventListener('focus', back);
+    };
+  }, []);
+  return {
+    available: available && !snoozed,
+    // "Depois": some por 1 hora e volta a lembrar
+    later: () => { setSnoozed(true); setTimeout(() => setSnoozed(false), 60 * 60_000); },
+  };
 }
 
 /* ---------- versão nova publicada ---------- */
