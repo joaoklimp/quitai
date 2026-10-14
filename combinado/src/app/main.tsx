@@ -13,6 +13,10 @@ import './styles/pages.css';
 import './styles/chat.css';
 import { ToastProvider, ConfirmProvider } from './ui';
 import { App } from './App';
+import { registerServiceWorker } from './pwa';
+
+// app instalável e notificações (só no site publicado; no desenvolvimento fica desligado)
+void registerServiceWorker();
 
 const queryClient = new QueryClient({
   defaultOptions: {

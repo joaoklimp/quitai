@@ -35,12 +35,18 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'a-a', group: 'Ações', label: 'Novo agendamento', icon: CalendarPlus, run: go('/agenda?novo=1') },
     ];
     const pages: Item[] = [...allowed(PRIMARY, me.role, me.company.modules), ...allowed(SECONDARY, me.role, me.company.modules)].map((p) => ({ id: 'p' + p.to, group: 'Páginas', label: p.label, icon: p.icon, run: go(p.to) }));
-    const out: Item[] = [];
-    out.push(...actions.filter((a) => !f || a.id === 'a-ai' || fold(a.label).includes(f)));
-    out.push(...contacts.map((c) => ({ id: 'c' + c.id, group: 'Pacientes', label: c.name, meta: formatPhone(c.phone), icon: User, run: go(`/clientes/${c.id}`) })));
-    out.push(...quotes.map((x) => ({ id: 'q' + x.id, group: 'Orçamentos', label: `Orçamento nº ${String(x.number).padStart(4, '0')}`, meta: brl(x.total), icon: FileText, run: go(`/orcamentos/${x.id}`) })));
-    out.push(...pages.filter((p) => !f || fold(p.label).includes(f)));
-    return out;
+    if (!f) return [...actions, ...pages];
+    // o que bate com o que foi digitado vem primeiro (Enter abre a página); a IA fica como última opção
+    const starts = (label: string) => fold(label).split(/\s+/).some((w) => w.startsWith(f)) || fold(label).startsWith(f);
+    const pageHits = pages.filter((p) => fold(p.label).includes(f)).sort((a, b) => Number(starts(b.label)) - Number(starts(a.label)));
+    const found: Item[] = [
+      ...pageHits,
+      ...actions.filter((a) => a.id !== 'a-ai' && fold(a.label).includes(f)),
+      ...contacts.map((c) => ({ id: 'c' + c.id, group: 'Pacientes', label: c.name, meta: formatPhone(c.phone), icon: User, run: go(`/clientes/${c.id}`) })),
+      ...quotes.map((x) => ({ id: 'q' + x.id, group: 'Orçamentos', label: `Orçamento nº ${String(x.number).padStart(4, '0')}`, meta: brl(x.total), icon: FileText, run: go(`/orcamentos/${x.id}`) })),
+    ];
+    const ai = { ...actions[0], group: 'Assistente' };
+    return found.length ? [...found, ai] : [ai];
   }, [term, contacts, quotes, nav, onClose, assistant]);
 
   useEffect(() => { setSel(0); }, [term]);

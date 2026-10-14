@@ -13,6 +13,7 @@ import { Badge, Button, Delta, Empty, IconButton, Menu, PageHeader, Avatar, cx, 
 import { addDays, brl, brl0, brlShort, firstName, fmtAgo, fmtDuration, fmtLong, fmtTime, localDate, MONTHS, num, todayLocal, fromLocal } from '../../shared/format';
 import type { AuditEntry, DailyStat } from '../data/types';
 import { GettingStarted, ValueCard } from './dashboard/ValueCards';
+import { AppCard } from './dashboard/AppCard';
 
 export default function Dashboard() {
   const { me } = useMeCtx();
@@ -62,6 +63,7 @@ export default function Dashboard() {
       />
 
       <GettingStarted />
+      <AppCard />
       <ValueCard />
 
       <div className={cx('dash', isFetching && rows && 'refetching')}>

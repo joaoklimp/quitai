@@ -551,3 +551,57 @@ Deno.test({ name: 'relatório semanal: aviso no painel e mensagem para o dono co
   const again = await (await runCron(new Request('http://local/cron', { method: 'POST', headers: { 'x-cron-secret': 'segredo-cron' } }))).json();
   assertEquals(again.sent.relatorio_semanal ?? 0, 0);
 }});
+
+Deno.test({ name: 'notificações nos aparelhos: cada aviso chega a quem deve, discreto por padrão, uma vez só, e aparelho cancelado sai da lista', ...opts, fn: async () => {
+  const { deliver } = await import('../_shared/push.ts');
+  const BIA = Deno.env.get('IT_ATTENDANT_ID')!;
+  const keys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  const ANA1 = 'https://fcm.googleapis.com/fcm/send/ana-1', ANA2 = 'https://web.push.apple.com/ana-2', BIA1 = 'https://fcm.googleapis.com/fcm/send/bia-1';
+  const ins = await db.from('push_subscriptions').insert([
+    { user_id: UID, company_id: CID, endpoint: ANA1, ...keys }, { user_id: UID, company_id: CID, endpoint: ANA2, ...keys }, { user_id: BIA, company_id: CID, endpoint: BIA1, ...keys },
+  ]);
+  assertEquals(ins.error, null);
+  const sent: { endpoint: string; payload: Record<string, unknown>; urgency?: string }[] = [];
+  // o iPhone da Ana cancelou as notificações (o serviço da Apple responde 410)
+  const fake = (t: { endpoint: string }, payload: Record<string, unknown>, _k: unknown, _s: string, o?: { urgency?: string }) => {
+    sent.push({ endpoint: t.endpoint, payload, urgency: o?.urgency });
+    return Promise.resolve(t.endpoint === ANA2 ? { ok: false, status: 410, gone: true } : { ok: true, status: 201, gone: false });
+  };
+  const aviso = async (kind: string, title: string, body: string | null, user_id: string | null = null) =>
+    (await db.from('notifications').insert({ company_id: CID, kind, title, body, link: '#/conversas', user_id }).select('id').single()).data!.id as string;
+
+  // paciente esperando: toda a equipe, com urgência, sem nome na tela bloqueada
+  const a = await aviso('atendimento', 'Juliana precisa de você', 'Quer remarcar a consulta');
+  assertEquals(await deliver(a, fake), { sent: 2, failed: 0, removed: 1 });
+  assertEquals(sent.map((s) => s.endpoint).sort(), [ANA1, ANA2, BIA1].sort());
+  assert(sent.every((s) => s.payload.title === 'Um paciente precisa de atendimento' && s.urgency === 'high'));
+  assert(!JSON.stringify(sent).includes('Juliana'));
+  const { data: left } = await db.from('push_subscriptions').select('endpoint').eq('company_id', CID);
+  assertEquals(left!.map((r) => r.endpoint).sort(), [ANA1, BIA1].sort());
+  // o banco chamou duas vezes? entrega uma só
+  sent.length = 0;
+  assertEquals((await deliver(a, fake)).skipped, 'já entregue');
+  assertEquals(sent.length, 0);
+
+  // pagamento recebido: só dono e gerente
+  await deliver(await aviso('venda', 'Pagamento recebido: R$ 300,00', 'Juliana Ribeiro · Limpeza'), fake);
+  assertEquals(sent.map((s) => s.endpoint), [ANA1]);
+
+  // preferências: a Bia silencia agenda; a Ana prefere ver os detalhes
+  assertEquals((await db.from('push_prefs').upsert({ user_id: BIA, muted: ['agendamento'] })).error, null);
+  assertEquals((await db.from('push_prefs').upsert({ user_id: UID, details: true })).error, null);
+  sent.length = 0;
+  await deliver(await aviso('agendamento', 'Novo horário: Juliana', 'Amanhã às 10h'), fake);
+  assertEquals(sent.map((s) => [s.endpoint, s.payload.title, s.payload.body]), [[ANA1, 'Novo horário: Juliana', 'Amanhã às 10h']]);
+
+  // lembrete de tarefa de uma pessoa só
+  sent.length = 0;
+  await deliver(await aviso('tarefa', 'Ligar para o laboratório', null, BIA), fake);
+  assertEquals(sent.map((s) => s.endpoint), [BIA1]);
+
+  // as chaves do servidor foram criadas uma vez e ficam guardadas
+  const { data: sec } = await db.from('app_secrets').select('name');
+  assertEquals(sec!.map((r) => r.name), ['vapid']);
+  await db.from('push_subscriptions').delete().eq('company_id', CID);
+  await db.from('push_prefs').delete().in('user_id', [UID, BIA]);
+}});

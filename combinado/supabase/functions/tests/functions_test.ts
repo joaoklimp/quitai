@@ -242,3 +242,97 @@ Deno.test('criptografia dos segredos: grava cifrado e lê de volta; lê valores 
   assertEquals(await open('texto-antigo'), 'texto-antigo');
   assertEquals(await open(null), '');
 });
+
+/* ---------- notificações nos aparelhos (Web Push) ---------- */
+const wp = await import('../_shared/webpush.ts');
+const { payloadFor } = await import('../_shared/push.ts');
+
+Deno.test('Web Push: criptografia igual ao exemplo do RFC 8291', async () => {
+  const asPub = wp.unb64u('BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8');
+  const jwk = { kty: 'EC', crv: 'P-256', d: 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw', x: wp.b64u(asPub.slice(1, 33)), y: wp.b64u(asPub.slice(33)) };
+  const serverKeys = {
+    privateKey: await crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']),
+    publicKey: await crypto.subtle.importKey('raw', asPub, { name: 'ECDH', namedCurve: 'P-256' }, true, []),
+  };
+  const out = await wp.encryptPayload(new TextEncoder().encode('When I grow up, I want to be a watermelon'),
+    { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' },
+    { salt: wp.unb64u('DGv6ra1nlYgDCS1FRnbzlw'), serverKeys });
+  assertEquals(wp.b64u(out), 'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN');
+});
+
+/** O lado do navegador (RFC 8291): decifra com a chave privada do aparelho, para conferir o envio de verdade. */
+async function browserDecrypt(body: Uint8Array, ua: CryptoKeyPair, authSecret: Uint8Array<ArrayBuffer>): Promise<string> {
+  const salt = body.slice(0, 16), idlen = body[20], asPublic = body.slice(21, 21 + idlen), ct = body.slice(21 + idlen);
+  const uaPublic = new Uint8Array(await crypto.subtle.exportKey('raw', ua.publicKey));
+  const asKey = await crypto.subtle.importKey('raw', asPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: asKey }, ua.privateKey, 256));
+  const hk = async (s: Uint8Array<ArrayBuffer>, ikm: Uint8Array<ArrayBuffer>, info: string | Uint8Array<ArrayBuffer>, n: number) => new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: s, info: typeof info === 'string' ? new TextEncoder().encode(info) : info }, await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), n * 8));
+  const info = new Uint8Array([...new TextEncoder().encode('WebPush: info\0'), ...uaPublic, ...asPublic]);
+  const ikm = await hk(authSecret, shared, info, 32);
+  const key = await crypto.subtle.importKey('raw', await hk(salt, ikm, 'Content-Encoding: aes128gcm\0', 16), 'AES-GCM', false, ['decrypt']);
+  const pt = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: await hk(salt, ikm, 'Content-Encoding: nonce\0', 12) }, key, ct));
+  assertEquals(pt[pt.length - 1], 2); // delimitador do último registro
+  return new TextDecoder().decode(pt.slice(0, -1));
+}
+
+Deno.test('Web Push: envio com assinatura VAPID válida e conteúdo que só o aparelho decifra', async () => {
+  const ua = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const authSecret = crypto.getRandomValues(new Uint8Array(16));
+  const target = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc123', p256dh: wp.b64u(new Uint8Array(await crypto.subtle.exportKey('raw', ua.publicKey))), auth: wp.b64u(authSecret) };
+  const keys = await wp.generateVapidKeys();
+  const prev = globalThis.fetch;
+  let seen: { url: string; headers: Headers; body: Uint8Array } | null = null;
+  globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) => {
+    seen = { url: String(input), headers: new Headers(init?.headers), body: new Uint8Array(init?.body as Uint8Array) };
+    return new Response(null, { status: 201 });
+  }) as typeof fetch;
+  try {
+    const r = await wp.sendWebPush(target, { title: 'Oi', body: 'Mensagem com acentuação' }, keys, 'https://orbyta.test', { urgency: 'high', ttl: 60 });
+    assertEquals(r, { ok: true, status: 201, gone: false });
+  } finally { globalThis.fetch = prev; }
+  const s = seen as unknown as { url: string; headers: Headers; body: Uint8Array };
+  assertEquals(s.url, target.endpoint);
+  assertEquals(s.headers.get('content-encoding'), 'aes128gcm');
+  assertEquals(s.headers.get('ttl'), '60');
+  assertEquals(s.headers.get('urgency'), 'high');
+  // token VAPID: para a origem do serviço de push, assinado com a chave do servidor
+  const m = /^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=(.+)$/.exec(s.headers.get('authorization') ?? '')!;
+  assert(m, 'cabeçalho VAPID');
+  assertEquals(m[4], keys.publicKey);
+  const claims = JSON.parse(new TextDecoder().decode(wp.unb64u(m[2])));
+  assertEquals(claims.aud, 'https://fcm.googleapis.com');
+  assertEquals(claims.sub, 'https://orbyta.test');
+  assert(claims.exp > Date.now() / 1000 && claims.exp <= Date.now() / 1000 + 24 * 3600);
+  const pub = await crypto.subtle.importKey('raw', wp.unb64u(keys.publicKey), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+  assert(await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, wp.unb64u(m[3]), new TextEncoder().encode(`${m[1]}.${m[2]}`)));
+  // o aparelho decifra; o serviço de push no meio do caminho não
+  assertEquals(JSON.parse(await browserDecrypt(s.body, ua, authSecret)), { title: 'Oi', body: 'Mensagem com acentuação' });
+  assert(!new TextDecoder().decode(s.body).includes('acentuação'));
+});
+
+Deno.test('Web Push: só aceita serviços de push dos navegadores (nada de endereço interno)', () => {
+  const keys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  for (const ok of ['https://fcm.googleapis.com/fcm/send/x', 'https://updates.push.services.mozilla.com/wpush/v2/x', 'https://web.push.apple.com/QK/x', 'https://wns2-par02p.notify.windows.com/w/?token=x']) {
+    assert(wp.validSubscription({ endpoint: ok, keys }), ok);
+  }
+  for (const bad of ['http://fcm.googleapis.com/x', 'https://127.0.0.1/x', 'https://localhost/x', 'https://fcm.googleapis.com:8443/x', 'https://evil.com/fcm.googleapis.com',
+    'https://fcm.googleapis.com.evil.com/x', 'https://user:pw@fcm.googleapis.com/x', 'https://169.254.169.254/latest', 'https://gtemzlgsjngaplsigqse.supabase.co/rest/v1/']) {
+    assertEquals(wp.validSubscription({ endpoint: bad, keys }), null, bad);
+  }
+  assertEquals(wp.validSubscription({ endpoint: 'https://fcm.googleapis.com/x', keys: { ...keys, auth: 'curto' } }), null);
+  assertEquals(wp.validSubscription({ endpoint: 'https://fcm.googleapis.com/x', keys: { ...keys, p256dh: wp.b64u(new Uint8Array(65)) } }), null);
+  assertEquals(wp.validSubscription(null), null);
+});
+
+Deno.test('Web Push: tela bloqueada discreta por padrão (sem nome de paciente nem valor)', () => {
+  const n = { id: 'n1', company_id: 'c', user_id: null, kind: 'venda' as const, title: 'Pagamento recebido: R$ 300,00', body: 'Maria Silva · Limpeza', link: '#/cobrancas', created_at: '2026-10-14T12:00:00Z' };
+  const discreet = payloadFor(n, false);
+  assertEquals(discreet.title, 'Pagamento recebido');
+  assertEquals(discreet.body, 'Toque para ver na ORBYTA.');
+  assert(!JSON.stringify(discreet).includes('Maria'));
+  assert(!JSON.stringify(discreet).includes('300'));
+  assertEquals(payloadFor(n, true), { title: 'Pagamento recebido: R$ 300,00', body: 'Maria Silva · Limpeza', link: '#/cobrancas', kind: 'venda', tag: 'venda:#/cobrancas', at: n.created_at });
+  // link estranho vira a página inicial do painel
+  assertEquals(payloadFor({ ...n, link: 'javascript:alert(1)' }, true).link, '#/');
+  assertEquals(payloadFor({ ...n, link: 'https://evil.com' }, true).link, '#/');
+});

@@ -24,6 +24,21 @@ create table auth.users (
 create or replace function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid
 $$;
+create or replace function auth.jwt() returns jsonb language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claim', true), ''), nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+$$;
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create table auth.mfa_factors (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  factor_type text not null default 'totp',
+  status text not null default 'unverified',
+  created_at timestamptz not null default now()
+);
 create or replace function auth.role() returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'))::text
 $$;
@@ -35,7 +50,8 @@ alter default privileges in schema public grant all on functions to anon, authen
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 `;
 
-export type Who = { user: string } | 'anon' | 'service';
+/** Usuário logado; `aal` imita o nível da sessão (aal2 = já digitou o código da verificação em duas etapas) e `session` o id da sessão no token. */
+export type Who = { user: string; aal?: 'aal1' | 'aal2'; session?: string } | 'anon' | 'service';
 export interface Q {
   rows<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
   one<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T>;
@@ -87,7 +103,7 @@ export async function startDb(): Promise<TestDb> {
         else if (who === 'anon') { await client.query('set local role anon'); await client.query(`select set_config('request.jwt.claims', '{"role":"anon"}', true)`); }
         else {
           await client.query('set local role authenticated');
-          await client.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: who.user, role: 'authenticated' })]);
+          await client.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: who.user, role: 'authenticated', aal: who.aal ?? 'aal1', ...(who.session ? { session_id: who.session } : {}) })]);
         }
         const out = await fn(q);
         await client.query('commit');

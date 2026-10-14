@@ -1,5 +1,5 @@
 // Fonte de dados do modo demonstração (tudo no navegador).
-import type { DataSource, AdminAction, AdminCompanyRow, AdminHistoryRow, AdminOverview, AuthProvider, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import type { DataSource, AdminAction, AdminCompanyRow, AdminHistoryRow, AdminOverview, AuthProvider, IntegrationAction, MfaEnrollment, MfaFactor, OnboardInput, PushAction, PushPrefs, SignUpInput } from '../source';
 import { presetsFor } from '../../../shared/presets';
 import type { Appointment, AiSettings, Charge, ValueReport, ChargeMethod, Company, CompanyIntegration, DailyStat, FinanceEntry, FiscalNote, ImportResult, Me, Member, Product, Query, Quote, QuoteItem, RowMap, StockMovement, TableName, UsageMonth, WhatsAppAccount, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
@@ -39,6 +39,37 @@ export class DemoSource implements DataSource {
   }
   async signInWithEmailLink() { await wait(600); }
   async signOut() { await wait(); setDemoSession({ state: 'off' }); }
+  async signOutOthers() { await wait(); }
+
+  // Na demonstração não há conta de verdade para proteger: a verificação em duas etapas fica só na conta real.
+  async mfaFactors(): Promise<MfaFactor[]> { return []; }
+  async mfaEnroll(): Promise<MfaEnrollment> { await wait(); throw new Error('Na demonstração a verificação em duas etapas fica desligada. Crie sua conta para ativar.'); }
+  async mfaConfirm() { await wait(); }
+  async mfaVerify() { await wait(); }
+  async mfaRemove() { await wait(); }
+
+  // Notificações na demonstração: as preferências ficam neste navegador e o teste aparece direto no aparelho.
+  async push<T = Record<string, unknown>>(action: PushAction, b: Record<string, unknown> = {}): Promise<T> {
+    await wait(150);
+    const KEY = 'orbyta-demo-push';
+    let prefs: PushPrefs = { muted: [], details: false };
+    try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { /* padrão */ }
+    if (action === 'prefs') {
+      if (Array.isArray(b.muted)) prefs.muted = b.muted.map(String);
+      if (typeof b.details === 'boolean') prefs.details = b.details;
+      try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* ignora */ }
+      return { prefs } as T;
+    }
+    if (action === 'test') {
+      const reg = await navigator.serviceWorker?.getRegistration('/app/');
+      const title = 'Notificações da ORBYTA ativadas', body = 'É assim que os avisos vão chegar neste aparelho.';
+      if (reg) await reg.showNotification(title, { body, icon: '/icon-192.png', badge: '/badge-96.png', tag: 'teste', data: { link: '#/configuracoes/app' } });
+      else if ('Notification' in window) try { new window.Notification(title, { body, icon: '/icon-192.png' }); } catch { /* Android só mostra pelo service worker */ }
+      return { sent: 1, failed: 0, removed: 0 } as T;
+    }
+    if (action === 'config') return { publicKey: '', prefs, devices: 0 } as T;
+    return { ok: true } as T;
+  }
   async requestPasswordReset() { await wait(); }
   async updatePassword() { await wait(); }
   async onboard(input: OnboardInput) {

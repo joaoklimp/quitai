@@ -1,6 +1,6 @@
 // Acesso ao banco com a chave de serviço (ignora o RLS: as funções conferem permissões antes de agir).
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
-import { clientIp, HttpError } from './http.ts';
+import { clientIp, HttpError, jwtClaims } from './http.ts';
 import type { Role } from './types.ts';
 
 export const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -27,8 +27,13 @@ export interface Caller { userId: string; companyId: string; role: Role; name: s
 export async function caller(req: Request): Promise<Caller> {
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   if (!token) throw new HttpError(401, 'nao_autenticado', 'Entre na sua conta para continuar.');
+  // o Supabase Auth confere a assinatura, a validade e se a sessão ainda existe ("sair dos outros aparelhos")
   const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) throw new HttpError(401, 'nao_autenticado', 'Sua sessão expirou. Entre de novo.');
+  // verificação em duas etapas ativada: só com o código digitado nesta sessão (mesma regra do banco)
+  if ((data.user.factors ?? []).some((f) => f.status === 'verified') && jwtClaims(token).aal !== 'aal2') {
+    throw new HttpError(401, 'codigo_2fa', 'Digite o código da verificação em duas etapas para continuar.');
+  }
   await rateLimit(`u:${data.user.id}`, 120, 60);
   const { data: m } = await db.from('members').select('company_id, role, name, email, active').eq('user_id', data.user.id).maybeSingle();
   if (!m || !m.active) throw new HttpError(403, 'sem_empresa', 'Seu acesso a esta empresa não está ativo.');

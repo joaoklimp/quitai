@@ -418,6 +418,8 @@ export interface Me {
   role: Role;
   company: Company;
   isPlatformAdmin: boolean;
+  /** Login feito com a senha, falta o código da verificação em duas etapas (nada da empresa é carregado antes). */
+  mfaPending?: boolean;
 }
 
 /** Resposta do assistente (comandos do dono) e do simulador de cliente. */

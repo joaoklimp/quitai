@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Stethoscope,
   BarChart3, Bell, CalendarDays, CheckCheck, ClipboardList, CreditCard, FileText, HelpCircle, History, LayoutGrid, LogOut, Menu as MenuIcon, MessageCircle,
   Monitor, Moon, Search, Settings, ShieldCheck, Smartphone, Sparkles, Sun, Tag, Users, Wallet, Workflow, CalendarCheck, CircleDollarSign, Bot, Info,
-  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight,
+  Landmark, Package, Plug, Orbit, ReceiptText, ChevronLeft, ChevronRight, Download, WifiOff,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BRAND, logoSvg, wordmarkHtml } from '../../shared/brand';
@@ -14,6 +14,7 @@ import { useAssistant, useMeCtx, useTheme } from '../context';
 import { useList, useInvalidate } from '../data/hooks';
 import { api, isDemo, leaveDemo, canUseRealAccount } from '../data/api';
 import { CommandPalette } from './CommandPalette';
+import { disablePush, enablePush, localNotify, pushState, setBadge, useInstall } from '../pwa';
 import type { ModuleKey, Notification, Role } from '../data/types';
 
 type NavItem = { to: string; label: string; icon: typeof Bell; end?: boolean; roles?: Role[]; module?: ModuleKey };
@@ -70,6 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [assistant]);
   useEffect(() => { setMoreOpen(false); window.scrollTo({ top: 0 }); }, [loc.pathname]);
 
+  const online = useOnline();
   const trialDays = me.company.billing_status === 'trialing' ? Math.max(0, Math.ceil((Date.parse(me.company.trial_ends_at) - Date.now()) / 86400000)) : null;
   const blocked = !me.company.complimentary && (me.company.billing_status === 'canceled' || me.company.billing_status === 'blocked' || (me.company.billing_status === 'trialing' && trialDays === 0));
 
@@ -118,6 +120,8 @@ export function Shell({ children }: { children: ReactNode }) {
         {!isDemo && blocked && (
           <div className="demo-bar" role="alert" style={{ background: 'var(--red-soft)' }}><Info /><span className="grow"><b>Sua assinatura está inativa.</b> O painel está em modo leitura e a IA parou de responder.</span><Button size="sm" variant="solid" onClick={() => nav('/configuracoes/assinatura')}>Reativar</Button></div>
         )}
+
+        {!online && <div className="demo-bar" role="status" style={{ background: 'var(--yellow-soft)' }}><WifiOff /><span className="grow"><b>Sem internet.</b> O que aparece pode estar desatualizado; a ORBYTA atualiza sozinha quando a conexão voltar.</span></div>}
 
         <main className="page" id="conteudo">{children}</main>
       </div>
@@ -183,6 +187,7 @@ function MoreSheet({ onClose }: { onClose: () => void }) {
 
 function UserMenu() {
   const { me } = useMeCtx();
+  const inst = useInstall();
   const [theme, setTheme] = useTheme();
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -200,6 +205,7 @@ function UserMenu() {
           <button onClick={() => { close(); nav('/configuracoes'); }}><Settings />Configurações</button>
           <button onClick={() => { close(); nav('/configuracoes/assinatura'); }}><CreditCard />Assinatura e faturas</button>
           <button onClick={() => { close(); nav('/ajuda'); }}><HelpCircle />Ajuda</button>
+          {!inst.installed && <button onClick={async () => { close(); if (!(inst.canPrompt && await inst.prompt())) nav('/configuracoes/app'); }}><Download />Instalar o app</button>}
           <div className="sep" />
           <div className="menu-title">Tema</div>
           {([['auto', 'Automático', Monitor], ['light', 'Claro', Sun], ['dark', 'Escuro', Moon]] as const).map(([v, l, I]) => (
@@ -207,8 +213,8 @@ function UserMenu() {
           ))}
           <div className="sep" />
           {isDemo
-            ? <button onClick={async () => { close(); if (canUseRealAccount) leaveDemo(); else { await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); } }}><LogOut />{canUseRealAccount ? 'Sair da demonstração' : 'Sair'}</button>
-            : <button className="danger" onClick={async () => { close(); await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); }}><LogOut />Sair</button>}
+            ? <button onClick={async () => { close(); await disablePush(); if (canUseRealAccount) leaveDemo(); else { await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); } }}><LogOut />{canUseRealAccount ? 'Sair da demonstração' : 'Sair'}</button>
+            : <button className="danger" onClick={async () => { close(); await disablePush(); await api.signOut(); qc.clear(); location.hash = '#/entrar'; location.reload(); }}><LogOut />Sair</button>}
         </>
       )}
     </Menu>
@@ -228,19 +234,25 @@ const N_ICON: Record<Notification['kind'], [typeof Bell, string, string]> = {
 };
 
 function Notifications() {
+  const { me } = useMeCtx();
+  const toast = useToast();
   const { data = [] } = useList('notifications', { order: [{ col: 'created_at', asc: false }], limit: 30 });
   const unread = data.filter((n) => !n.read_at).length;
   const inv = useInvalidate();
   const nav = useNavigate();
   const lastCount = useRef(unread);
-  // aviso do sistema operacional quando chega algo novo (se a pessoa permitiu)
+  const [push, setPush] = useState<string | null>(null);
+  useEffect(() => { void pushState(me.user_id).then(setPush); }, [me.user_id]);
+  // aviso do sistema quando chega algo novo com o painel em segundo plano (se este aparelho não recebe push)
   useEffect(() => {
-    if (unread > lastCount.current && 'Notification' in window && window.Notification.permission === 'granted' && document.hidden) {
+    if (unread > lastCount.current && document.hidden && push !== 'on') {
       const n = data.find((x) => !x.read_at);
-      if (n) new window.Notification(n.title, { body: n.body ?? undefined, icon: '/favicon.svg' });
+      if (n) void localNotify(n.title, n.body, n.link);
     }
     lastCount.current = unread;
-  }, [unread, data]);
+  }, [unread, data, push]);
+  useEffect(() => { setBadge(unread); }, [unread]);
+  const turnOn = async () => { try { await enablePush(me.user_id); setPush('on'); toast('Notificações ativadas neste aparelho'); } catch (e) { toast((e as Error).message, 'err'); nav('/configuracoes/app'); } };
   const markAll = async () => { await Promise.all(data.filter((n) => !n.read_at).map((n) => api.update('notifications', n.id, { read_at: new Date().toISOString() }))); inv('notifications'); };
   const items = useMemo(() => data.slice(0, 20), [data]);
   return (
@@ -250,7 +262,8 @@ function Notifications() {
           <div className="notif-head">
             <h4>Avisos</h4>
             <div className="row" style={{ gap: 4 }}>
-              {'Notification' in window && window.Notification.permission === 'default' && <Button size="sm" variant="ghost" onClick={() => window.Notification.requestPermission()}>Ativar no computador</Button>}
+              {push === 'off' && <Button size="sm" variant="ghost" icon={<Bell />} onClick={() => { close(); void turnOn(); }}>Ativar no aparelho</Button>}
+              {push === 'ios-install' && <Button size="sm" variant="ghost" onClick={() => { close(); nav('/configuracoes/app'); }}>Receber no celular</Button>}
               {unread > 0 && <Button size="sm" variant="ghost" icon={<CheckCheck />} onClick={markAll}>Marcar lidas</Button>}
             </div>
           </div>
@@ -270,4 +283,15 @@ function Notifications() {
       )}
     </Menu>
   );
+}
+
+/** Conexão do aparelho (para avisar quando a internet cair). */
+function useOnline() {
+  const [on, setOn] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  useEffect(() => {
+    const up = () => setOn(true), down = () => setOn(false);
+    window.addEventListener('online', up); window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+  return on;
 }

@@ -1,31 +1,32 @@
 {
+  "id": "/app/",
   "name": "ORBYTA",
   "short_name": "ORBYTA",
-  "description": "Sua empresa funcionando por uma conversa.",
+  "description": "O painel da sua clínica: conversas do WhatsApp, pacientes, agenda e orçamentos, com a IA atendendo por você.",
   "start_url": "/app/",
-  "scope": "/",
+  "scope": "/app/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#050A1A",
   "theme_color": "#050A1A",
   "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "medical", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/badge-96.png", "sizes": "96x96", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    { "name": "Conversas", "short_name": "Conversas", "description": "Pacientes no WhatsApp", "url": "/app/#/conversas", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Agenda", "short_name": "Agenda", "description": "Horários de hoje", "url": "/app/#/agenda", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Pacientes", "short_name": "Pacientes", "url": "/app/#/clientes", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "screenshots": [
+    { "src": "/img/app-celular.jpg", "sizes": "780x1688", "type": "image/jpeg", "form_factor": "narrow", "label": "Visão geral da clínica no celular" },
+    { "src": "/img/app-computador.jpg", "sizes": "1600x1000", "type": "image/jpeg", "form_factor": "wide", "label": "Painel da ORBYTA no computador" }
   ]
 }

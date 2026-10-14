@@ -49,3 +49,19 @@ export function clientIp(req: Request): string {
 }
 
 export const str = (v: unknown, max = 500) => String(v ?? '').trim().slice(0, max);
+
+/** Lê o conteúdo de um token (sem conferir a assinatura: use só depois de o Supabase Auth ter validado o token). */
+export function jwtClaims(token: string): Record<string, unknown> {
+  try {
+    const p = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p + '='.repeat((4 - (p.length % 4)) % 4)), (c) => c.charCodeAt(0))));
+  } catch { return {}; }
+}
+
+/** Compara segredos sem vazar, pelo tempo de resposta, quantos caracteres bateram. */
+export function safeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}

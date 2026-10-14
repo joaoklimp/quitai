@@ -13,6 +13,12 @@ export interface SignUpInput { name: string; email: string; password: string; ca
 export type AuthProvider = 'google' | 'apple' | 'azure';
 export interface OnboardInput { company: string; segment: string; phone: string; city?: string; preset?: boolean; modules?: ModuleKey[] }
 export interface CheckoutInput { plan: PaidPlanId; cycle: Cycle; method: 'cartao' | 'pix_boleto'; cpfCnpj?: string }
+/** Notificações no aparelho (função "push"). */
+export type PushAction = 'config' | 'subscribe' | 'unsubscribe' | 'unsubscribe_all' | 'prefs' | 'test';
+export interface PushPrefs { muted: string[]; details: boolean }
+/** Aplicativo autenticador cadastrado (verificação em duas etapas). */
+export interface MfaFactor { id: string; name: string; verified: boolean; created_at: string }
+export interface MfaEnrollment { factorId: string; qr: string; secret: string }
 
 export interface DataSource {
   readonly mode: 'demo' | 'supabase';
@@ -32,6 +38,21 @@ export interface DataSource {
   onAuthChange(cb: () => void): () => void;
   /** Aviso sobre um link de e-mail (confirmação, convite, nova senha) que expirou ou já foi usado. */
   authNotice?(): string | null;
+  /** Encerra as sessões dos outros aparelhos (este continua conectado). */
+  signOutOthers(): Promise<void>;
+
+  /* verificação em duas etapas (código do aplicativo autenticador) */
+  mfaFactors(): Promise<MfaFactor[]>;
+  /** Começa o cadastro: devolve o QR Code e a chave para digitar no aplicativo. */
+  mfaEnroll(): Promise<MfaEnrollment>;
+  /** Termina o cadastro com o primeiro código do aplicativo. */
+  mfaConfirm(factorId: string, code: string): Promise<void>;
+  /** Código pedido no login, depois da senha. */
+  mfaVerify(code: string): Promise<void>;
+  mfaRemove(factorId: string): Promise<void>;
+
+  /* notificações no aparelho */
+  push<T = Record<string, unknown>>(action: PushAction, payload?: Record<string, unknown>): Promise<T>;
 
   /* empresa e configurações */
   updateCompany(patch: Partial<Company>): Promise<Company>;

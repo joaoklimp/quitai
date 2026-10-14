@@ -2,6 +2,7 @@
 // Roda as automações ligadas em cada clínica: lembrete com confirmação de presença, acompanhamento de orçamento,
 // resumo do dia, pós-consulta, reativação de pacientes, lembretes de tarefas, relatório semanal de valor, encaixe de
 // pacientes da lista de espera em horários desmarcados e convite para o retorno. Cada envio é registrado uma vez só.
+import { safeEqual } from '../_shared/http.ts';
 import { db, notify } from '../_shared/db.ts';
 import { syncNote } from '../_shared/fiscal.ts';
 import type { FiscalNote } from '../_shared/types.ts';
@@ -21,7 +22,7 @@ let budget = MAX_PER_RUN;
 /** Roda as automações (exportado para os testes). */
 export async function runCron(req: Request): Promise<Response> {
   const secret = Deno.env.get('CRON_SECRET') ?? '';
-  if (!secret || req.headers.get('x-cron-secret') !== secret) return new Response('unauthorized', { status: 401 });
+  if (!secret || !safeEqual(req.headers.get('x-cron-secret') ?? '', secret)) return new Response('unauthorized', { status: 401 });
   budget = MAX_PER_RUN;
   const { data: autos } = await db.from('automations').select('*').eq('enabled', true);
   const byCompany = new Map<string, Automation[]>();

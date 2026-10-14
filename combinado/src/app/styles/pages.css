@@ -204,8 +204,9 @@
 .kv-list dd { margin: 0; font-weight: 550; }
 
 /* ================= catálogo, tarefas, histórico ================= */
-.svc-list { display: grid; }
-.svc { display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.svc-list { display: grid; grid-template-columns: minmax(0, 1fr); }
+.svc { display: flex; align-items: center; gap: 14px; row-gap: 8px; padding: 12px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.svc > .grow { flex: 1 1 240px; }
 .svc:last-child { border-bottom: 0; }
 .svc-meta { display: flex; align-items: center; gap: 8px; }
 .svc-price { min-width: 96px; text-align: right; font-size: 15px; }
@@ -530,6 +531,18 @@
 @media (max-width: 1100px) { .value-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .value-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .value-tile b { font-size: 20px; } }
 .starter { margin-bottom: 18px; }
+/* convite para instalar o app e ligar as notificações */
+.app-invite { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; position: relative; padding-right: 44px; }
+.app-invite h3 { font-size: 16px; }
+.app-invite p { margin: 3px 0 0; }
+.app-invite-actions { display: flex; align-items: center; gap: 12px; flex: none; }
+.app-invite > .icon-btn { position: absolute; top: 10px; right: 10px; }
+@media (max-width: 640px) {
+  .app-invite { flex-wrap: wrap; }
+  .app-invite .grow { flex: 1 1 calc(100% - 60px); }
+  .app-invite-actions { width: 100%; }
+  .app-invite-actions .btn { flex: 1; }
+}
 .starter-head { display: flex; gap: 14px; align-items: flex-start; }
 .starter-ic { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--ai); color: #fff; }
 .starter-ic svg { width: 21px; height: 21px; }
@@ -659,3 +672,19 @@ details.adv[open] > summary::before { transform: rotate(90deg); }
 .admin-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
 .admin-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .admin-log li:last-child { border-bottom: 0; }
+
+/* ---------- app e notificações, segurança ---------- */
+.install-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.install-steps li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
+.install-steps .n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue-ink); font-weight: 750; font-size: 13px; }
+.inline-ic { width: 15px; height: 15px; vertical-align: -3px; display: inline-block; }
+.device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.device-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.device-list li > svg { width: 20px; height: 20px; color: var(--ink-3); flex: none; }
+.device-list .grow { display: grid; gap: 2px; min-width: 0; }
+.sec-tips { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13.5px; color: var(--ink-2); }
+.sec-tips li { display: flex; gap: 8px; align-items: flex-start; }
+.sec-tips svg { width: 16px; height: 16px; color: var(--green-ink); flex: none; margin-top: 2px; }
+.mfa-setup { display: grid; gap: 12px; }
+.mfa-qr { display: block; margin: 4px auto; width: 190px; height: 190px; padding: 10px; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+.otp-input { font-size: 26px !important; letter-spacing: .45em; text-align: center; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }

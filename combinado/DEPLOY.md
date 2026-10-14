@@ -80,7 +80,9 @@ Nos exemplos abaixo, troque:
    | `ASAAS_API_KEY` | Chave da API do Asaas (etapa 7) |
    | `ASAAS_ENV` | `sandbox` para testar, `production` para cobrar de verdade |
    | `ASAAS_WEBHOOK_TOKEN` | Uma senha que você inventa, usada pelo Asaas ao avisar pagamentos (etapa 7) |
-   | `CRON_SECRET` | **O mesmo segredo** guardado no Vault como `cron_secret` |
+   | `CRON_SECRET` | **O mesmo segredo** guardado no Vault como `cron_secret`. Também protege a entrega das notificações (o banco chama a função `push` com ele) |
+   | `DATA_ENCRYPTION_KEY` | 64 caracteres hexadecimais (gere com `openssl rand -hex 32`). Criptografa no banco os tokens das empresas (WhatsApp, Asaas, Focus NFe) e as chaves das notificações. **Não troque depois de usar**: o que foi gravado com a chave antiga deixa de abrir |
+   | `VAPID_SUBJECT` | Opcional: contato do servidor para os serviços de notificação dos navegadores (`mailto:voce@seudominio.com.br` ou o endereço do site). Padrão: `SITE_URL` |
    | `SITE_URL` | Endereço do site, sem barra no final: `https://seudominio.com.br` (vai nos links de orçamento, convites e retorno do pagamento) |
    | `ALLOWED_ORIGINS` | Endereços que podem chamar as funções, separados por vírgula: `https://seudominio.com.br,https://www.seudominio.com.br` |
    | `TRANSCRIBE_API_KEY` | Opcional, recomendado: chave para transcrever os áudios do WhatsApp (clientes e equipe). Padrão: [Groq](https://console.groq.com/keys) com Whisper, que custa centavos por hora de áudio. Sem ela, a IA pede para a pessoa escrever |
@@ -105,7 +107,7 @@ Nos exemplos abaixo, troque:
 npx supabase functions deploy
 ```
 
-Isso publica as nove funções: `agent`, `whatsapp-webhook`, `whatsapp`, `billing`, `asaas-webhook`, `team`, `cron`, `integrations` (conectar Asaas e Focus NFe da empresa, cobrar e emitir notas) e `cobranca-webhook` (aviso de pagamento das cobranças que as empresas fazem aos clientes delas). Cada uma faz a própria conferência de acesso (as do painel validam o login do usuário; as que recebem chamadas de fora conferem a assinatura da Meta, o token do Asaas ou o segredo do agendador), por isso o `supabase/config.toml` desliga a verificação automática de token do Supabase. Assim elas funcionam com as chaves antigas e com as novas chaves de API do Supabase.
+Isso publica as dez funções: `agent`, `whatsapp-webhook`, `whatsapp`, `billing`, `asaas-webhook`, `team`, `cron`, `integrations` (conectar Asaas e Focus NFe da empresa, cobrar e emitir notas), `cobranca-webhook` (aviso de pagamento das cobranças que as empresas fazem aos clientes delas) e `push` (notificações no celular e no computador; as chaves VAPID são criadas sozinhas na primeira vez e guardadas criptografadas no banco). Cada uma faz a própria conferência de acesso (as do painel validam o login do usuário; as que recebem chamadas de fora conferem a assinatura da Meta, o token do Asaas ou o segredo do agendador), por isso o `supabase/config.toml` desliga a verificação automática de token do Supabase. Assim elas funcionam com as chaves antigas e com as novas chaves de API do Supabase.
 
 Sempre que mudar algo em `supabase/functions/`, rode esse comando de novo. Se mudou algo em `src/shared/`, rode antes `npm run sync:functions`.
 
@@ -130,7 +132,9 @@ Sempre que mudar algo em `supabase/functions/`, rode esse comando de novo. Se mu
 
    Esses modelos usam links que funcionam em qualquer aparelho (a pessoa pode pedir no computador e abrir no celular). O painel também aceita os links dos modelos padrão do Supabase, mas os padrão estão em inglês.
 
-4. **Authentication → Sign In / Providers → Email:** deixe **Confirm email** ligado. Se quiser, aumente o tamanho mínimo da senha para 8 (o painel já exige 8).
+4. **Authentication → Sign In / Providers → Email:** deixe **Confirm email** ligado e aumente o tamanho mínimo da senha para 8 (o painel já exige 8, mas assim o servidor também exige). No plano Pro, ligue também **Leaked password protection** (recusa senhas que já vazaram na internet).
+
+   **Verificação em duas etapas:** o código por aplicativo autenticador (TOTP) já vem ligado em todo projeto Supabase (**Authentication → Multi-Factor**). Cada pessoa ativa a sua em **Configurações → Segurança** no painel. Quem ativou só enxerga os dados depois de digitar o código: a regra fica no banco (função `session_ok`) e nas funções do servidor. Se alguém perder o celular, apague o fator dela em **Authentication → Users → (pessoa) → MFA factors** e peça para ativar de novo.
 
 5. **Entrar com Google e Microsoft** (**Authentication → Sign In / Providers**). A tela de acesso mostra os dois botões; ative cada um no Supabase (enquanto um não estiver ativo, o botão dele avisa que ainda não está disponível). Em todos, a **Callback URL** é a que o Supabase mostra na página do provedor: `https://SEU_REF.supabase.co/auth/v1/callback`.
    - **Google:** no [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crie um *OAuth client ID* do tipo **Web application**, com a Callback URL acima em *Authorized redirect URIs*. Na *OAuth consent screen*, coloque o nome ORBYTA, o logotipo e os links de `/privacidade/` e `/termos/`. Cole *Client ID* e *Client Secret* no Supabase.
@@ -166,6 +170,8 @@ Depois, ligue o seu domínio na hospedagem e confira:
 - `https://seudominio.com.br/` abre o site;
 - `https://seudominio.com.br/app/` abre a tela de entrar;
 - **Criar conta** manda o e-mail de confirmação, e o link leva para a criação da empresa.
+
+**App instalável (PWA).** O painel já é um app: `public/manifest.webmanifest` (nome, ícones, atalhos e imagens da tela de instalação) e `public/sw.js` (service worker com escopo `/app/`). O service worker guarda só os arquivos públicos do painel para abrir rápido e sem internet mostra a última versão; respostas do Supabase e dados de pacientes nunca entram no cache. Na Vercel, o `vercel.json` já manda o `sw.js` sem cache, para cada publicação chegar na hora. Funciona só em HTTPS (ou `localhost`). No iPhone, a instalação é pelo Safari (Compartilhar → Adicionar à Tela de Início) e as notificações funcionam no app instalado (iOS 16.4+).
 
 ---
 
@@ -338,6 +344,9 @@ No Console da Anthropic, defina um **limite de gasto mensal** (**Settings → Li
 - [ ] Textos legais preenchidos e revisados
 - [ ] Limite de gasto definido no Console da Anthropic
 - [ ] `ASAAS_ENV=production` com a chave de produção e o webhook da conta de produção
+- [ ] App instalável: no Chrome do Android aparece **Instalar** e o painel abre em tela cheia pelo ícone
+- [ ] Notificações: **Configurações → App e notificações → Ativar** e **Enviar notificação de teste** chegam no celular e no computador
+- [ ] Verificação em duas etapas: ativar, sair, entrar de novo e o painel pedir o código
 
 ---
 
@@ -352,6 +361,8 @@ No Console da Anthropic, defina um **limite de gasto mensal** (**Settings → Li
 **“O WhatsApp só permite escrever com um modelo aprovado.”** Passaram 24 horas desde a última mensagem do cliente. A automação usa o modelo correspondente, que precisa estar aprovado com o nome exato.
 
 **Os lembretes e o resumo do dia não saem.** Confira `select * from cron.job_run_details order by start_time desc limit 10;` e as respostas em `select * from net._http_response order by created desc limit 10;`. Status 401 significa que o `CRON_SECRET` das funções está diferente do `cron_secret` do Vault.
+
+**As notificações não chegam no celular.** No aparelho: **Configurações → App e notificações** precisa mostrar “Ativadas” (no iPhone, só pelo app instalado, iOS 16.4 ou mais novo). No servidor: `select status_code, content from net._http_response order by created desc limit 5;` mostra as chamadas do banco para a função `push` (401 = `CRON_SECRET` diferente do `cron_secret` do Vault) e os registros ficam em **Edge Functions → push → Logs**. Aparelhos que cancelaram a inscrição saem sozinhos da lista.
 
 **Os e-mails de cadastro não chegam.** Configure o SMTP próprio (etapa 4) e confira a caixa de spam. No serviço de e-mail, valide o domínio (registros SPF e DKIM).
 

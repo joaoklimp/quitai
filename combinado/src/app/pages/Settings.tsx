@@ -1,11 +1,11 @@
-// Configurações: empresa, assistente IA, WhatsApp, equipe, assinatura e conta.
+// Configurações: empresa, assistente IA, WhatsApp, equipe, assinatura, app e notificações, segurança e conta.
 import { SPECIALTIES } from '../../shared/presets';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Bot, MessageCircle, Users, CreditCard, UserCog, Check, Copy, Plus, Trash2, ShieldCheck, Smartphone, Sparkles, Download, KeyRound, ExternalLink,
-  QrCode, Receipt, RefreshCw, Lock, CircleAlert, Link2, Unlink,
+  QrCode, Receipt, RefreshCw, Lock, CircleAlert, Link2, Unlink, BellRing,
 } from 'lucide-react';
 import { api, isDemo } from '../data/api';
 import { SUPABASE_URL } from '../data/supabase/supaSource';
@@ -16,6 +16,7 @@ import { Avatar, Badge, Button, Empty, Field, Input, Loader, Modal, MoneyInput, 
 import { brl, fmtDate, fmtAgo, formatPhone, timeLeftLabel, WEEKDAYS } from '../../shared/format';
 import { TEMPLATE_LIST } from '../../shared/templates';
 import { PLANS, PAID_PLANS, planPrice, monthlyEquivalent, type Cycle, type PaidPlanId } from '../../shared/plans';
+import { AppTab, SecurityTab } from './settings/AppSecurity';
 
 const TABS = [
   { id: 'empresa', label: 'Empresa', icon: Building2 },
@@ -23,6 +24,8 @@ const TABS = [
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { id: 'equipe', label: 'Equipe', icon: Users },
   { id: 'assinatura', label: 'Assinatura', icon: CreditCard },
+  { id: 'app', label: 'App e notificações', icon: BellRing },
+  { id: 'seguranca', label: 'Segurança', icon: ShieldCheck },
   { id: 'conta', label: 'Sua conta', icon: UserCog },
 ];
 export const SEGMENTS: [string, string][] = SPECIALTIES;
@@ -44,6 +47,8 @@ export default function Settings() {
           {current.id === 'whatsapp' && <WhatsAppTab />}
           {current.id === 'equipe' && <TeamTab />}
           {current.id === 'assinatura' && <BillingTab />}
+          {current.id === 'app' && <AppTab />}
+          {current.id === 'seguranca' && <SecurityTab />}
           {current.id === 'conta' && <AccountTab />}
         </div>
       </div>
@@ -557,7 +562,6 @@ function AccountTab() {
   const confirm = useConfirm();
   const [theme, setTheme] = useTheme();
   const [name, setName] = useState(me.name);
-  const [pw, setPw] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [delOpen, setDelOpen] = useState(false);
   const [delText, setDelText] = useState('');
@@ -567,7 +571,6 @@ function AccountTab() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `orbyta-dados-${new Date().toISOString().slice(0, 10)}.json`; a.click();
     toast('Arquivo com seus dados baixado');
   });
-  const notifPerm = useMemo(() => ('Notification' in window ? window.Notification.permission : 'denied'), []);
   return (
     <>
       <section className="card set-section">
@@ -578,15 +581,9 @@ function AccountTab() {
         </div>
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}><Button variant="solid" loading={busy === 'name'} disabled={name.trim() === me.name || name.trim().length < 2} onClick={() => run('name', async () => { await api.updateMember(me.user_id, { name: name.trim() }); refresh(); toast('Nome atualizado'); })}>Salvar nome</Button></div>
       </section>
-      {!isDemo && (
-        <section className="card set-section">
-          <div className="card-head"><div><h3>Senha</h3><div className="sub">Use pelo menos 8 caracteres.</div></div></div>
-          <div className="row wrap" style={{ gap: 10 }}><Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Nova senha" autoComplete="new-password" style={{ maxWidth: 320 }} /><Button loading={busy === 'pw'} disabled={pw.length < 8} onClick={() => run('pw', async () => { await api.updatePassword(pw); setPw(''); toast('Senha alterada'); })}>Alterar senha</Button></div>
-        </section>
-      )}
       <section className="card set-section">
-        <div className="card-head"><div><h3>Avisos no computador</h3><div className="sub">Receba um alerta quando um paciente precisar de você, mesmo com o painel em outra aba.</div></div></div>
-        {notifPerm === 'granted' ? <div className="callout ok"><Check /><span>Avisos ativados neste navegador.</span></div> : <Button onClick={() => window.Notification?.requestPermission().then(() => toast('Pronto!'))}>Ativar avisos</Button>}
+        <div className="card-head"><div><h3>Senha, aparelhos e notificações</h3><div className="sub">Troque a senha, ative a verificação em duas etapas e escolha os avisos que chegam no celular.</div></div></div>
+        <div className="row wrap" style={{ gap: 10 }}><Link className="btn" to="/configuracoes/seguranca"><ShieldCheck />Segurança</Link><Link className="btn" to="/configuracoes/app"><BellRing />App e notificações</Link></div>
       </section>
       <section className="card set-section">
         <div className="card-head"><div><h3>Seus dados</h3><div className="sub">LGPD: você pode baixar ou apagar tudo quando quiser.</div></div></div>

@@ -24,7 +24,7 @@ let db: TestDb;
 let pgrst: ChildProcess;
 let proxy: Server;
 let proxyPort = 0;
-let companyId = '', userId = '';
+let companyId = '', userId = '', attendantId = '';
 
 async function waitFor(url: string, tries = 80) {
   for (let i = 0; i < tries; i++) {
@@ -64,6 +64,8 @@ describe.skipIf(!hasPgrst)('ferramentas da IA contra o banco (PostgREST)', () =>
     companyId = (await db.as({ user: userId }, (q) => q.one<{ id: string }>(`select public.onboard_company('Brilho Lar Higienização', 'odontologia', '61999990000', 'Brasília', true) as id`))).id;
     const hours = JSON.stringify(Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [String(d), [['08:00', '18:00']]])));
     await db.sql(`update companies set business_hours = $1::jsonb, slot_minutes = 60, min_notice_minutes = 0, max_days_ahead = 60 where id = $2`, [hours, companyId]);
+    attendantId = await db.createUser('bia@brilholar.com', 'Bia Rocha');
+    await db.sql(`insert into members (company_id, user_id, role, name, email) values ($1, $2, 'atendente', 'Bia Rocha', 'bia@brilholar.com')`, [companyId, attendantId]);
   }, 240_000);
 
   afterAll(async () => {
@@ -81,7 +83,7 @@ describe.skipIf(!hasPgrst)('ferramentas da IA contra o banco (PostgREST)', () =>
       env: {
         ...process.env, DENO_NO_PACKAGE_JSON: '1',
         SUPABASE_URL: `http://127.0.0.1:${proxyPort}`, SUPABASE_SERVICE_ROLE_KEY: jwt({ role: 'service_role', iss: 'supabase', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 }),
-        ANTHROPIC_API_KEY: 'sk-ant-teste', SITE_URL: 'https://combinado.test', IT_COMPANY_ID: companyId, IT_USER_ID: userId,
+        ANTHROPIC_API_KEY: 'sk-ant-teste', SITE_URL: 'https://combinado.test', IT_COMPANY_ID: companyId, IT_USER_ID: userId, IT_ATTENDANT_ID: attendantId,
       },
     });
     let out = '';

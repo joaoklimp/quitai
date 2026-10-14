@@ -433,4 +433,80 @@ describe('segurança', () => {
     await expect(db.as(user(ana), (q) => q.one(`select public.rate_hit('x', 1, 60)`))).rejects.toThrow(/permission denied/);
     await expect(db.as(user(ana), (q) => q.rows(`select * from rate_limits`))).rejects.toThrow(/permission denied/);
   });
+
+  it('verificação em duas etapas: com o código ativado, a senha sozinha não abre nada', async () => {
+    const peek = (who: { user: string; aal?: 'aal1' | 'aal2' }) => db.as(who, (q) => q.one<{ cid: string | null; contacts: number; members: number; role: string | null; admin: boolean }>(`
+      select public.my_company() as cid, (select count(*)::int from contacts) as contacts, (select count(*)::int from members) as members,
+             public.my_role() as role, public.is_platform_admin() as admin`));
+    // sem 2FA: entra normalmente
+    const before = await peek(user(ana));
+    expect(before).toMatchObject({ cid: cidA, role: 'dono', admin: true });
+    expect(before.contacts).toBeGreaterThan(0);
+    // código cadastrado mas ainda não confirmado: nada muda
+    await db.sql(`insert into auth.mfa_factors (user_id, status) values ($1, 'unverified')`, [ana]);
+    expect((await peek(user(ana))).cid).toBe(cidA);
+    // confirmado: sessão só com a senha (aal1) não vê dados, papel nem área da plataforma
+    await db.sql(`update auth.mfa_factors set status = 'verified' where user_id = $1`, [ana]);
+    expect(await peek(user(ana))).toEqual({ cid: null, contacts: 0, members: 0, role: null, admin: false });
+    await expect(db.as(user(ana), (q) => q.one(`select public.admin_overview()`))).rejects.toThrow('Acesso restrito');
+    await expect(db.as(user(ana), (q) => q.one(`select public.owner_link_code()`))).rejects.toThrow(/Sessão expirada/);
+    await expect(db.as(user(ana), (q) => q.exec(`update companies set name = 'Invadida' where id = $1`, [cidA]))).resolves.toBe(0);
+    // depois do código (aal2): tudo de volta
+    expect(await peek({ user: ana, aal: 'aal2' })).toMatchObject({ cid: cidA, role: 'dono', admin: true, contacts: before.contacts, members: before.members });
+    // quem não ativou continua entrando só com a senha
+    expect((await peek(user(carla))).cid).toBe(cidA);
+    await db.sql(`delete from auth.mfa_factors where user_id = $1`, [ana]);
+    expect((await peek(user(ana))).cid).toBe(cidA);
+  });
+
+  it('sessão encerrada (sair dos outros aparelhos, troca de senha) perde o acesso na hora', async () => {
+    const [s] = await db.sql(`insert into auth.sessions (user_id) values ($1) returning id`, [ana]);
+    const who = { user: ana, session: s.id as string };
+    const n = () => db.as(who, (q) => q.one<{ cid: string | null; contacts: number }>(`select public.my_company() as cid, (select count(*)::int from contacts) as contacts`));
+    expect((await n()).cid).toBe(cidA);
+    await db.sql(`delete from auth.sessions where id = $1`, [s.id]);
+    // o token ainda não venceu, mas a sessão não existe mais
+    expect(await n()).toEqual({ cid: null, contacts: 0 });
+  });
+
+  it('avisos de pagamento, nota fiscal e assinatura ficam com dono e gerente', async () => {
+    await db.as('service', (q) => q.exec(`
+      insert into notifications (company_id, kind, title) values ($1, 'venda', 'Pagamento recebido: R$ 300,00'), ($1, 'financeiro', 'Nota fiscal autorizada'),
+        ($1, 'assinatura', 'Fatura paga'), ($1, 'atendimento', 'Paciente precisa de você')`, [cidA]));
+    const kinds = (who: string) => db.as(user(who), (q) => q.rows<{ kind: string }>(`select distinct kind from notifications where title in ('Pagamento recebido: R$ 300,00', 'Nota fiscal autorizada', 'Fatura paga', 'Paciente precisa de você') order by kind`)).then((r) => r.map((x) => x.kind));
+    expect(await kinds(ana)).toEqual(['assinatura', 'atendimento', 'financeiro', 'venda']);
+    expect(await kinds(carla)).toEqual(['atendimento']);
+    // a atendente também não consegue marcar como lido o que não vê
+    await expect(db.as(user(carla), (q) => q.exec(`update notifications set read_at = now() where kind = 'venda' and company_id = $1`, [cidA]))).resolves.toBe(0);
+  });
+
+  it('notificações no aparelho: tabelas fechadas para o painel, envio sem travar o aviso e limpeza ao sair da equipe', async () => {
+    const sub = (uid: string, cid: string, tag: string) => db.as('service', (q) => q.exec(`insert into push_subscriptions (user_id, company_id, endpoint, p256dh, auth) values ($1, $2, $3, 'p', 'a')`, [uid, cid, `https://fcm.googleapis.com/fcm/send/${tag}`]));
+    await sub(ana, cidA, 'ana-celular');
+    await sub(carla, cidA, 'carla-celular');
+    for (const t of ['push_subscriptions', 'push_prefs', 'app_secrets']) {
+      await expect(db.as(user(ana), (q) => q.rows(`select * from ${t}`))).rejects.toThrow(/permission denied/);
+    }
+    // sem o pg_net (como aqui), o aviso é gravado mesmo assim
+    await db.as('service', (q) => q.exec(`insert into notifications (company_id, kind, title) values ($1, 'sistema', 'Sem pg_net')`, [cidA]));
+    // com o pg_net: um pedido para a função "push" por aviso, só quando há aparelho para receber
+    await db.sql(`create schema if not exists net; create table if not exists net.calls (url text, body jsonb);
+      create or replace function net.http_post(url text, headers jsonb, body jsonb, timeout_milliseconds int) returns bigint
+      language sql as $$ insert into net.calls values (url, body) returning 1::bigint $$;
+      create schema if not exists vault; create table if not exists vault.decrypted_secrets (name text, decrypted_secret text);
+      insert into vault.decrypted_secrets values ('project_url', 'https://projeto.supabase.co'), ('cron_secret', 'segredo');`);
+    const n = await db.as('service', (q) => q.one<{ id: string }>(`insert into notifications (company_id, kind, title) values ($1, 'agendamento', 'Novo horário') returning id`, [cidA]));
+    await db.as('service', (q) => q.exec(`insert into notifications (company_id, kind, title) values ($1, 'agendamento', 'Sem aparelho') returning id`, [cidB]));
+    const calls = await db.sql(`select url, body from net.calls`);
+    expect(calls).toEqual([{ url: 'https://projeto.supabase.co/functions/v1/push', body: { action: 'deliver', id: n.id } }]);
+    // aviso só para uma pessoa sem aparelho: nem chama
+    await db.as('service', (q) => q.exec(`insert into notifications (company_id, user_id, kind, title) values ($1, $2, 'tarefa', 'Só para o Beto')`, [cidA, beto]));
+    expect(await db.sql(`select count(*)::int as n from net.calls`)).toEqual([{ n: 1 }]);
+    // desativada na equipe: os aparelhos param de receber
+    await db.as('service', (q) => q.exec(`update members set active = false where user_id = $1`, [carla]));
+    expect(await db.sql(`select count(*)::int as n from push_subscriptions where user_id = $1`, [carla])).toEqual([{ n: 0 }]);
+    await db.as('service', (q) => q.exec(`update members set active = true where user_id = $1`, [carla]));
+    expect(await db.sql(`select count(*)::int as n from push_subscriptions where user_id = $1`, [ana])).toEqual([{ n: 1 }]);
+    await db.sql(`drop schema net cascade; drop schema vault cascade; delete from push_subscriptions;`);
+  });
 });

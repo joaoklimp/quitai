@@ -3,7 +3,8 @@
 # - agent, whatsapp, billing, team e integrations: validam o login do usuário no Supabase Auth (caller() em _shared/db.ts),
 #   o que funciona tanto com as chaves antigas (anon) quanto com as novas chaves e chaves de assinatura do projeto;
 # - whatsapp-webhook, asaas-webhook, cobranca-webhook e cron: conferem a assinatura da Meta, o token do Asaas
-#   (da plataforma ou da empresa) e o x-cron-secret.
+#   (da plataforma ou da empresa) e o x-cron-secret;
+# - push: login do usuário (ativar o aparelho, preferências, teste) ou x-cron-secret (entrega pedida pelo banco).
 project_id = "orbyta"
 
 [functions.agent]
@@ -31,4 +32,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.cron]
+verify_jwt = false
+
+[functions.push]
 verify_jwt = false

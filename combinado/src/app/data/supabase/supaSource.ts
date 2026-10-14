@@ -1,6 +1,6 @@
 // Fonte de dados real: Supabase (Postgres com RLS por empresa + Edge Functions para IA, WhatsApp e cobrança).
 import { createClient, type EmailOtpType, type SupabaseClient } from '@supabase/supabase-js';
-import type { AdminAction, AdminHistoryRow, AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, OnboardInput, SignUpInput } from '../source';
+import type { AdminAction, AdminHistoryRow, AdminOverview, AuthProvider, CheckoutInput, DataSource, IntegrationAction, MfaEnrollment, MfaFactor, OnboardInput, PushAction, SignUpInput } from '../source';
 import type { AgentReply, AiSettings, Company, ValueReport, DailyStat, Filter, ImportResult, Me, Member, Query, Quote, QuoteItem, RowMap, TableName, UsageMonth, WhatsAppAccount, Role, TemplateStatus } from '../types';
 import type { ProductRow } from '../sheet';
 
@@ -20,6 +20,13 @@ const FRIENDLY: Record<string, string> = {
   'For security purposes, you can only request this': 'Por segurança, aguarde um minuto antes de pedir outro link.',
   'Email rate limit exceeded': 'Muitos e-mails enviados em pouco tempo. Tente de novo em alguns minutos.',
   'provider is not enabled': 'Esse jeito de entrar ainda não foi ativado. Use o e-mail por enquanto.',
+  'Invalid TOTP code': 'Código incorreto ou vencido. Confira se o horário do celular está certo e tente de novo.',
+  'AAL2 required': 'Digite o código da verificação em duas etapas antes de continuar.',
+  'Maximum number of verified factors': 'Você já cadastrou o número máximo de aplicativos autenticadores.',
+  'MFA enroll is disabled': 'A verificação em duas etapas está indisponível no momento.',
+  'MFA verification is disabled': 'A verificação em duas etapas está indisponível no momento.',
+  'Too many requests': 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.',
+  'New password should be different': 'A nova senha precisa ser diferente da atual.',
 };
 function friendly(e: unknown): AppError {
   const msg = (e as { message?: string })?.message ?? String(e);
@@ -127,8 +134,17 @@ export class SupabaseSource implements DataSource {
     const { data: s } = await this.sb.auth.getSession();
     const user = s.session?.user;
     if (!user) return null;
+    const pending = (): Me => ({ user_id: user.id, email: user.email ?? '', name: (user.user_metadata?.name as string) ?? '', role: 'dono', company: null as unknown as Company, isPlatformAdmin: false, mfaPending: true });
+    // verificação em duas etapas ativada e o código ainda não foi digitado nesta sessão: nada da clínica carrega antes
+    const { data: aal } = await this.sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') return pending();
     const { data: m, error } = await this.sb.from('members').select('*').eq('user_id', user.id).eq('active', true).maybeSingle();
     if (error) throw friendly(error);
+    if (!m && aal?.currentLevel !== 'aal2') {
+      // o código pode ter sido ativado em outro aparelho depois deste login: confere com o servidor
+      const { data: fresh } = await this.sb.auth.getUser();
+      if (fresh.user?.factors?.some((f) => f.status === 'verified')) return pending();
+    }
     const { data: adm } = await this.sb.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle();
     if (!m) {
       // Google e Microsoft mandam o nome como full_name; o cadastro da empresa usa "name"
@@ -163,6 +179,52 @@ export class SupabaseSource implements DataSource {
     if (error) throw friendly(error);
   }
   async signOut() { await this.sb.auth.signOut(); this.companyId = null; }
+  async signOutOthers() {
+    const { error } = await this.sb.auth.signOut({ scope: 'others' });
+    if (error) throw friendly(error);
+  }
+
+  /* ---------- verificação em duas etapas ---------- */
+  async mfaFactors(): Promise<MfaFactor[]> {
+    const { data, error } = await this.sb.auth.mfa.listFactors();
+    if (error) throw friendly(error);
+    return (data?.all ?? []).filter((f) => f.factor_type === 'totp')
+      .map((f) => ({ id: f.id, name: f.friendly_name || 'Aplicativo autenticador', verified: f.status === 'verified', created_at: f.created_at }));
+  }
+  async mfaEnroll(): Promise<MfaEnrollment> {
+    // um cadastro que ficou pela metade atrapalha o próximo: some antes
+    const { data: list } = await this.sb.auth.mfa.listFactors();
+    for (const f of list?.all ?? []) if (f.status !== 'verified') await this.sb.auth.mfa.unenroll({ factorId: f.id });
+    const stamp = new Date().toLocaleDateString('pt-BR');
+    const { data, error } = await this.sb.auth.mfa.enroll({ factorType: 'totp', issuer: 'ORBYTA', friendlyName: `Celular de ${stamp} (${Math.random().toString(36).slice(2, 6)})` });
+    if (error) throw friendly(error);
+    const qr = data.totp.qr_code.startsWith('data:') ? data.totp.qr_code : `data:image/svg+xml;utf-8,${encodeURIComponent(data.totp.qr_code)}`;
+    return { factorId: data.id, qr, secret: data.totp.secret };
+  }
+  async mfaConfirm(factorId: string, code: string) {
+    const { error } = await this.sb.auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\D/g, '') });
+    if (error) throw friendly(error);
+  }
+  async mfaVerify(code: string) {
+    const { data, error } = await this.sb.auth.mfa.listFactors();
+    if (error) throw friendly(error);
+    const factors = data?.totp ?? [];
+    if (!factors.length) throw new AppError('Nenhum aplicativo autenticador cadastrado nesta conta.');
+    // com dois celulares cadastrados, o código pode ser de qualquer um deles
+    let last: unknown = null;
+    for (const f of factors) {
+      const r = await this.sb.auth.mfa.challengeAndVerify({ factorId: f.id, code: code.replace(/\D/g, '') });
+      if (!r.error) return;
+      last = r.error;
+    }
+    throw friendly(last);
+  }
+  async mfaRemove(factorId: string) {
+    const { error } = await this.sb.auth.mfa.unenroll({ factorId });
+    if (error) throw friendly(error);
+    await this.sb.auth.refreshSession();
+  }
+  push<T = Record<string, unknown>>(action: PushAction, payload: Record<string, unknown> = {}) { return this.fn<T>('push', { action, ...payload }); }
   async requestPasswordReset(email: string, captchaToken?: string) {
     const { error } = await this.sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${location.origin}/app/#/nova-senha`, captchaToken });
     if (error) throw friendly(error);
@@ -170,6 +232,8 @@ export class SupabaseSource implements DataSource {
   async updatePassword(password: string) {
     const { error } = await this.sb.auth.updateUser({ password });
     if (error) throw friendly(error);
+    // senha nova: quem estava conectado com a antiga em outro aparelho sai
+    await this.sb.auth.signOut({ scope: 'others' }).catch(() => {});
   }
   async onboard(input: OnboardInput) {
     const { data: id, error } = await this.sb.rpc('onboard_company', { p_name: input.company, p_segment: input.segment, p_phone: input.phone, p_city: input.city ?? null, p_preset: input.preset ?? true });
@@ -396,7 +460,21 @@ export class SupabaseSource implements DataSource {
     for (const t of ['messages', 'conversations', 'notifications', 'appointments', 'quotes', 'pending_actions', 'contacts', 'sales', 'tasks', 'finance_entries', 'products', 'stock_movements', 'charges', 'fiscal_notes', 'waitlist', 'professionals'] as TableName[]) {
       ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t, filter: `company_id=eq.${cid}` } as never, () => cb(t));
     }
-    ch.subscribe();
-    return () => { void this.sb.removeChannel(ch); };
+    // sem tempo real (internet oscilou, aparelho dormiu ou o plano chegou no limite de conexões):
+    // atualiza o que mais muda a cada 30 segundos e, quando a conexão volta, busca o que passou enquanto estava fora
+    const busy: TableName[] = ['conversations', 'messages', 'notifications', 'appointments', 'quotes', 'tasks', 'pending_actions'];
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let wasDown = false;
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        if (timer) { clearInterval(timer); timer = null; }
+        if (wasDown) busy.forEach(cb);
+        wasDown = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        wasDown = true;
+        timer ??= setInterval(() => { if (!document.hidden) busy.forEach(cb); }, 30_000);
+      }
+    });
+    return () => { if (timer) clearInterval(timer); timer = null; void this.sb.removeChannel(ch); };
   }
 }
