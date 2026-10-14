@@ -15,6 +15,7 @@ export const SITE_HEADER = `<header class="site-head inner-head">
       <a href="/sobre/">Sobre</a>
     </nav>
     <div class="head-cta">
+      <a class="btn ghost head-app" href="/#baixar"><i data-icon="download"></i>Baixar o app</a>
       <a class="btn ghost head-login" href="/app/?real#/entrar">Entrar</a>
       <a class="btn solid head-try" href="/app/?real#/cadastro">Teste grátis<i data-icon="arrow-up-right"></i></a>
     </div>
@@ -30,7 +31,7 @@ export const SITE_FOOTER = `<footer class="site-foot">
     </div>
     <nav class="foot-col" aria-label="Produto"><b>Produto</b><a href="/#como-funciona">Como funciona</a><a href="/#recursos">Recursos</a><a href="/#modulos">ORBYTA ONE</a><a href="/#precos">Preços</a><a href="/app/?demo">Demonstração</a></nav>
     <nav class="foot-col" aria-label="Empresa"><b>Empresa</b><a href="/sobre/">Sobre a ORBYTA</a><a href="/seguranca/">Segurança</a><a href="/sobre/#contato">Contato</a><a href="/sobre/#contato">Parcerias</a></nav>
-    <nav class="foot-col" aria-label="Conta"><b>Conta</b><a href="/app/?real#/entrar">Entrar</a><a href="/app/?real#/cadastro">Criar conta grátis</a><a href="/app/?real#/recuperar">Recuperar senha</a></nav>
+    <nav class="foot-col" aria-label="Conta"><b>Conta</b><a href="/app/?real#/entrar">Entrar</a><a href="/app/?real#/cadastro">Criar conta grátis</a><a href="/#baixar">Baixar o app</a><a href="/app/?real#/recuperar">Recuperar senha</a></nav>
     <nav class="foot-col" aria-label="Legal"><b>Legal</b><a href="/termos/">Termos de uso</a><a href="/privacidade/">Privacidade</a><a href="/privacidade/#p9">Seus direitos (LGPD)</a><a href="/seguranca/#subprocessadores">Subprocessadores</a></nav>
   </div>
   <div class="wrap foot-bottom">

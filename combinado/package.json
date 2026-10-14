@@ -26,7 +26,8 @@
     "lucide-react": "^1.49.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "uqr": "0.1.2"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

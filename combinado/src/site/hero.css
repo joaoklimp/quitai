@@ -123,8 +123,8 @@
 .site-head.on-dark .head-nav { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .1); box-shadow: none; }
 .site-head.on-dark .head-nav a { color: #C9D3EA; }
 .site-head.on-dark .head-nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
-.site-head.on-dark .head-login { color: #fff; }
-.site-head.on-dark .head-login:hover { background: rgba(255, 255, 255, .08); }
+.site-head.on-dark .head-login, .site-head.on-dark .head-app { color: #fff; }
+.site-head.on-dark .head-login:hover, .site-head.on-dark .head-app:hover { background: rgba(255, 255, 255, .08); }
 .site-head.on-dark .head-try { background: #fff; color: #0B0D12; border-color: #fff; }
 .site-head.on-dark .head-menu { color: #fff; background: rgba(255, 255, 255, .08); }
 .site-head.on-dark.scrolled { background: rgba(4, 6, 13, .55); box-shadow: 0 1px 0 rgba(255, 255, 255, .06); }

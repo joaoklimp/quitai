@@ -688,3 +688,31 @@ details.adv[open] > summary::before { transform: rotate(90deg); }
 .mfa-setup { display: grid; gap: 12px; }
 .mfa-qr { display: block; margin: 4px auto; width: 190px; height: 190px; padding: 10px; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
 .otp-input { font-size: 26px !important; letter-spacing: .45em; text-align: center; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+
+/* ---------- baixar o app ---------- */
+.install-pick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.install-opt { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 6px 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 650; line-height: 1.2; text-align: center; min-width: 0; transition: border-color .15s, box-shadow .15s, color .15s; }
+.install-opt:hover { border-color: var(--line-strong, var(--ink-4)); color: var(--ink); }
+.install-opt.on { border-color: var(--blue); color: var(--ink); box-shadow: 0 0 0 3px var(--blue-soft); }
+.install-opt-ic { width: 26px; height: 26px; color: var(--ink-2); }
+.install-opt.on .install-opt-ic { color: var(--blue-ink); }
+.install-opt em { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .02em; padding: 2px 7px; border-radius: 999px; background: var(--blue); color: #fff; }
+.install-block { display: grid; gap: 10px; }
+.install-block + .install-block { padding-top: 14px; border-top: 1px solid var(--line); }
+.install-block h4 { margin: 0; font-size: 14px; font-weight: 750; color: var(--ink); }
+.install-qr { display: flex; align-items: center; gap: 16px; padding: 14px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
+.install-qr img { flex: none; width: 132px; height: 132px; border-radius: 10px; background: #fff; }
+.install-qr p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.install-qr .spin { margin: 54px; }
+.install-ff { margin: 0; }
+@media (max-width: 420px) { .install-opt { font-size: 12px; padding: 12px 4px 10px; } .install-qr { flex-direction: column; text-align: center; } }
+.install-guide { display: grid; gap: 14px; text-align: left; }
+.install-now { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.install-more summary { cursor: pointer; font-size: 13.5px; font-weight: 650; color: var(--ink-2); margin-bottom: 12px; }
+.install-url { margin-top: 8px; }
+.install-note { margin: 0; font-size: 14px; line-height: 1.5; }
+.install-steps li > div { min-width: 0; }
+.install-perks { list-style: none; margin: 4px 0 18px; padding: 0; display: grid; gap: 9px; font-size: 14px; color: var(--ink-2); text-align: left; }
+.install-perks li { display: flex; gap: 10px; align-items: center; }
+.install-perks svg { width: 17px; height: 17px; color: var(--blue-ink); flex: none; }
+.install-card .auth-foot .btn svg { width: 16px; height: 16px; }

@@ -17,6 +17,24 @@ export function isIOS(): boolean {
 }
 export const isAndroid = () => typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
+export type BrowserKind = 'chrome' | 'edge' | 'opera' | 'samsung' | 'firefox' | 'safari' | 'other';
+export type OsKind = 'android' | 'ios' | 'mac' | 'windows' | 'linux' | 'other';
+/** Navegador e sistema, para mostrar o passo a passo certo de instalação. */
+export function browserInfo(): { browser: BrowserKind; os: OsKind } {
+  if (typeof navigator === 'undefined') return { browser: 'other', os: 'other' };
+  const ua = navigator.userAgent;
+  const os: OsKind = isIOS() ? 'ios' : /Android/i.test(ua) ? 'android' : /Windows/i.test(ua) ? 'windows' : /Mac OS X|Macintosh/i.test(ua) ? 'mac' : /Linux|CrOS/i.test(ua) ? 'linux' : 'other';
+  const browser: BrowserKind = /Edg(A|iOS)?\//.test(ua) ? 'edge' : /OPR\/|Opera/.test(ua) ? 'opera' : /SamsungBrowser/.test(ua) ? 'samsung'
+    : /Firefox\/|FxiOS/.test(ua) ? 'firefox' : /Chrome\/|CriOS/.test(ua) ? 'chrome' : /Safari\//.test(ua) ? 'safari' : 'other';
+  return { browser, os };
+}
+/** O navegador deste computador instala apps? (Chrome, Edge e Opera instalam; Safari no Mac adiciona ao Dock; Firefox não.) */
+export function desktopCanInstall(): boolean {
+  const { browser, os } = browserInfo();
+  if (os === 'android' || os === 'ios') return false;
+  return browser === 'chrome' || browser === 'edge' || browser === 'opera' || (browser === 'safari' && os === 'mac');
+}
+
 /** Nome amigável do aparelho para a lista de aparelhos (ex.: "iPhone · Safari"). */
 export function deviceLabel(): string {
   const ua = navigator.userAgent;

@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Check, Download, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { api, enterDemo, isDemo } from '../../data/api';
 import type { AuthProvider } from '../../data/source';
 import { Button, Field, Input, cx } from '../../ui';
@@ -191,6 +191,7 @@ export default function Auth() {
         {mode === 'cadastro' && ENABLED_PROVIDERS.length > 0 && <p className="auth-fine">Ao criar a conta com {ENABLED_PROVIDERS.map((p) => PROVIDER_LABEL[p]).join(', ').replace(/, ([^,]*)$/, ' ou $1')}, você também precisa aceitar os termos acima.</p>}
         <div className="auth-foot">
           <button type="button" className="auth-demo-btn" onClick={enterDemo}><Sparkles />{isDemo ? 'Entrar direto na empresa de exemplo' : 'Ver a demonstração sem cadastro'}</button>
+          <button type="button" className="auth-demo-btn" onClick={() => nav('/instalar')}><Download />Baixar o app (computador e celular)</button>
           <span className="auth-secure"><Lock />Conexão criptografada · Dados protegidos pela LGPD</span>
         </div>
       </div>

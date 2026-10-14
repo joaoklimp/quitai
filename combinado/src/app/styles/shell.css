@@ -31,6 +31,9 @@
 .search-btn:hover { color: var(--ink-2); }
 .search-btn svg { width: 17px; height: 17px; }
 .search-btn .kbd { margin-left: auto; }
+.install-btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px 0 14px; border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-pill); color: var(--ink); font-weight: 650; font-size: 14px; flex: none; }
+.install-btn svg { width: 17px; height: 17px; color: var(--blue-ink); }
+.install-btn:hover { color: var(--ink); }
 .ai-btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 6px; border-radius: var(--r-pill); background: var(--solid); color: var(--on-solid); font-weight: 650; font-size: 14px; box-shadow: var(--shadow-solid); }
 .ai-btn .sparkle-ai { width: 32px; height: 32px; border-radius: 50%; }
 .ai-btn:hover { background: var(--solid-hover); }
@@ -93,6 +96,8 @@
 @media (max-width: 1560px) {
   .search-btn { min-width: 0; width: 44px; padding: 0; justify-content: center; }
   .search-btn span, .search-btn .kbd { display: none; }
+  .install-btn { width: 44px; padding: 0; justify-content: center; }
+  .install-btn span { display: none; }
   .ai-btn .label { display: none; }
   .ai-btn { padding: 0 6px; }
 }

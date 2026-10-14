@@ -44,8 +44,11 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .head-nav a { padding: 9px 16px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; color: var(--ink-2); transition: background .15s, color .15s; }
 .head-nav a:hover { background: var(--glass-nav-hover); color: var(--ink); }
 .head-cta { display: flex; align-items: center; gap: 8px; flex: none; }
-.head-login { color: var(--ink); }
-.head-login:hover { background: var(--glass-nav-hover); }
+.head-login, .head-app { color: var(--ink); }
+.head-login:hover, .head-app:hover { background: var(--glass-nav-hover); }
+.head-app { gap: 7px; }
+.head-app svg { width: 16px; height: 16px; }
+.mobile-cta .btn svg { width: 17px; height: 17px; }
 .head-try svg { width: 16px; height: 16px; }
 .head-menu { display: none; }
 .mobile-menu { position: fixed; top: 70px; left: 12px; right: 12px; z-index: 49; padding: 10px; border-radius: 26px; background: var(--surface); box-shadow: var(--shadow-3); border: 1px solid var(--line); animation: pop .18s ease; }
@@ -163,6 +166,9 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .fc-tag svg { width: 12px; height: 12px; }
 .fc-msg { left: -58px; top: 67%; width: 300px; align-items: flex-start; animation-delay: -2s; }
 .fc-ok { right: -36px; top: 7.5%; }
+/* em notebooks (até ~1400px) os cartões flutuantes ficam dentro da tela, sem a página arrastar para o lado */
+@media (max-width: 1400px) { .fc-ok { right: 14px; } .fc-msg { left: 14px; } }
+.pv-sec { overflow-x: clip; }
 .fc-cal { right: 21%; top: 81%; animation-delay: -4.5s; }
 
 /* versão compacta (telas estreitas): só indicadores e gráfico, em tamanho maior */
@@ -431,6 +437,20 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
 .faq details p { padding: 0 24px 22px; color: var(--ink-2); font-size: 15px; line-height: 1.7; }
 
 /* ---------- chamada final ---------- */
+/* baixar o app: Windows, Mac, Android e iPhone */
+.get-app { padding: 10px 0 clamp(40px, 6vw, 70px); }
+.get-app-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 56px); align-items: center; padding: clamp(28px, 4vw, 48px); border-radius: 36px; background: var(--glass-nav); border: 1px solid var(--glass-line); box-shadow: 0 24px 60px rgba(30, 60, 120, 0.12); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.get-app-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--ink-2); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass-nav-hover); }
+.get-app-eyebrow svg { width: 15px; height: 15px; }
+.get-app-text h2 { margin-top: 14px; font-size: clamp(30px, 3.6vw, 46px); font-weight: 600; letter-spacing: -0.04em; line-height: 1.05; text-wrap: balance; }
+.get-app-text p { margin-top: 14px; font-size: clamp(15px, 1.3vw, 17px); color: var(--ink-2); max-width: 460px; }
+.get-app-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.get-app-btn { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 20px; background: var(--solid); color: var(--on-solid); font-weight: 700; font-size: 17px; line-height: 1.15; transition: transform .15s, box-shadow .15s; box-shadow: 0 10px 24px rgba(11, 13, 18, .18); }
+.get-app-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(11, 13, 18, .24); }
+.get-app-btn small { display: block; font-size: 12px; font-weight: 600; opacity: .72; margin-bottom: 2px; }
+.get-app-btn .ga-ic { width: 30px; height: 30px; flex: none; }
+@media (max-width: 900px) { .get-app-card { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .get-app-btn { padding: 14px; gap: 10px; font-size: 15px; } .get-app-btn .ga-ic { width: 24px; height: 24px; } }
 .final { padding: 10px 0 clamp(70px, 9vw, 110px); }
 .final-card { position: relative; isolation: isolate; overflow: hidden; border-radius: 44px; padding: clamp(64px, 8vw, 104px) 24px; text-align: center; display: flex; flex-direction: column; align-items: center; box-shadow: 0 30px 80px rgba(30, 60, 120, 0.16); border: 1px solid var(--glass-line); }
 .final-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(60% 70% at 50% 100%, rgba(var(--orbit-rgb), .28), transparent 70%); }
@@ -478,7 +498,7 @@ body.site { font-size: 16px; background: var(--bg); background-image: none; over
   .bento > .bento-card:first-child { grid-column: span 12; }
 }
 @media (max-width: 960px) {
-  .head-nav, .head-login { display: none; }
+  .head-nav, .head-login, .head-app { display: none; }
   .head-row { justify-content: space-between; }
   .head-menu { display: inline-grid; }
   .show-grid, .show-grid.flip, .faq-grid { grid-template-columns: minmax(0, 1fr); }

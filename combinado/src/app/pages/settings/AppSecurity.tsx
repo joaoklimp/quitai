@@ -2,13 +2,14 @@
 // e "Segurança" (senha, verificação em duas etapas e aparelhos conectados).
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRing, BellOff, Check, Copy, Download, KeyRound, LogOut, MonitorSmartphone, Plus, Send, Share, ShieldCheck, Smartphone, SquarePlus, Trash2, Lock } from 'lucide-react';
+import { BellRing, BellOff, Check, Copy, KeyRound, LogOut, MonitorSmartphone, Plus, Send, ShieldCheck, Smartphone, Trash2, Lock } from 'lucide-react';
 import { api, isDemo } from '../../data/api';
 import type { MfaEnrollment, PushPrefs } from '../../data/source';
 import { useMeCtx, can, hasModule } from '../../context';
 import { Badge, Button, Field, Input, Loader, Modal, Switch, useConfirm, useToast } from '../../ui';
 import { fmtDate } from '../../../shared/format';
-import { currentEndpoint, disablePush, enablePush, pushState, useInstall, type PushState } from '../../pwa';
+import { currentEndpoint, disablePush, enablePush, pushState, type PushState } from '../../pwa';
+import { InstallGuide } from '../install/InstallGuide';
 
 type Kind = 'atendimento' | 'agendamento' | 'orcamento' | 'tarefa' | 'venda' | 'financeiro' | 'assinatura' | 'estoque' | 'sistema';
 const KINDS: { kind: Kind; title: string; text: string; managers?: boolean; module?: 'estoque' }[] = [
@@ -27,7 +28,6 @@ const KINDS: { kind: Kind; title: string; text: string; managers?: boolean; modu
 export function AppTab() {
   const { me } = useMeCtx();
   const toast = useToast();
-  const inst = useInstall();
   const qc = useQueryClient();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -57,29 +57,7 @@ export function AppTab() {
     <>
       <section className="card set-section">
         <div className="card-head"><div><h3>App da ORBYTA</h3><div className="sub">Instale no celular e no computador: abre com um toque, em tela cheia, sem procurar o site.</div></div></div>
-        {inst.installed ? (
-          <div className="callout ok"><Check /><span>Você está usando o app instalado neste aparelho.</span></div>
-        ) : inst.canPrompt ? (
-          <div className="row wrap" style={{ gap: 12 }}>
-            <Button variant="solid" icon={<Download />} onClick={async () => { if (await inst.prompt()) toast('Pronto! A ORBYTA está instalada.'); }}>Instalar a ORBYTA</Button>
-            <span className="muted small">Grátis, não ocupa quase nada e atualiza sozinho.</span>
-          </div>
-        ) : inst.ios ? (
-          <ol className="install-steps">
-            <li><span className="n">1</span><span>Abra este painel no <b>Safari</b> (no iPhone, a instalação é por ele).</span></li>
-            <li><span className="n">2</span><span>Toque em <b>Compartilhar</b> <Share className="inline-ic" aria-label="ícone de compartilhar" /> na barra de baixo.</span></li>
-            <li><span className="n">3</span><span>Escolha <b>Adicionar à Tela de Início</b> <SquarePlus className="inline-ic" aria-hidden /> e toque em <b>Adicionar</b>.</span></li>
-            <li><span className="n">4</span><span>Abra a ORBYTA pelo ícone novo e volte aqui para ligar as notificações.</span></li>
-          </ol>
-        ) : inst.android ? (
-          <ol className="install-steps">
-            <li><span className="n">1</span><span>No <b>Chrome</b>, toque no menu <b>⋮</b> (canto de cima).</span></li>
-            <li><span className="n">2</span><span>Escolha <b>Instalar app</b> (ou <b>Adicionar à tela inicial</b>).</span></li>
-            <li><span className="n">3</span><span>Abra a ORBYTA pelo ícone novo.</span></li>
-          </ol>
-        ) : (
-          <p className="muted small" style={{ margin: 0 }}>No <b>Chrome</b> ou no <b>Edge</b>, clique no ícone de instalar à direita da barra de endereço (ou no menu ⋮ → <b>Instalar ORBYTA</b>). No Firefox e no Safari do computador, as notificações funcionam mesmo sem instalar.</p>
-        )}
+        <InstallGuide />
       </section>
 
       <section className="card set-section">

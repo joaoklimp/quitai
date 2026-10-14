@@ -15,6 +15,7 @@ import { useList, useInvalidate } from '../data/hooks';
 import { api, isDemo, leaveDemo, canUseRealAccount } from '../data/api';
 import { CommandPalette } from './CommandPalette';
 import { disablePush, enablePush, localNotify, pushState, setBadge, useInstall } from '../pwa';
+import { InstallModal } from '../pages/install/InstallGuide';
 import type { ModuleKey, Notification, Role } from '../data/types';
 
 type NavItem = { to: string; label: string; icon: typeof Bell; end?: boolean; roles?: Role[]; module?: ModuleKey };
@@ -101,6 +102,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </ScrollPills>
           <div className="topbar-tools">
             <button className="search-btn" onClick={() => setCmdOpen(true)} aria-label="Buscar"><Search /><span>Buscar...</span><span className="kbd">Ctrl K</span></button>
+            <InstallTopButton />
             <Notifications />
             <button className="ai-btn only-desktop" onClick={() => assistant.setOpen(true)} title="Assistente (Ctrl+J)"><span className="sparkle-ai"><Sparkles /></span><span className="label">Assistente</span></button>
             <UserMenu />
@@ -205,7 +207,7 @@ function UserMenu() {
           <button onClick={() => { close(); nav('/configuracoes'); }}><Settings />Configurações</button>
           <button onClick={() => { close(); nav('/configuracoes/assinatura'); }}><CreditCard />Assinatura e faturas</button>
           <button onClick={() => { close(); nav('/ajuda'); }}><HelpCircle />Ajuda</button>
-          {!inst.installed && <button onClick={async () => { close(); if (!(inst.canPrompt && await inst.prompt())) nav('/configuracoes/app'); }}><Download />Instalar o app</button>}
+          {!inst.installed && <button onClick={async () => { close(); if (!(inst.canPrompt && await inst.prompt())) nav('/configuracoes/app'); }}><Download />Baixar o app</button>}
           <div className="sep" />
           <div className="menu-title">Tema</div>
           {([['auto', 'Automático', Monitor], ['light', 'Claro', Sun], ['dark', 'Escuro', Moon]] as const).map(([v, l, I]) => (
@@ -282,6 +284,22 @@ function Notifications() {
         </div>
       )}
     </Menu>
+  );
+}
+
+/** "Instalar app" no topo enquanto o painel não está instalado neste aparelho. */
+function InstallTopButton() {
+  const inst = useInstall();
+  const [open, setOpen] = useState(false);
+  if (inst.installed) return null;
+  return (
+    <>
+      <button className="install-btn" title="Baixar o app da ORBYTA neste aparelho" aria-label="Baixar o app"
+        onClick={async () => { if (!(inst.canPrompt && await inst.prompt())) setOpen(true); }}>
+        <Download /><span>Baixar app</span>
+      </button>
+      <InstallModal open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }
 

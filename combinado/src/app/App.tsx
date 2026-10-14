@@ -36,6 +36,7 @@ const Auth = lazy(() => import('./pages/auth/Auth'));
 const Onboarding = lazy(() => import('./pages/auth/Onboarding'));
 const NewPassword = lazy(() => import('./pages/auth/NewPassword'));
 const MfaChallenge = lazy(() => import('./pages/auth/Mfa'));
+const InstallPage = lazy(() => import('./pages/install/InstallPage'));
 
 applyTheme(readTheme());
 
@@ -87,6 +88,8 @@ export function App() {
   // verificação em duas etapas: o código vem antes de tudo (inclusive de criar a nova senha)
   if (me?.mfaPending) return <Page><MfaChallenge /></Page>;
   if (loc.pathname === '/nova-senha') return <Page><NewPassword /></Page>;
+  // "Baixar o app" do site e da tela de entrar: abre com ou sem login
+  if (loc.pathname === '/instalar' || loc.pathname.startsWith('/instalar/')) return <Page><InstallPage loggedIn={!!me?.company} platform={loc.pathname.split('/')[2]} /></Page>;
   if (!me) return <Page><Auth /></Page>;
   if (!me.company) return <Page><Onboarding /></Page>;
 
